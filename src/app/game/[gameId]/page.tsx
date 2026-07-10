@@ -13,6 +13,8 @@ import { PublicZoneStack } from '@/components/game/PublicZoneStack';
 import { CommandZone } from '@/components/game/CommandZone';
 import { GameLog } from '@/components/game/GameLog';
 import { GameLobbyWait } from '@/components/game/GameLobbyWait';
+import { ScryModal } from '@/components/game/ScryModal';
+import { LookCountPrompt } from '@/components/game/LookCountPrompt';
 import { CardContextMenu, type ContextMenuOption } from '@/components/game/CardContextMenu';
 
 export default function GameTablePage() {
@@ -21,6 +23,7 @@ export default function GameTablePage() {
   const { state, gameInfo, log, joinError, actionError, sendAction, onlineUserIds, refreshState } = useGameState(params.gameId);
   const [menu, setMenu] = useState<{ x: number; y: number; options: ContextMenuOption[] } | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [lookPrompt, setLookPrompt] = useState<'scry' | 'surveil' | null>(null);
 
   const isMyTurn = state?.status === 'ACTIVE' && state.currentTurnSeat === state.viewerSeat;
 
@@ -92,8 +95,9 @@ export default function GameTablePage() {
 
       <div className="flex items-center justify-between border-b border-white/10 bg-panel px-4 py-1.5 text-xs text-slate-400">
         <span>
-          Click a card to play/draw it · right-click a card for more options (discard, exile, return to hand) ·
-          keyboard: <kbd className="rounded bg-panelLight px-1">D</kbd> draw, <kbd className="rounded bg-panelLight px-1">Space</kbd> pass turn
+          Click a card to play/draw it · right-click a card for more options (discard, exile, top/bottom of library) ·
+          Scry/Surveil buttons are next to your library · keyboard: <kbd className="rounded bg-panelLight px-1">D</kbd> draw,{' '}
+          <kbd className="rounded bg-panelLight px-1">Space</kbd> pass turn
         </span>
         <button onClick={() => setShowHelp((v) => !v)} className="rounded bg-panelLight px-2 py-0.5 hover:bg-white/10">
           {showHelp ? 'Hide help' : '? Help'}
@@ -113,17 +117,20 @@ export default function GameTablePage() {
             <strong>Tap/untap:</strong> click a permanent on your battlefield.
           </p>
           <p className="mb-1">
-            <strong>Discard, exile, sacrifice, bounce:</strong> right-click a card (in hand or on the battlefield) for a
-            move-to-zone menu.
+            <strong>Discard, exile, sacrifice, bounce, top/bottom of library:</strong> right-click a card (in hand or
+            on the battlefield) for a move-to-zone menu.
+          </p>
+          <p className="mb-1">
+            <strong>Scry / Surveil:</strong> click the Scry or Surveil button next to your library, pick how many
+            cards, then choose top/bottom (scry) or top/graveyard (surveil) for each card revealed.
           </p>
           <p className="mb-1">
             <strong>Life:</strong> the −/+ buttons next to any player&apos;s name adjust their life (you can adjust
             opponents&apos; life too — e.g. to deal combat damage — same as you would with paper life pads).
           </p>
           <p>
-            <strong>Not yet built:</strong> scry/surveil and other library-peek effects, counters beyond the basics,
-            and combat damage math — those are on the roadmap; for now, resolve them by hand using life adjustments
-            and the move-to-zone menu.
+            <strong>Not yet built:</strong> counters beyond the basics and combat damage math — for now, resolve
+            those by hand using life adjustments and the move-to-zone menu.
           </p>
         </div>
       )}
@@ -177,7 +184,35 @@ export default function GameTablePage() {
                 onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: me.seat, delta })}
               />
               <div className="mt-2 flex items-center gap-2">
-                <LibraryStack count={me.libraryCount} onDraw={() => sendAction({ type: 'DRAW_CARD' })} />
+                <div className="relative">
+                  <LibraryStack count={me.libraryCount} onDraw={() => sendAction({ type: 'DRAW_CARD' })} />
+                  <div className="mt-1 flex gap-1">
+                    <button
+                      onClick={() => setLookPrompt('scry')}
+                      disabled={me.pendingLook.length > 0}
+                      className="rounded bg-panelLight px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-white/10 disabled:opacity-40"
+                    >
+                      Scry
+                    </button>
+                    <button
+                      onClick={() => setLookPrompt('surveil')}
+                      disabled={me.pendingLook.length > 0}
+                      className="rounded bg-panelLight px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-white/10 disabled:opacity-40"
+                    >
+                      Surveil
+                    </button>
+                  </div>
+                  {lookPrompt && (
+                    <LookCountPrompt
+                      label={lookPrompt === 'scry' ? 'Scry' : 'Surveil'}
+                      onConfirm={(count) => {
+                        sendAction({ type: lookPrompt === 'scry' ? 'SCRY' : 'SURVEIL', count });
+                        setLookPrompt(null);
+                      }}
+                      onCancel={() => setLookPrompt(null)}
+                    />
+                  )}
+                </div>
                 <PublicZoneStack label="Graveyard" scryfallIds={me.graveyard} cards={state.cards} />
                 <PublicZoneStack label="Exile" scryfallIds={me.exile} cards={state.cards} />
                 {state.format === 'COMMANDER' && (
@@ -224,6 +259,28 @@ export default function GameTablePage() {
                           onClick: () =>
                             sendAction({ type: 'MOVE_CARD', fromZone: 'battlefield', toZone: 'hand', instanceId: card.instanceId }),
                         },
+                        {
+                          label: 'Put on top of library',
+                          onClick: () =>
+                            sendAction({
+                              type: 'MOVE_CARD',
+                              fromZone: 'battlefield',
+                              toZone: 'library',
+                              instanceId: card.instanceId,
+                              position: 'top',
+                            }),
+                        },
+                        {
+                          label: 'Put on bottom of library',
+                          onClick: () =>
+                            sendAction({
+                              type: 'MOVE_CARD',
+                              fromZone: 'battlefield',
+                              toZone: 'library',
+                              instanceId: card.instanceId,
+                              position: 'bottom',
+                            }),
+                        },
                       ],
                     })
                   }
@@ -247,6 +304,16 @@ export default function GameTablePage() {
                           label: 'Exile from hand',
                           onClick: () => sendAction({ type: 'MOVE_CARD', fromZone: 'hand', toZone: 'exile', scryfallId }),
                         },
+                        {
+                          label: 'Put on top of library',
+                          onClick: () =>
+                            sendAction({ type: 'MOVE_CARD', fromZone: 'hand', toZone: 'library', scryfallId, position: 'top' }),
+                        },
+                        {
+                          label: 'Put on bottom of library',
+                          onClick: () =>
+                            sendAction({ type: 'MOVE_CARD', fromZone: 'hand', toZone: 'library', scryfallId, position: 'bottom' }),
+                        },
                       ],
                     })
                   }
@@ -262,6 +329,15 @@ export default function GameTablePage() {
       </div>
 
       {menu && <CardContextMenu x={menu.x} y={menu.y} options={menu.options} onClose={() => setMenu(null)} />}
+
+      {me && me.pendingLookMode && me.pendingLook.length > 0 && (
+        <ScryModal
+          mode={me.pendingLookMode}
+          cards={me.pendingLook}
+          cardFacts={state.cards}
+          onResolve={(scryfallId, destination) => sendAction({ type: 'RESOLVE_LOOK', scryfallId, destination })}
+        />
+      )}
     </div>
   );
 }

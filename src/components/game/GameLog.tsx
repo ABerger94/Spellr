@@ -20,6 +20,15 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
       return `${who} untapped a card.`;
     case 'MOVE_CARD':
       return `${who} moved a card from ${event.payload.fromZone} to ${event.payload.toZone}.`;
+    case 'SCRY':
+      return `${who} scries ${event.payload.count}.`;
+    case 'SURVEIL':
+      return `${who} surveils ${event.payload.count}.`;
+    case 'LOOK_RESOLVED': {
+      const dest = event.payload.destination as string;
+      const destLabel = dest === 'top' ? 'kept it on top' : dest === 'bottom' ? 'put it on the bottom' : 'put it in the graveyard';
+      return `${who} ${destLabel} of their library.`;
+    }
     case 'ADJUST_LIFE': {
       const delta = event.payload.delta as number;
       return `${who}'s life changed by ${delta > 0 ? '+' : ''}${delta}.`;

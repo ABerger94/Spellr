@@ -7,6 +7,8 @@ export interface BattlefieldCard {
   counters?: Record<string, number>;
 }
 
+export type LookMode = 'scry' | 'surveil';
+
 export interface ZoneState {
   library: string[];
   hand: string[];
@@ -14,6 +16,9 @@ export interface ZoneState {
   graveyard: string[];
   exile: string[];
   commandZone: string[];
+  /** Cards temporarily pulled off the top of the library for a scry/surveil in progress. */
+  pendingLook: string[];
+  pendingLookMode: LookMode | null;
 }
 
 export const EMPTY_ZONES: ZoneState = {
@@ -23,6 +28,8 @@ export const EMPTY_ZONES: ZoneState = {
   graveyard: [],
   exile: [],
   commandZone: [],
+  pendingLook: [],
+  pendingLookMode: null,
 };
 
 export interface CardFacts {
@@ -49,6 +56,8 @@ export interface PlayerStateView {
   libraryCount: number;
   hand: string[] | null; // full contents only for the viewer's own seat
   handCount: number;
+  pendingLook: string[]; // only populated for the viewer's own seat
+  pendingLookMode: LookMode | null;
 }
 
 export interface GameStateView {
@@ -62,6 +71,13 @@ export interface GameStateView {
   cards: Record<string, CardFacts>;
 }
 
+export type LibraryPosition = 'top' | 'bottom';
+export type LookDestination = LibraryPosition | 'graveyard';
+
+/** The "real" card-holding zones — excludes pendingLook/pendingLookMode, which
+ * are scry/surveil bookkeeping, not a zone cards can be generically moved to/from. */
+export type ContentZone = 'library' | 'hand' | 'battlefield' | 'graveyard' | 'exile' | 'commandZone';
+
 export type GameActionPayload =
   | { type: 'DRAW_CARD' }
   | { type: 'PLAY_CARD'; scryfallId: string; fromZone: 'hand' | 'commandZone' }
@@ -69,12 +85,16 @@ export type GameActionPayload =
   | { type: 'UNTAP_CARD'; instanceId: string }
   | {
       type: 'MOVE_CARD';
-      fromZone: keyof ZoneState;
-      toZone: keyof ZoneState;
+      fromZone: ContentZone;
+      toZone: ContentZone;
       // For battlefield source, identify by instanceId; for other zones, by scryfallId.
       instanceId?: string;
       scryfallId?: string;
       targetSeat?: number; // defaults to actor's own seat; used for e.g. giving control (future)
+      position?: LibraryPosition; // only meaningful when toZone === 'library'; defaults to 'top'
     }
   | { type: 'ADJUST_LIFE'; seat: number; delta: number }
-  | { type: 'PASS_TURN' };
+  | { type: 'PASS_TURN' }
+  | { type: 'SCRY'; count: number }
+  | { type: 'SURVEIL'; count: number }
+  | { type: 'RESOLVE_LOOK'; scryfallId: string; destination: LookDestination };
