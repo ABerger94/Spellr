@@ -318,6 +318,10 @@ export default function GameTablePage() {
             actions still happen normally while it&apos;s hidden, tap 📜 Show log to bring it back.
           </p>
           <p className="mb-1">
+            <strong>Chat:</strong> type in the box under the log and hit Enter (or tap Send) to talk to everyone at
+            the table — chat messages show up right in the log alongside the actions.
+          </p>
+          <p className="mb-1">
             <strong>Life:</strong> the −/+ buttons next to any player&apos;s name adjust their life (you can adjust
             opponents&apos; life too — e.g. to deal combat damage — same as you would with paper life pads).
           </p>
@@ -574,7 +578,12 @@ export default function GameTablePage() {
         {showLog && (
           <div className="flex h-40 flex-shrink-0 flex-col lg:h-auto lg:w-72">
             <div className="min-h-0 flex-1">
-              <GameLog events={log} displayName={displayName} onClose={() => setShowLog(false)} />
+              <GameLog
+                events={log}
+                displayName={displayName}
+                onClose={() => setShowLog(false)}
+                onSendChat={(text) => sendAction({ type: 'CHAT_MESSAGE', text })}
+              />
             </div>
             <DiceRoller
               onRoll={(sides) => sendAction({ type: 'ROLL_DICE', sides })}

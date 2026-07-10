@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { GameLogEntry } from '@/hooks/useGameState';
 
 const AI_EVENT_TYPES = new Set(['AI_REASONING', 'AI_SKIPPED_NO_KEY', 'AI_ERROR', 'AI_TURN_CAPPED']);
@@ -112,17 +112,28 @@ export function GameLog({
   events,
   displayName,
   onClose,
+  onSendChat,
 }: {
   events: GameLogEntry[];
   displayName: (seat: number | null) => string;
   /** Renders a "✕" header button to collapse/hide the log, when provided. */
   onClose?: () => void;
+  /** Renders a chat input pinned under the log, when provided. */
+  onSendChat?: (text: string) => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [chatText, setChatText] = useState('');
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [events.length]);
+
+  function handleSend() {
+    const text = chatText.trim();
+    if (!text || !onSendChat) return;
+    onSendChat(text);
+    setChatText('');
+  }
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-lg border border-white/10 bg-panel text-sm">
@@ -136,16 +147,44 @@ export function GameLog({
       </div>
       <div className="flex-1 overflow-y-auto p-3">
         {events.length === 0 && <p className="text-slate-500">No events yet.</p>}
-        {events.map((event) => (
-          <p
-            key={event.id}
-            className={AI_EVENT_TYPES.has(event.type) ? 'italic text-accent2' : 'text-slate-300'}
-          >
-            {describeEvent(event, displayName)}
-          </p>
-        ))}
+        {events.map((event) =>
+          event.type === 'CHAT_MESSAGE' ? (
+            <p key={event.id} className="text-white">
+              <strong className="text-accent2">{displayName(event.actorSeat)}:</strong>{' '}
+              {(event.payload.text as string) ?? ''}
+            </p>
+          ) : (
+            <p
+              key={event.id}
+              className={AI_EVENT_TYPES.has(event.type) ? 'italic text-accent2' : 'text-slate-300'}
+            >
+              {describeEvent(event, displayName)}
+            </p>
+          ),
+        )}
         <div ref={bottomRef} />
       </div>
+      {onSendChat && (
+        <div className="flex flex-shrink-0 items-center gap-1.5 border-t border-white/10 p-2">
+          <input
+            value={chatText}
+            onChange={(e) => setChatText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSend();
+            }}
+            placeholder="Say something…"
+            maxLength={500}
+            className="flex-1 rounded border border-white/10 bg-panelLight px-2 py-1 text-sm text-white placeholder:text-slate-500"
+          />
+          <button
+            onClick={handleSend}
+            disabled={!chatText.trim()}
+            className="rounded bg-accent px-3 py-1 text-sm font-medium text-white hover:bg-accent/80 disabled:opacity-40"
+          >
+            Send
+          </button>
+        </div>
+      )}
     </div>
   );
 }

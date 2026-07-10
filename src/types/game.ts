@@ -126,4 +126,5 @@ export type GameActionPayload =
   | { type: 'ADJUST_COUNTER'; instanceId: string; counterType: string; delta: number }
   | { type: 'ADJUST_MANA'; color: ManaColor; delta: number }
   | { type: 'EMPTY_MANA_POOL' }
-  | { type: 'END_GAME' };
+  | { type: 'END_GAME' }
+  | { type: 'CHAT_MESSAGE'; text: string };

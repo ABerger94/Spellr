@@ -310,6 +310,11 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       event = await logEvent(gameId, 'GAME_ENDED', {}, actor);
       break;
     }
+
+    case 'CHAT_MESSAGE': {
+      event = await logEvent(gameId, 'CHAT_MESSAGE', { text: action.text }, actor);
+      break;
+    }
   }
 
   await broadcastState(gameId);
