@@ -19,7 +19,16 @@ export const env = {
   get geminiModel(): string {
     return process.env.GEMINI_MODEL || 'gemini-2.0-flash';
   },
-  get port(): number {
-    return Number(process.env.PORT) || 3000;
+  get pusherAppId() {
+    return required('PUSHER_APP_ID');
+  },
+  get pusherKey() {
+    return required('NEXT_PUBLIC_PUSHER_KEY');
+  },
+  get pusherSecret() {
+    return required('PUSHER_SECRET');
+  },
+  get pusherCluster() {
+    return required('NEXT_PUBLIC_PUSHER_CLUSTER');
   },
 };

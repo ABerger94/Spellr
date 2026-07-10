@@ -1,9 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import type { ZoneState } from '@/types/game';
 import { drawCard, moveCard, tapCard } from './zones';
-import { buildStateFor } from './stateSerializer';
 import { logEvent } from './gameEvents';
-import { getIO, gameRoom } from '@/server/socket/io';
+import { broadcastGameState } from '@/server/realtime/pusherServer';
 import type { Action } from './actionTypes';
 import { maybeTakeAITurn } from '@/server/ai/aiController';
 
@@ -37,17 +36,11 @@ async function updateZones(gamePlayerId: string, zones: ZoneState) {
 
 async function broadcastState(gameId: string) {
   try {
-    const io = getIO();
-    const sockets = await io.in(gameRoom(gameId)).fetchSockets();
-    await Promise.all(
-      sockets.map(async (s) => {
-        const seat = (s.data.seat as number | null) ?? null;
-        const state = await buildStateFor(gameId, seat);
-        io.to(s.id).emit('game:state', state);
-      }),
-    );
-  } catch {
-    // io not initialized — safe to skip (e.g. an AI turn triggered outside the socket server).
+    await broadcastGameState(gameId);
+  } catch (err) {
+    // Pusher not configured / unreachable — state is persisted regardless and
+    // will be picked up on next page load/reconnect, so this is safe to swallow.
+    console.error('[broadcastGameState]', err);
   }
 }
 

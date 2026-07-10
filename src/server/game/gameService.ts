@@ -2,8 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { GameFormat, DeckFormat } from '@prisma/client';
 import { shuffle } from './zones';
 import { EMPTY_ZONES, type ZoneState } from '@/types/game';
-import { getIO, gameRoom } from '@/server/socket/io';
-import { buildStateFor } from './stateSerializer';
+import { broadcastGameState } from '@/server/realtime/pusherServer';
 import { logEvent } from './gameEvents';
 import { maybeTakeAITurn } from '@/server/ai/aiController';
 
@@ -149,11 +148,10 @@ export async function startGame(gameId: string, requestingUserId: string) {
 
   await logEvent(gameId, 'GAME_STARTED', { seatCount: players.length });
 
-  const state = await buildStateFor(gameId, null);
   try {
-    getIO().to(gameRoom(gameId)).emit('game:state', state);
-  } catch {
-    // io not initialized (e.g. invoked from a script) — safe to skip.
+    await broadcastGameState(gameId);
+  } catch (err) {
+    console.error('[broadcastGameState]', err);
   }
 
   const firstPlayer = players.find((p) => p.seat === 0);

@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { useSocket } from './useSocket';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { PresenceChannel } from 'pusher-js';
+import { getPusherClient } from '@/lib/pusherClient';
 import type { GameActionPayload, GameStateView } from '@/types/game';
 
 export interface GameLogEntry {
@@ -10,6 +11,10 @@ export interface GameLogEntry {
   payload: Record<string, unknown>;
   actorSeat: number | null;
   createdAt: string;
+}
+
+interface PresenceMember {
+  id: string;
 }
 
 const MAX_LOG_ENTRIES = 500;
@@ -22,60 +27,91 @@ function mergeLogEntries(existing: GameLogEntry[], incoming: GameLogEntry[]): Ga
 }
 
 export function useGameState(gameId: string) {
-  const { socketRef, connected } = useSocket();
   const [state, setState] = useState<GameStateView | null>(null);
   const [log, setLog] = useState<GameLogEntry[]>([]);
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
+  const stateRef = useRef<GameStateView | null>(null);
 
   useEffect(() => {
-    fetch(`/api/games/${gameId}/events`)
-      .then((res) => res.json())
-      // Merge rather than replace: a game:log event may already have arrived
-      // over the socket before this REST fetch resolves.
-      .then((data) => setLog((prev) => mergeLogEntries(prev, data.events ?? [])))
-      .catch(() => undefined);
-  }, [gameId]);
+    let cancelled = false;
+    const pusher = getPusherClient();
+    let seatChannelName: string | null = null;
+    const presenceChannelName = `presence-game-${gameId}`;
 
-  useEffect(() => {
-    const socket = socketRef.current;
-    if (!socket || !connected) return;
-
-    function onState(s: GameStateView) {
-      setState(s);
-    }
-    function onLog(event: GameLogEntry) {
-      setLog((prev) => mergeLogEntries(prev, [event]));
-    }
-
-    socket.on('game:state', onState);
-    socket.on('game:log', onLog);
-
-    socket.emit('game:join', { gameId }, (res: { ok: boolean; error?: string }) => {
-      if (res.ok) {
-        setJoinError(null);
-        // Pick up anything logged between the initial REST fetch and this
-        // socket actually joining the room (and thus starting to receive game:log).
-        fetch(`/api/games/${gameId}/events`)
-          .then((r) => r.json())
-          .then((data) => setLog((prev) => mergeLogEntries(prev, data.events ?? [])))
-          .catch(() => undefined);
-      } else {
-        setJoinError(res.error ?? 'Failed to join game');
+    async function init() {
+      // Resolve our own seat + initial state via REST first — the per-seat
+      // private channel's name depends on knowing our seat.
+      const res = await fetch(`/api/games/${gameId}`);
+      if (cancelled) return;
+      if (!res.ok) {
+        setJoinError('You are not a player in this game');
+        return;
       }
-    });
+      const data = await res.json();
+      if (cancelled) return;
+      setState(data.state);
+      stateRef.current = data.state;
+      setJoinError(null);
+
+      const presenceChannel = pusher.subscribe(presenceChannelName) as PresenceChannel;
+      presenceChannel.bind('pusher:subscription_succeeded', () => {
+        const ids = new Set<string>();
+        presenceChannel.members.each((m: PresenceMember) => ids.add(m.id));
+        setOnlineUserIds(ids);
+      });
+      presenceChannel.bind('pusher:member_added', (m: PresenceMember) => {
+        setOnlineUserIds((prev) => new Set(prev).add(m.id));
+      });
+      presenceChannel.bind('pusher:member_removed', (m: PresenceMember) => {
+        setOnlineUserIds((prev) => {
+          const next = new Set(prev);
+          next.delete(m.id);
+          return next;
+        });
+      });
+      presenceChannel.bind('game:log', (event: GameLogEntry) => {
+        setLog((prev) => mergeLogEntries(prev, [event]));
+      });
+
+      const viewerSeat: number | null = data.state.viewerSeat;
+      if (viewerSeat !== null) {
+        seatChannelName = `private-game-${gameId}-seat-${viewerSeat}`;
+        const seatChannel = pusher.subscribe(seatChannelName);
+        seatChannel.bind('game:state', (s: GameStateView) => {
+          setState(s);
+          stateRef.current = s;
+        });
+      }
+
+      const eventsRes = await fetch(`/api/games/${gameId}/events`);
+      const eventsData = await eventsRes.json().catch(() => ({}));
+      if (!cancelled) setLog((prev) => mergeLogEntries(prev, eventsData.events ?? []));
+    }
+
+    init();
 
     return () => {
-      socket.off('game:state', onState);
-      socket.off('game:log', onLog);
+      cancelled = true;
+      pusher.unsubscribe(presenceChannelName);
+      if (seatChannelName) pusher.unsubscribe(seatChannelName);
     };
-  }, [gameId, connected, socketRef]);
+  }, [gameId]);
 
   const sendAction = useCallback(
-    (action: GameActionPayload) => {
-      socketRef.current?.emit('game:action', { gameId, action });
+    async (action: GameActionPayload) => {
+      const res = await fetch(`/api/games/${gameId}/actions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        console.error('[sendAction]', data.error ?? 'Action failed');
+      }
     },
-    [gameId, socketRef],
+    [gameId],
   );
 
-  return { state, log, connected, joinError, sendAction };
+  return { state, log, joinError, sendAction, onlineUserIds };
 }

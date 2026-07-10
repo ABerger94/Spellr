@@ -15,7 +15,7 @@ import { CardContextMenu, type ContextMenuOption } from '@/components/game/CardC
 
 export default function GameTablePage() {
   const params = useParams<{ gameId: string }>();
-  const { state, log, connected, joinError, sendAction } = useGameState(params.gameId);
+  const { state, log, joinError, sendAction, onlineUserIds } = useGameState(params.gameId);
   const [menu, setMenu] = useState<{ x: number; y: number; options: ContextMenuOption[] } | null>(null);
 
   if (joinError) {
@@ -34,7 +34,7 @@ export default function GameTablePage() {
       <div>
         <NavBar />
         <main className="mx-auto max-w-3xl px-6 py-8">
-          <p className="text-slate-400">{connected ? 'Joining game…' : 'Connecting…'}</p>
+          <p className="text-slate-400">Loading game…</p>
         </main>
       </div>
     );
@@ -59,6 +59,7 @@ export default function GameTablePage() {
                   player={p}
                   isViewer={false}
                   isActiveTurn={state.currentTurnSeat === p.seat}
+                  isOnline={p.isAI || (p.userId !== null && onlineUserIds.has(p.userId))}
                   onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: p.seat, delta })}
                 />
                 <div className="mt-2 flex items-center gap-2">
@@ -87,6 +88,7 @@ export default function GameTablePage() {
                 player={me}
                 isViewer
                 isActiveTurn={state.currentTurnSeat === me.seat}
+                isOnline
                 onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: me.seat, delta })}
               />
               <div className="mt-2 flex items-center gap-2">
