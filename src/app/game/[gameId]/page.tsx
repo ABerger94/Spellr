@@ -168,6 +168,40 @@ export default function GameTablePage() {
     });
   }
 
+  function openPlayerActionsMenu(e: React.MouseEvent) {
+    if (!me) return;
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      options: [
+        { label: '🔀 Shuffle library', onClick: () => sendAction({ type: 'SHUFFLE_LIBRARY' }) },
+        { label: '↺ Untap all', onClick: () => sendAction({ type: 'UNTAP_ALL' }) },
+        { label: '♥ Reset my life', onClick: () => sendAction({ type: 'RESET_LIFE' }) },
+        {
+          label: '⟲ Reset my board',
+          onClick: () => {
+            if (window.confirm('Put all your cards back in your library and reshuffle? This also resets your life.')) {
+              sendAction({ type: 'RESET_BOARD' });
+            }
+          },
+        },
+      ],
+    });
+  }
+
+  function handleRestartGame() {
+    if (
+      window.confirm(
+        'Restart the game for everyone? This reshuffles every library, resets all life totals and boards, and returns to turn 1.',
+      )
+    ) {
+      sendAction({ type: 'RESTART_GAME' });
+    }
+  }
+
+  const viewerUserId = (session?.user as { id?: string } | undefined)?.id;
+  const isHost = !!viewerUserId && viewerUserId === gameInfo.hostUserId;
+
   return (
     <DragDropProvider onDrop={handleDrop}>
     <div className="flex h-screen flex-col">
@@ -178,9 +212,18 @@ export default function GameTablePage() {
           Tap or drag a card to play/move it · tap ⋯ on a card for more options · use the bar at the bottom for draw/scry/surveil/pass ·
           keyboard: <kbd className="rounded bg-panelLight px-1">D</kbd> draw, <kbd className="rounded bg-panelLight px-1">Space</kbd> pass turn
         </span>
+        {isHost && (
+          <button
+            onClick={handleRestartGame}
+            title="Restart the game for everyone"
+            className="ml-auto mr-2 rounded bg-red-500/10 px-2 py-0.5 text-red-400 hover:bg-red-500/20 sm:ml-2"
+          >
+            ⟲ Restart game
+          </button>
+        )}
         <button
           onClick={() => setShowHelp((v) => !v)}
-          className="ml-auto rounded bg-panelLight px-2 py-0.5 hover:bg-white/10 sm:ml-0"
+          className={`rounded bg-panelLight px-2 py-0.5 hover:bg-white/10 ${isHost ? '' : 'ml-auto sm:ml-0'}`}
         >
           {showHelp ? 'Hide help' : '? Help'}
         </button>
@@ -221,6 +264,17 @@ export default function GameTablePage() {
             <strong>Life:</strong> the −/+ buttons next to any player&apos;s name adjust their life (you can adjust
             opponents&apos; life too — e.g. to deal combat damage — same as you would with paper life pads).
           </p>
+          <p className="mb-1">
+            <strong>Actions menu:</strong> the ⚙ Actions button next to Pass turn lets you shuffle your library, untap
+            everything at once, reset your life, or reset your whole board (cards back to library, reshuffled) — the
+            🔀 Shuffle button under your library does just the shuffle.
+          </p>
+          {isHost && (
+            <p className="mb-1">
+              <strong>Restart game:</strong> the host-only Restart game button reshuffles every player&apos;s library,
+              resets everyone&apos;s life and board, and returns to turn 1 — for a mulligan on the whole game.
+            </p>
+          )}
           <p>
             <strong>Not yet built:</strong> counters beyond the basics and combat damage math — for now, resolve
             those by hand using life adjustments and the move-to-zone menu.
@@ -277,7 +331,12 @@ export default function GameTablePage() {
                 onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: me.seat, delta })}
               />
               <div className="mt-2 flex items-center gap-2">
-                <LibraryStack count={me.libraryCount} onDraw={() => sendAction({ type: 'DRAW_CARD' })} draggable />
+                <LibraryStack
+                  count={me.libraryCount}
+                  onDraw={() => sendAction({ type: 'DRAW_CARD' })}
+                  onShuffle={() => sendAction({ type: 'SHUFFLE_LIBRARY' })}
+                  draggable
+                />
                 <PublicZoneStack
                   label="Graveyard"
                   zone="graveyard"
@@ -302,10 +361,19 @@ export default function GameTablePage() {
                     draggable
                   />
                 )}
+                <button
+                  onClick={openPlayerActionsMenu}
+                  title="Shuffle, untap all, reset life, reset board"
+                  className={`rounded bg-panelLight px-3 py-2 text-sm font-medium text-white hover:bg-white/10 ${
+                    state.currentTurnSeat === me.seat ? '' : 'ml-auto'
+                  }`}
+                >
+                  ⚙ Actions
+                </button>
                 {state.currentTurnSeat === me.seat && (
                   <button
                     onClick={() => sendAction({ type: 'PASS_TURN' })}
-                    className="ml-auto rounded bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/80"
+                    className="rounded bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/80"
                   >
                     Pass turn
                   </button>

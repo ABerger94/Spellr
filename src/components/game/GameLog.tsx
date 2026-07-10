@@ -40,6 +40,16 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
     }
     case 'TURN_PASSED':
       return `${who} passed the turn.`;
+    case 'SHUFFLE_LIBRARY':
+      return `${who} shuffled their library.`;
+    case 'UNTAP_ALL':
+      return `${who} untapped all their permanents.`;
+    case 'RESET_LIFE':
+      return `${who} reset their life to ${event.payload.life}.`;
+    case 'RESET_BOARD':
+      return `${who} reset their board.`;
+    case 'RESTART_GAME':
+      return `The game was restarted.`;
     case 'ATTACK_DECLARED':
       return `${who} declares an attack.`;
     case 'AI_REASONING':

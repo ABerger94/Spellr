@@ -101,4 +101,9 @@ export type GameActionPayload =
   | { type: 'PASS_TURN' }
   | { type: 'SCRY'; count: number }
   | { type: 'SURVEIL'; count: number }
-  | { type: 'RESOLVE_LOOK'; scryfallId: string; destination: LookDestination };
+  | { type: 'RESOLVE_LOOK'; scryfallId: string; destination: LookDestination }
+  | { type: 'SHUFFLE_LIBRARY' }
+  | { type: 'UNTAP_ALL' }
+  | { type: 'RESET_LIFE' }
+  | { type: 'RESET_BOARD' }
+  | { type: 'RESTART_GAME' };

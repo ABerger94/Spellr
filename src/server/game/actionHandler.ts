@@ -1,11 +1,12 @@
 import { prisma } from '@/lib/prisma';
 import type { GameEvent } from '@prisma/client';
 import type { ZoneState } from '@/types/game';
-import { drawCards, moveCard, resolveLook, startLook, tapCard } from './zones';
+import { drawCards, moveCard, resolveLook, startLook, tapCard, untapAll, shuffleLibrary } from './zones';
 import { logEvent } from './gameEvents';
 import { broadcastGameState } from '@/server/realtime/pusherServer';
 import type { Action } from './actionTypes';
 import { maybeTakeAITurn } from '@/server/ai/aiController';
+import { resetPlayerBoard, restartGame, startingLifeFor } from './gameService';
 
 export interface ActionActor {
   userId?: string | null;
@@ -162,6 +163,42 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       if (nextPlayer?.isAI) {
         void maybeTakeAITurn(gameId, nextSeat);
       }
+      break;
+    }
+
+    case 'SHUFFLE_LIBRARY': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      await updateZones(player.id, shuffleLibrary(zones));
+      event = await logEvent(gameId, 'SHUFFLE_LIBRARY', {}, actor);
+      break;
+    }
+
+    case 'UNTAP_ALL': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      await updateZones(player.id, untapAll(zones));
+      event = await logEvent(gameId, 'UNTAP_ALL', {}, actor);
+      break;
+    }
+
+    case 'RESET_LIFE': {
+      const player = await getPlayer(gameId, actor.seat);
+      const life = startingLifeFor(game.format);
+      await prisma.gamePlayer.update({ where: { id: player.id }, data: { life } });
+      event = await logEvent(gameId, 'RESET_LIFE', { life }, actor);
+      break;
+    }
+
+    case 'RESET_BOARD': {
+      await resetPlayerBoard(gameId, actor.seat);
+      event = await logEvent(gameId, 'RESET_BOARD', {}, actor);
+      break;
+    }
+
+    case 'RESTART_GAME': {
+      await restartGame(gameId, actor.userId ?? '');
+      event = await logEvent(gameId, 'RESTART_GAME', {}, actor);
       break;
     }
   }

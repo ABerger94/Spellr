@@ -127,6 +127,17 @@ export function tapCard(zones: ZoneState, instanceId: string, tapped: boolean): 
   };
 }
 
+export function untapAll(zones: ZoneState): ZoneState {
+  return {
+    ...cloneZones(zones),
+    battlefield: zones.battlefield.map((c) => ({ ...c, tapped: false })),
+  };
+}
+
+export function shuffleLibrary(zones: ZoneState): ZoneState {
+  return { ...cloneZones(zones), library: shuffle(zones.library) };
+}
+
 const MAX_DRAW_COUNT = 40;
 
 /** Draws up to `count` cards, stopping early (without error) if the library
