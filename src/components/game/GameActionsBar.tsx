@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { GameActionsMenu } from './GameActionsMenu';
 
 export function GameActionsBar({
@@ -47,6 +47,15 @@ export function GameActionsBar({
   onResetDeck: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
+  const actionsButtonRef = useRef<HTMLButtonElement>(null);
+
+  function toggleMenu() {
+    if (!menuOpen && actionsButtonRef.current) {
+      setAnchorRect(actionsButtonRef.current.getBoundingClientRect());
+    }
+    setMenuOpen((v) => !v);
+  }
 
   return (
     <div className="flex items-center gap-2 overflow-x-auto border-b border-white/10 bg-panel px-3 py-2">
@@ -72,15 +81,17 @@ export function GameActionsBar({
       >
         Pass
       </button>
-      <div className="relative flex-shrink-0">
+      <div className="flex-shrink-0">
         <button
-          onClick={() => setMenuOpen((v) => !v)}
+          ref={actionsButtonRef}
+          onClick={toggleMenu}
           className="rounded bg-panelLight px-3 py-1.5 text-sm text-white hover:bg-white/10"
         >
           Actions ▾
         </button>
-        {menuOpen && (
+        {menuOpen && anchorRect && (
           <GameActionsMenu
+            anchorRect={anchorRect}
             onClose={() => setMenuOpen(false)}
             lookInProgress={lookInProgress}
             onDrawX={onDrawX}
