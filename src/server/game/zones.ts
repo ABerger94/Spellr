@@ -99,10 +99,20 @@ export function tapCard(zones: ZoneState, instanceId: string, tapped: boolean): 
   };
 }
 
-export function drawCard(zones: ZoneState): { zones: ZoneState; drawnScryfallId: string | null } {
-  if (zones.library.length === 0) return { zones, drawnScryfallId: null };
-  const result = moveCard(zones, { fromZone: 'library', toZone: 'hand' });
-  return { zones: result.zones, drawnScryfallId: result.movedScryfallId };
+const MAX_DRAW_COUNT = 40;
+
+/** Draws up to `count` cards, stopping early (without error) if the library
+ * runs out partway through — that's a legitimate game state, not a bug. */
+export function drawCards(zones: ZoneState, count: number): { zones: ZoneState; drawnScryfallIds: string[] } {
+  const clamped = Math.min(Math.max(1, Math.floor(count)), MAX_DRAW_COUNT);
+  let current = zones;
+  const drawn: string[] = [];
+  for (let i = 0; i < clamped && current.library.length > 0; i++) {
+    const result = moveCard(current, { fromZone: 'library', toZone: 'hand' });
+    current = result.zones;
+    drawn.push(result.movedScryfallId);
+  }
+  return { zones: current, drawnScryfallIds: drawn };
 }
 
 const MAX_LOOK_COUNT = 20;

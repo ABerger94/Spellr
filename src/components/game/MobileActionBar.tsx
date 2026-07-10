@@ -13,24 +13,37 @@ export function MobileActionBar({
 }: {
   isMyTurn: boolean;
   lookInProgress: boolean;
-  onDraw: () => void;
+  onDraw: (count: number) => void;
   onScry: (count: number) => void;
   onSurveil: (count: number) => void;
   onPassTurn: () => void;
 }) {
-  const [prompt, setPrompt] = useState<'scry' | 'surveil' | null>(null);
+  const [prompt, setPrompt] = useState<'draw' | 'scry' | 'surveil' | null>(null);
 
   return (
     <div
       className="sticky bottom-0 z-30 flex items-stretch gap-1.5 border-t border-white/10 bg-panel px-2 py-2"
       style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
     >
-      <button
-        onClick={onDraw}
-        className="flex-1 rounded bg-panelLight py-3 text-sm font-medium text-white active:bg-white/20"
-      >
-        Draw
-      </button>
+      <div className="relative flex-1">
+        <button
+          onClick={() => setPrompt('draw')}
+          className="w-full rounded bg-panelLight py-3 text-sm font-medium text-white active:bg-white/20"
+        >
+          Draw
+        </button>
+        {prompt === 'draw' && (
+          <LookCountPrompt
+            label="Draw"
+            direction="up"
+            onConfirm={(count) => {
+              onDraw(count);
+              setPrompt(null);
+            }}
+            onCancel={() => setPrompt(null)}
+          />
+        )}
+      </div>
 
       <div className="relative flex-1">
         <button

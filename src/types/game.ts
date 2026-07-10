@@ -79,7 +79,7 @@ export type LookDestination = LibraryPosition | 'graveyard';
 export type ContentZone = 'library' | 'hand' | 'battlefield' | 'graveyard' | 'exile' | 'commandZone';
 
 export type GameActionPayload =
-  | { type: 'DRAW_CARD' }
+  | { type: 'DRAW_CARD'; count?: number }
   | { type: 'PLAY_CARD'; scryfallId: string; fromZone: 'hand' | 'commandZone' }
   | { type: 'TAP_CARD'; instanceId: string }
   | { type: 'UNTAP_CARD'; instanceId: string }

@@ -108,8 +108,9 @@ export default function GameTablePage() {
       {showHelp && (
         <div className="border-b border-white/10 bg-panel px-4 py-3 text-sm text-slate-300">
           <p className="mb-1">
-            <strong>Draw:</strong> tap your library (the card-back stack), the Draw button at the bottom of the
-            screen, or press <kbd className="rounded bg-panelLight px-1">D</kbd> on a keyboard.
+            <strong>Draw:</strong> tap your library (the card-back stack) for one card instantly, or press{' '}
+            <kbd className="rounded bg-panelLight px-1">D</kbd> on a keyboard. The Draw button at the bottom of the
+            screen lets you pick a number first — e.g. draw 7 for your opening hand.
           </p>
           <p className="mb-1">
             <strong>Play a card:</strong> tap it in your hand — lands/creatures/artifacts/etc. go to the battlefield; the
@@ -306,7 +307,7 @@ export default function GameTablePage() {
         <MobileActionBar
           isMyTurn={!!isMyTurn}
           lookInProgress={me.pendingLook.length > 0}
-          onDraw={() => sendAction({ type: 'DRAW_CARD' })}
+          onDraw={(count) => sendAction({ type: 'DRAW_CARD', count })}
           onScry={(count) => sendAction({ type: 'SCRY', count })}
           onSurveil={(count) => sendAction({ type: 'SURVEIL', count })}
           onPassTurn={() => sendAction({ type: 'PASS_TURN' })}

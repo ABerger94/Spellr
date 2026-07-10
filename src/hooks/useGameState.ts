@@ -141,6 +141,12 @@ export function useGameState(gameId: string) {
         setState(data.state);
         stateRef.current = data.state;
       }
+      // Same issue as state: the game log otherwise only updates via the
+      // realtime broadcast, so our own actions wouldn't show up in our own
+      // log until some other refresh happened to fire.
+      if (data.event) {
+        setLog((prev) => mergeLogEntries(prev, [data.event]));
+      }
     },
     [gameId],
   );

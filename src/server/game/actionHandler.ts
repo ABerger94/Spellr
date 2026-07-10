@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
+import type { GameEvent } from '@prisma/client';
 import type { ZoneState } from '@/types/game';
-import { drawCard, moveCard, resolveLook, startLook, tapCard } from './zones';
+import { drawCards, moveCard, resolveLook, startLook, tapCard } from './zones';
 import { logEvent } from './gameEvents';
 import { broadcastGameState } from '@/server/realtime/pusherServer';
 import type { Action } from './actionTypes';
@@ -44,22 +45,24 @@ async function broadcastState(gameId: string) {
   }
 }
 
-export function execute(gameId: string, actor: ActionActor, action: Action): Promise<void> {
+export function execute(gameId: string, actor: ActionActor, action: Action): Promise<GameEvent> {
   return withGameLock(gameId, () => executeLocked(gameId, actor, action));
 }
 
-async function executeLocked(gameId: string, actor: ActionActor, action: Action): Promise<void> {
+async function executeLocked(gameId: string, actor: ActionActor, action: Action): Promise<GameEvent> {
   const game = await prisma.game.findUniqueOrThrow({ where: { id: gameId } });
   if (game.status !== 'ACTIVE') throw new Error('Game is not active');
+
+  let event: GameEvent;
 
   switch (action.type) {
     case 'DRAW_CARD': {
       const player = await getPlayer(gameId, actor.seat);
       const zones = player.zones as unknown as ZoneState;
-      const { zones: nextZones, drawnScryfallId } = drawCard(zones);
-      if (!drawnScryfallId) throw new Error('Library is empty');
+      const { zones: nextZones, drawnScryfallIds } = drawCards(zones, action.count ?? 1);
+      if (drawnScryfallIds.length === 0) throw new Error('Library is empty');
       await updateZones(player.id, nextZones);
-      await logEvent(gameId, 'DRAW_CARD', {}, actor);
+      event = await logEvent(gameId, 'DRAW_CARD', { count: drawnScryfallIds.length }, actor);
       break;
     }
 
@@ -72,7 +75,7 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
         scryfallId: action.scryfallId,
       });
       await updateZones(player.id, nextZones);
-      await logEvent(gameId, 'PLAY_CARD', { scryfallId: action.scryfallId, fromZone: action.fromZone }, actor);
+      event = await logEvent(gameId, 'PLAY_CARD', { scryfallId: action.scryfallId, fromZone: action.fromZone }, actor);
       break;
     }
 
@@ -82,7 +85,7 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       const zones = player.zones as unknown as ZoneState;
       const nextZones = tapCard(zones, action.instanceId, action.type === 'TAP_CARD');
       await updateZones(player.id, nextZones);
-      await logEvent(gameId, action.type, { instanceId: action.instanceId }, actor);
+      event = await logEvent(gameId, action.type, { instanceId: action.instanceId }, actor);
       break;
     }
 
@@ -97,7 +100,7 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
         position: action.position,
       });
       await updateZones(player.id, nextZones);
-      await logEvent(
+      event = await logEvent(
         gameId,
         'MOVE_CARD',
         { fromZone: action.fromZone, toZone: action.toZone, position: action.position },
@@ -113,7 +116,7 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       const mode = action.type === 'SCRY' ? 'scry' : 'surveil';
       const nextZones = startLook(zones, action.count, mode);
       await updateZones(player.id, nextZones);
-      await logEvent(gameId, action.type, { count: nextZones.pendingLook.length }, actor);
+      event = await logEvent(gameId, action.type, { count: nextZones.pendingLook.length }, actor);
       break;
     }
 
@@ -123,14 +126,14 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       const mode = zones.pendingLookMode;
       const nextZones = resolveLook(zones, action.scryfallId, action.destination);
       await updateZones(player.id, nextZones);
-      await logEvent(gameId, 'LOOK_RESOLVED', { mode, destination: action.destination }, actor);
+      event = await logEvent(gameId, 'LOOK_RESOLVED', { mode, destination: action.destination }, actor);
       break;
     }
 
     case 'ADJUST_LIFE': {
       const player = await getPlayer(gameId, action.seat);
       await prisma.gamePlayer.update({ where: { id: player.id }, data: { life: { increment: action.delta } } });
-      await logEvent(gameId, 'ADJUST_LIFE', { seat: action.seat, delta: action.delta }, actor);
+      event = await logEvent(gameId, 'ADJUST_LIFE', { seat: action.seat, delta: action.delta }, actor);
       break;
     }
 
@@ -149,7 +152,7 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
         where: { id: gameId },
         data: { currentTurnSeat: nextSeat, turnNumber: wrapped ? game.turnNumber + 1 : game.turnNumber },
       });
-      await logEvent(gameId, 'TURN_PASSED', { nextSeat }, actor);
+      event = await logEvent(gameId, 'TURN_PASSED', { nextSeat }, actor);
 
       const nextPlayer = players.find((p) => p.seat === nextSeat);
       if (nextPlayer?.isAI) {
@@ -160,4 +163,5 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
   }
 
   await broadcastState(gameId);
+  return event;
 }

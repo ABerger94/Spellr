@@ -5,7 +5,7 @@ const libraryPosition = z.enum(['top', 'bottom']);
 const lookDestination = z.enum(['top', 'bottom', 'graveyard']);
 
 export const actionSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('DRAW_CARD') }),
+  z.object({ type: z.literal('DRAW_CARD'), count: z.number().int().min(1).max(40).optional() }),
   z.object({ type: z.literal('PLAY_CARD'), scryfallId: z.string(), fromZone: z.enum(['hand', 'commandZone']) }),
   z.object({ type: z.literal('TAP_CARD'), instanceId: z.string() }),
   z.object({ type: z.literal('UNTAP_CARD'), instanceId: z.string() }),
