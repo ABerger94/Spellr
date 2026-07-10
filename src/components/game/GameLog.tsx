@@ -50,6 +50,22 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
       return `${who} reset their board.`;
     case 'RESTART_GAME':
       return `The game was restarted.`;
+    case 'MILL': {
+      const count = (event.payload.count as number) ?? 1;
+      return count > 1 ? `${who} milled ${count} cards.` : `${who} milled a card.`;
+    }
+    case 'RANDOM_DISCARD':
+      return `${who} randomly discarded a card.`;
+    case 'REVEAL_HAND': {
+      const names = (event.payload.cardNames as string[]) ?? [];
+      return names.length > 0 ? `${who} revealed their hand: ${names.join(', ')}.` : `${who} revealed an empty hand.`;
+    }
+    case 'MULLIGAN':
+      return `${who} took a mulligan.`;
+    case 'ROLL_DICE':
+      return `${who} rolled a d${event.payload.sides}: ${event.payload.result}.`;
+    case 'FLIP_COIN':
+      return `${who} flipped a coin: ${event.payload.result}.`;
     case 'ATTACK_DECLARED':
       return `${who} declares an attack.`;
     case 'AI_REASONING':

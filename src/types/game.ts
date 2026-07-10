@@ -106,4 +106,10 @@ export type GameActionPayload =
   | { type: 'UNTAP_ALL' }
   | { type: 'RESET_LIFE' }
   | { type: 'RESET_BOARD' }
-  | { type: 'RESTART_GAME' };
+  | { type: 'RESTART_GAME' }
+  | { type: 'MILL'; count: number }
+  | { type: 'RANDOM_DISCARD' }
+  | { type: 'REVEAL_HAND' }
+  | { type: 'MULLIGAN' }
+  | { type: 'ROLL_DICE'; sides: number }
+  | { type: 'FLIP_COIN' };

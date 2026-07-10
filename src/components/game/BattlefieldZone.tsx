@@ -8,12 +8,15 @@ export function BattlefieldZone({
   battlefield,
   cards,
   interactive,
+  zoom = 1,
   onTapToggle,
   onContextMenu,
 }: {
   battlefield: BattlefieldCard[];
   cards: Record<string, CardFacts>;
   interactive: boolean;
+  /** Client-side-only view scale (does not affect stored positions). */
+  zoom?: number;
   onTapToggle?: (instanceId: string, tapped: boolean) => void;
   onContextMenu?: (e: React.MouseEvent, card: BattlefieldCard) => void;
 }) {
@@ -27,6 +30,7 @@ export function BattlefieldZone({
       className={`relative h-56 w-full overflow-hidden rounded sm:h-64 ${
         isHover ? 'bg-accent/10 ring-2 ring-accent' : ''
       }`}
+      style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}
     >
       {battlefield.length === 0 && (
         <div className="flex h-full items-center justify-center text-xs text-slate-600">

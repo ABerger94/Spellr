@@ -154,6 +154,43 @@ export function drawCards(zones: ZoneState, count: number): { zones: ZoneState; 
   return { zones: current, drawnScryfallIds: drawn };
 }
 
+/** Mills up to `count` cards from the top of the library to the graveyard,
+ * stopping early (without error) if the library runs out. */
+export function millCards(zones: ZoneState, count: number): { zones: ZoneState; milledScryfallIds: string[] } {
+  const clamped = Math.min(Math.max(1, Math.floor(count)), MAX_DRAW_COUNT);
+  let current = zones;
+  const milled: string[] = [];
+  for (let i = 0; i < clamped && current.library.length > 0; i++) {
+    const result = moveCard(current, { fromZone: 'library', toZone: 'graveyard' });
+    current = result.zones;
+    milled.push(result.movedScryfallId);
+  }
+  return { zones: current, milledScryfallIds: milled };
+}
+
+/** Discards a uniformly random card from hand. */
+export function randomDiscard(zones: ZoneState): { zones: ZoneState; discardedScryfallId: string } {
+  if (zones.hand.length === 0) throw new Error('Your hand is empty');
+  const scryfallId = zones.hand[Math.floor(Math.random() * zones.hand.length)];
+  const { zones: next } = moveCard(zones, { fromZone: 'hand', toZone: 'graveyard', scryfallId });
+  return { zones: next, discardedScryfallId: scryfallId };
+}
+
+/** Shuffles the current hand back into the library and draws the same
+ * number of cards back — a quick "start this hand over" utility. */
+export function mulligan(zones: ZoneState): ZoneState {
+  const handSize = zones.hand.length;
+  const shuffled = cloneZones(zones);
+  shuffled.library = shuffle([...shuffled.library, ...shuffled.hand]);
+  shuffled.hand = [];
+  let current = shuffled;
+  for (let i = 0; i < handSize && current.library.length > 0; i++) {
+    const result = moveCard(current, { fromZone: 'library', toZone: 'hand' });
+    current = result.zones;
+  }
+  return current;
+}
+
 const MAX_LOOK_COUNT = 20;
 
 /** Pulls the top `count` cards of the library into pendingLook for a scry/surveil. */
