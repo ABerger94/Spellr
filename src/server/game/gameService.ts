@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { waitUntil } from '@vercel/functions';
 import { GameFormat, DeckFormat, type Deck, type DeckCard } from '@prisma/client';
 import { shuffle } from './zones';
 import { EMPTY_ZONES, type ZoneState } from '@/types/game';
@@ -182,7 +183,10 @@ export async function startGame(gameId: string, requestingUserId: string) {
 
   const firstPlayer = players.find((p) => p.seat === 0);
   if (firstPlayer?.isAI) {
-    void maybeTakeAITurn(gameId, 0);
+    // See the comment on the equivalent PASS_TURN call in actionHandler.ts —
+    // waitUntil keeps this serverless invocation alive long enough for the
+    // AI's turn to actually run instead of it being silently dropped.
+    waitUntil(maybeTakeAITurn(gameId, 0));
   }
 }
 
@@ -231,7 +235,7 @@ export async function restartGame(gameId: string, requestingUserId: string) {
 
   const firstPlayer = players.find((p) => p.seat === 0);
   if (firstPlayer?.isAI) {
-    void maybeTakeAITurn(gameId, 0);
+    waitUntil(maybeTakeAITurn(gameId, 0));
   }
 }
 

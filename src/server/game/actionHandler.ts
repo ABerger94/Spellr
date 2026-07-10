@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { waitUntil } from '@vercel/functions';
 import type { GameEvent } from '@prisma/client';
 import type { ZoneState } from '@/types/game';
 import {
@@ -175,7 +176,12 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
 
       const nextPlayer = players.find((p) => p.seat === nextSeat);
       if (nextPlayer?.isAI) {
-        void maybeTakeAITurn(gameId, nextSeat);
+        // Fire-and-forget from the human's perspective (don't make them wait
+        // for the AI's whole turn), but keep the serverless function alive
+        // until it finishes — an unawaited promise can otherwise get frozen
+        // the instant this request's response is sent, silently dropping the
+        // AI's turn (including its no-key/error fallbacks) entirely.
+        waitUntil(maybeTakeAITurn(gameId, nextSeat));
       }
       break;
     }
