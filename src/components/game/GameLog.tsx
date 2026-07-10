@@ -10,8 +10,10 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
   switch (event.type) {
     case 'GAME_STARTED':
       return 'The game has started.';
-    case 'DRAW_CARD':
-      return `${who} drew a card.`;
+    case 'DRAW_CARD': {
+      const count = (event.payload.count as number) ?? 1;
+      return count > 1 ? `${who} drew ${count} cards.` : `${who} drew a card.`;
+    }
     case 'PLAY_CARD':
       return `${who} played a card.`;
     case 'TAP_CARD':
