@@ -8,6 +8,11 @@ interface Deck {
   id: string;
   name: string;
   format: 'COMMANDER' | 'STANDARD_1V1';
+  cards: { quantity: number }[];
+}
+
+function cardCount(deck: Deck): number {
+  return deck.cards.reduce((sum, c) => sum + c.quantity, 0);
 }
 
 interface GamePlayer {
@@ -145,7 +150,7 @@ export default function LobbyPage() {
                   <option value="">Select a deck…</option>
                   {decksForFormat.map((d) => (
                     <option key={d.id} value={d.id}>
-                      {d.name}
+                      {d.name} ({cardCount(d)} cards)
                     </option>
                   ))}
                 </select>
@@ -181,7 +186,7 @@ export default function LobbyPage() {
                   <option value="">Select a deck…</option>
                   {decks.map((d) => (
                     <option key={d.id} value={d.id}>
-                      {d.name} ({d.format === 'COMMANDER' ? 'Commander' : '1v1'})
+                      {d.name} ({d.format === 'COMMANDER' ? 'Commander' : '1v1'}, {cardCount(d)} cards)
                     </option>
                   ))}
                 </select>
