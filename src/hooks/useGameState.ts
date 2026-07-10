@@ -35,11 +35,18 @@ export function useGameState(gameId: string) {
 
   useEffect(() => {
     let cancelled = false;
-    const pusher = getPusherClient();
+    let pusher: ReturnType<typeof getPusherClient> | null = null;
     let seatChannelName: string | null = null;
     const presenceChannelName = `presence-game-${gameId}`;
 
     async function init() {
+      try {
+        pusher = getPusherClient();
+      } catch (err) {
+        setJoinError(err instanceof Error ? err.message : 'Realtime connection failed to initialize');
+        return;
+      }
+
       // Resolve our own seat + initial state via REST first — the per-seat
       // private channel's name depends on knowing our seat.
       const res = await fetch(`/api/games/${gameId}`);
@@ -89,12 +96,17 @@ export function useGameState(gameId: string) {
       if (!cancelled) setLog((prev) => mergeLogEntries(prev, eventsData.events ?? []));
     }
 
-    init();
+    init().catch((err) => {
+      console.error('[useGameState] init failed', err);
+      if (!cancelled) setJoinError(err instanceof Error ? err.message : 'Failed to load game');
+    });
 
     return () => {
       cancelled = true;
-      pusher.unsubscribe(presenceChannelName);
-      if (seatChannelName) pusher.unsubscribe(seatChannelName);
+      if (pusher) {
+        pusher.unsubscribe(presenceChannelName);
+        if (seatChannelName) pusher.unsubscribe(seatChannelName);
+      }
     };
   }, [gameId]);
 
