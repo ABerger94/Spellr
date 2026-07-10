@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useGameState } from '@/hooks/useGameState';
 import { NavBar } from '@/components/layout/NavBar';
@@ -27,6 +28,7 @@ const MAX_ZOOM = 1.5;
 
 export default function GameTablePage() {
   const params = useParams<{ gameId: string }>();
+  const router = useRouter();
   const { data: session } = useSession();
   const { state, gameInfo, log, joinError, actionError, sendAction, onlineUserIds, refreshState } = useGameState(params.gameId);
   const [menu, setMenu] = useState<{ x: number; y: number; options: ContextMenuOption[] } | null>(null);
@@ -88,7 +90,28 @@ export default function GameTablePage() {
     return (
       <div>
         <NavBar />
-        <GameLobbyWait state={state} gameInfo={gameInfo} isHost={userId === gameInfo.hostUserId} onStarted={refreshState} />
+        <GameLobbyWait
+          state={state}
+          gameInfo={gameInfo}
+          isHost={userId === gameInfo.hostUserId}
+          onStarted={refreshState}
+          onCancelled={() => router.push('/lobby')}
+        />
+      </div>
+    );
+  }
+
+  if (state.status === 'FINISHED') {
+    return (
+      <div>
+        <NavBar />
+        <main className="mx-auto max-w-lg px-6 py-12 text-center">
+          <h1 className="mb-2 text-2xl font-semibold text-white">Game over</h1>
+          <p className="mb-6 text-slate-400">This game has ended.</p>
+          <Link href="/lobby" className="rounded bg-accent px-4 py-2 font-medium text-white hover:bg-accent/80">
+            Back to lobby
+          </Link>
+        </main>
       </div>
     );
   }
@@ -194,6 +217,12 @@ export default function GameTablePage() {
     }
   }
 
+  function handleEndGame() {
+    if (window.confirm('End the game for everyone? This closes the table — the board and log are kept, but nobody can act anymore.')) {
+      sendAction({ type: 'END_GAME' });
+    }
+  }
+
   const viewerUserId = (session?.user as { id?: string } | undefined)?.id;
   const isHost = !!viewerUserId && viewerUserId === gameInfo.hostUserId;
 
@@ -215,6 +244,15 @@ export default function GameTablePage() {
             className="ml-auto mr-2 rounded bg-red-500/10 px-2 py-0.5 text-red-400 hover:bg-red-500/20 sm:ml-2"
           >
             ⟲ Restart game
+          </button>
+        )}
+        {isHost && (
+          <button
+            onClick={handleEndGame}
+            title="End the game for everyone"
+            className="mr-2 rounded bg-red-500/10 px-2 py-0.5 text-red-400 hover:bg-red-500/20"
+          >
+            ✕ End game
           </button>
         )}
         <button
@@ -297,6 +335,13 @@ export default function GameTablePage() {
             <p className="mb-1">
               <strong>Restart game:</strong> the host-only Restart game button reshuffles every player&apos;s library,
               resets everyone&apos;s life and board, and returns to turn 1 — for a mulligan on the whole game.
+            </p>
+          )}
+          {isHost && (
+            <p className="mb-1">
+              <strong>End game:</strong> the host-only End game button closes the table for everyone — the board and
+              log are kept, but nobody can act anymore, and it drops off everyone&apos;s lobby list. Cancelling a
+              still-waiting lobby (before Start) is available from the &quot;Waiting for players&quot; screen instead.
             </p>
           )}
           <p>

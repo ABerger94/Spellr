@@ -52,6 +52,7 @@ export const actionSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('ADJUST_MANA'), color: manaColor, delta: z.number().int().min(-99).max(99) }),
   z.object({ type: z.literal('EMPTY_MANA_POOL') }),
+  z.object({ type: z.literal('END_GAME') }),
 ]);
 
 export type Action = z.infer<typeof actionSchema>;

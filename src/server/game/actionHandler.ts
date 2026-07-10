@@ -20,7 +20,7 @@ import { logEvent } from './gameEvents';
 import { broadcastGameState } from '@/server/realtime/pusherServer';
 import type { Action } from './actionTypes';
 import { maybeTakeAITurn } from '@/server/ai/aiController';
-import { resetPlayerBoard, restartGame, startingLifeFor } from './gameService';
+import { endGame, resetPlayerBoard, restartGame, startingLifeFor } from './gameService';
 
 export interface ActionActor {
   userId?: string | null;
@@ -296,6 +296,12 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       const nextZones = emptyManaPool(zones);
       await updateZones(player.id, nextZones);
       event = await logEvent(gameId, 'EMPTY_MANA_POOL', {}, actor);
+      break;
+    }
+
+    case 'END_GAME': {
+      await endGame(gameId, actor.userId ?? '');
+      event = await logEvent(gameId, 'GAME_ENDED', {}, actor);
       break;
     }
   }

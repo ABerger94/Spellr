@@ -121,4 +121,5 @@ export type GameActionPayload =
   | { type: 'FLIP_COIN' }
   | { type: 'ADJUST_COUNTER'; instanceId: string; counterType: string; delta: number }
   | { type: 'ADJUST_MANA'; color: ManaColor; delta: number }
-  | { type: 'EMPTY_MANA_POOL' };
+  | { type: 'EMPTY_MANA_POOL' }
+  | { type: 'END_GAME' };

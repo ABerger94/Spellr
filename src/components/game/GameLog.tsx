@@ -91,6 +91,8 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
     }
     case 'EMPTY_MANA_POOL':
       return `${who} emptied their mana pool.`;
+    case 'GAME_ENDED':
+      return `${who} ended the game.`;
     case 'ATTACK_DECLARED':
       return `${who} declares an attack.`;
     case 'AI_REASONING':

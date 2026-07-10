@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireSession } from '@/server/auth/session';
-import { getGameForUser } from '@/server/game/gameService';
+import { cancelGame, getGameForUser } from '@/server/game/gameService';
 import { buildStateFor } from '@/server/game/stateSerializer';
 
 export async function GET(_req: Request, { params }: { params: { gameId: string } }) {
@@ -17,4 +17,17 @@ export async function GET(_req: Request, { params }: { params: { gameId: string 
     game: { id: game.id, hostUserId: game.hostUserId, maxSeats: game.maxSeats, inviteCode: game.inviteCode },
     state,
   });
+}
+
+/** Host-only: cancels a game that hasn't started yet. */
+export async function DELETE(_req: Request, { params }: { params: { gameId: string } }) {
+  const auth = await requireSession();
+  if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  try {
+    await cancelGame(params.gameId, auth.userId);
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Could not cancel game' }, { status: 400 });
+  }
 }
