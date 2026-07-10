@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String
+  displayName  String
+  createdAt    DateTime     @default(now())
+  decks        Deck[]
+  gamePlayers  GamePlayer[]
+  gameEvents   GameEvent[]
+  hostedGames  Game[]       @relation("HostedGames")
+}
+
+enum DeckFormat {
+  COMMANDER
+  STANDARD_1V1
+}
+
+model Deck {
+  id              String     @id @default(cuid())
+  userId          String
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  format          DeckFormat @default(COMMANDER)
+  commanderCardId String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  cards           DeckCard[]
+  gamePlayers     GamePlayer[]
+
+  @@index([userId])
+}
+
+model DeckCard {
+  id          String    @id @default(cuid())
+  deckId      String
+  deck        Deck      @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  scryfallId  String
+  cardCache   CardCache @relation(fields: [scryfallId], references: [scryfallId])
+  quantity    Int       @default(1)
+  isCommander Boolean   @default(false)
+
+  @@unique([deckId, scryfallId])
+}
+
+model CardCache {
+  scryfallId    String     @id
+  oracleId      String?
+  name          String
+  manaCost      String?
+  typeLine      String?
+  oracleText    String?
+  power         String?
+  toughness     String?
+  loyalty       String?
+  colors        String[]
+  colorIdentity String[]
+  imageNormal   String?
+  imageArtCrop  String?
+  imageLarge    String?
+  scryfallUri   String?
+  setCode       String?
+  collectorNum  String?
+  fetchedAt     DateTime   @default(now())
+  raw           Json
+  deckCards     DeckCard[]
+
+  @@index([name])
+}
+
+enum GameFormat {
+  ONE_V_ONE
+  COMMANDER
+}
+
+enum GameStatus {
+  LOBBY
+  ACTIVE
+  FINISHED
+}
+
+model Game {
+  id              String       @id @default(cuid())
+  format          GameFormat
+  status          GameStatus   @default(LOBBY)
+  inviteCode      String       @unique @default(cuid())
+  hostUserId      String
+  hostUser        User         @relation("HostedGames", fields: [hostUserId], references: [id])
+  maxSeats        Int
+  currentTurnSeat Int?
+  turnNumber      Int          @default(0)
+  createdAt       DateTime     @default(now())
+  startedAt       DateTime?
+  endedAt         DateTime?
+  players         GamePlayer[]
+  events          GameEvent[]
+}
+
+model GamePlayer {
+  id               String   @id @default(cuid())
+  gameId           String
+  game             Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  userId           String?
+  user             User?    @relation(fields: [userId], references: [id])
+  deckId           String?
+  deck             Deck?    @relation(fields: [deckId], references: [id])
+  seat             Int
+  isAI             Boolean  @default(false)
+  aiPersona        String?
+  life             Int      @default(40)
+  commanderDamage  Json     @default("{}")
+  zones            Json     @default("{\"library\":[],\"hand\":[],\"battlefield\":[],\"graveyard\":[],\"exile\":[],\"commandZone\":[]}")
+  counters         Json     @default("{}")
+  connected        Boolean  @default(false)
+  joinedAt         DateTime @default(now())
+
+  @@unique([gameId, seat])
+  @@index([userId])
+}
+
+model GameEvent {
+  id          String   @id @default(cuid())
+  gameId      String
+  game        Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  actorUserId String?
+  actorUser   User?    @relation(fields: [actorUserId], references: [id])
+  actorSeat   Int?
+  type        String
+  payload     Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  @@index([gameId, createdAt])
+}
