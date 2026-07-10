@@ -29,6 +29,7 @@ export default function GameTablePage() {
   const [menu, setMenu] = useState<{ x: number; y: number; options: ContextMenuOption[] } | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [showLog, setShowLog] = useState(true);
 
   const isMyTurn = state?.status === 'ACTIVE' && state.currentTurnSeat === state.viewerSeat;
 
@@ -213,8 +214,16 @@ export default function GameTablePage() {
           </button>
         )}
         <button
+          onClick={() => setShowLog((v) => !v)}
+          className={`mr-2 rounded px-2 py-0.5 hover:bg-white/10 ${
+            showLog ? 'bg-accent/20 text-accent' : 'bg-panelLight'
+          } ${isHost ? '' : 'ml-auto sm:ml-0'}`}
+        >
+          📜 {showLog ? 'Hide log' : 'Show log'}
+        </button>
+        <button
           onClick={() => setShowHelp((v) => !v)}
-          className={`rounded bg-panelLight px-2 py-0.5 hover:bg-white/10 ${isHost ? '' : 'ml-auto sm:ml-0'}`}
+          className="rounded bg-panelLight px-2 py-0.5 hover:bg-white/10"
         >
           {showHelp ? 'Hide help' : '? Help'}
         </button>
@@ -255,6 +264,10 @@ export default function GameTablePage() {
           <p className="mb-1">
             <strong>Dice &amp; coins:</strong> below the game log — pick a die size and tap Roll, or tap Flip for a
             coin flip; results post to the log for everyone to see.
+          </p>
+          <p className="mb-1">
+            <strong>Game log:</strong> tap 📜 Hide log up top (or the ✕ on the log panel) to free up screen space —
+            actions still happen normally while it&apos;s hidden, tap 📜 Show log to bring it back.
           </p>
           <p className="mb-1">
             <strong>Life:</strong> the −/+ buttons next to any player&apos;s name adjust their life (you can adjust
@@ -474,15 +487,17 @@ export default function GameTablePage() {
           )}
         </div>
 
-        <div className="flex h-40 flex-shrink-0 flex-col lg:h-auto lg:w-72">
-          <div className="min-h-0 flex-1">
-            <GameLog events={log} displayName={displayName} />
+        {showLog && (
+          <div className="flex h-40 flex-shrink-0 flex-col lg:h-auto lg:w-72">
+            <div className="min-h-0 flex-1">
+              <GameLog events={log} displayName={displayName} onClose={() => setShowLog(false)} />
+            </div>
+            <DiceRoller
+              onRoll={(sides) => sendAction({ type: 'ROLL_DICE', sides })}
+              onFlip={() => sendAction({ type: 'FLIP_COIN' })}
+            />
           </div>
-          <DiceRoller
-            onRoll={(sides) => sendAction({ type: 'ROLL_DICE', sides })}
-            onFlip={() => sendAction({ type: 'FLIP_COIN' })}
-          />
-        </div>
+        )}
       </div>
 
       {menu && <CardContextMenu x={menu.x} y={menu.y} options={menu.options} onClose={() => setMenu(null)} />}
