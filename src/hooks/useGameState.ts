@@ -26,8 +26,16 @@ function mergeLogEntries(existing: GameLogEntry[], incoming: GameLogEntry[]): Ga
   return merged.length > MAX_LOG_ENTRIES ? merged.slice(merged.length - MAX_LOG_ENTRIES) : merged;
 }
 
+export interface GameInfo {
+  id: string;
+  hostUserId: string;
+  maxSeats: number;
+  inviteCode: string;
+}
+
 export function useGameState(gameId: string) {
   const [state, setState] = useState<GameStateView | null>(null);
+  const [gameInfo, setGameInfo] = useState<GameInfo | null>(null);
   const [log, setLog] = useState<GameLogEntry[]>([]);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
@@ -59,6 +67,7 @@ export function useGameState(gameId: string) {
       if (cancelled) return;
       setState(data.state);
       stateRef.current = data.state;
+      setGameInfo(data.game);
       setJoinError(null);
 
       const presenceChannel = pusher.subscribe(presenceChannelName) as PresenceChannel;
@@ -125,5 +134,26 @@ export function useGameState(gameId: string) {
     [gameId],
   );
 
-  return { state, log, joinError, sendAction, onlineUserIds };
+  // A direct fallback for state-changing calls made outside the action
+  // pipeline (e.g. starting the game) — don't rely solely on the realtime
+  // push landing, since a dropped/delayed Pusher message shouldn't leave a
+  // player stuck looking at a stale view.
+  const refreshState = useCallback(async () => {
+    const [stateRes, eventsRes] = await Promise.all([
+      fetch(`/api/games/${gameId}`),
+      fetch(`/api/games/${gameId}/events`),
+    ]);
+    if (stateRes.ok) {
+      const data = await stateRes.json();
+      setState(data.state);
+      stateRef.current = data.state;
+      setGameInfo(data.game);
+    }
+    if (eventsRes.ok) {
+      const eventsData = await eventsRes.json().catch(() => ({}));
+      setLog((prev) => mergeLogEntries(prev, eventsData.events ?? []));
+    }
+  }, [gameId]);
+
+  return { state, gameInfo, log, joinError, sendAction, onlineUserIds, refreshState };
 }

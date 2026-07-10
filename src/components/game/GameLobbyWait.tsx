@@ -1,0 +1,77 @@
+'use client';
+
+import { useState } from 'react';
+import type { GameStateView } from '@/types/game';
+import type { GameInfo } from '@/hooks/useGameState';
+
+export function GameLobbyWait({
+  state,
+  gameInfo,
+  isHost,
+  onStarted,
+}: {
+  state: GameStateView;
+  gameInfo: GameInfo;
+  isHost: boolean;
+  onStarted: () => void | Promise<void>;
+}) {
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleStart() {
+    setStarting(true);
+    setError(null);
+    const res = await fetch(`/api/games/${gameInfo.id}/start`, { method: 'POST' });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error ?? 'Failed to start game');
+      setStarting(false);
+      return;
+    }
+    // Don't rely solely on the realtime push landing — fetch the new state
+    // directly so a dropped/delayed Pusher message can't strand the host on
+    // this screen even though the game did actually start.
+    await onStarted();
+  }
+
+  const seats = Array.from({ length: gameInfo.maxSeats }, (_, seat) => state.players.find((p) => p.seat === seat));
+
+  return (
+    <div className="mx-auto max-w-lg px-6 py-12">
+      <h1 className="mb-2 text-2xl font-semibold text-white">Waiting for players</h1>
+      <p className="mb-6 text-sm text-slate-400">
+        Invite code: <span className="font-mono text-accent2">{gameInfo.inviteCode}</span>
+      </p>
+
+      <div className="mb-6 space-y-2">
+        {seats.map((player, seat) => (
+          <div key={seat} className="flex items-center justify-between rounded border border-white/10 bg-panel px-4 py-2">
+            <span className="text-white">Seat {seat}</span>
+            {player ? (
+              <span className="text-sm text-slate-300">
+                {player.displayName}
+                {player.isAI && <span className="ml-1 rounded bg-panelLight px-1 text-[10px] text-slate-400">AI</span>}
+              </span>
+            ) : (
+              <span className="text-sm text-slate-600">Empty seat</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
+
+      {isHost ? (
+        <button
+          onClick={handleStart}
+          disabled={starting}
+          className="w-full rounded bg-accent px-4 py-2 font-medium text-white hover:bg-accent/80 disabled:opacity-50"
+        >
+          {starting ? 'Starting…' : 'Start game'}
+        </button>
+      ) : (
+        <p className="text-center text-sm text-slate-400">Waiting for the host to start the game…</p>
+      )}
+    </div>
+  );
+}
