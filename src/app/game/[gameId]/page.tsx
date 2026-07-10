@@ -19,8 +19,8 @@ import { DiceRoller } from '@/components/game/DiceRoller';
 import { CardContextMenu, type ContextMenuOption } from '@/components/game/CardContextMenu';
 import { DragDropProvider, type DragSource, type DropTarget } from '@/components/game/DragDropContext';
 
-const MIN_ZOOM = 0.6;
-const MAX_ZOOM = 1.3;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 1.5;
 
 export default function GameTablePage() {
   const params = useParams<{ gameId: string }>();
@@ -259,7 +259,13 @@ export default function GameTablePage() {
           <p className="mb-1">
             <strong>Game actions bar:</strong> at the top — Untap All, Draw, Pass are one tap; the Actions ▾ menu adds
             Draw X, Scry, Surveil, Mill, Exile Top, Look at Top, Random Discard, Reveal Hand, Shuffle, Mulligan, and
-            Reset Deck (cards back to library, reshuffled, life reset). The +/− on the right zooms your battlefield.
+            Reset Deck (cards back to library, reshuffled, life reset). The +/− on the right zooms the whole table
+            in and out — handy for fitting more on screen or seeing a crowded board at a glance.
+          </p>
+          <p className="mb-1">
+            <strong>More room:</strong> each battlefield is a scrollable canvas, not just the visible box — scroll
+            (or drag) to reach cards placed further out. Your hand strip scrolls too; use the ‹ › arrows if it&apos;s
+            hard to swipe, especially with lots of cards.
           </p>
           <p className="mb-1">
             <strong>Dice &amp; coins:</strong> below the game log — pick a die size and tap Roll, or tap Flip for a
@@ -317,8 +323,9 @@ export default function GameTablePage() {
         />
       )}
 
-      <div className="flex flex-1 flex-col gap-4 overflow-hidden p-4 lg:flex-row">
-        <div className="flex flex-1 flex-col gap-4 overflow-y-auto">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4 lg:flex-row">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+          <div className="flex flex-col gap-4" style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
           {/* Opponents */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {opponents.map((p) => (
@@ -399,7 +406,6 @@ export default function GameTablePage() {
                   battlefield={me.battlefield}
                   cards={state.cards}
                   interactive
-                  zoom={zoom}
                   onTapToggle={(instanceId, tapped) =>
                     sendAction(tapped ? { type: 'UNTAP_CARD', instanceId } : { type: 'TAP_CARD', instanceId })
                   }
@@ -485,6 +491,7 @@ export default function GameTablePage() {
               </div>
             </div>
           )}
+          </div>
         </div>
 
         {showLog && (
