@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import type { ZoneState } from '@/types/game';
-import { drawCard, moveCard, tapCard } from './zones';
+import { drawCard, moveCard, resolveLook, startLook, tapCard } from './zones';
 import { logEvent } from './gameEvents';
 import { broadcastGameState } from '@/server/realtime/pusherServer';
 import type { Action } from './actionTypes';
@@ -94,9 +94,36 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
         toZone: action.toZone,
         instanceId: action.instanceId,
         scryfallId: action.scryfallId,
+        position: action.position,
       });
       await updateZones(player.id, nextZones);
-      await logEvent(gameId, 'MOVE_CARD', { fromZone: action.fromZone, toZone: action.toZone }, actor);
+      await logEvent(
+        gameId,
+        'MOVE_CARD',
+        { fromZone: action.fromZone, toZone: action.toZone, position: action.position },
+        actor,
+      );
+      break;
+    }
+
+    case 'SCRY':
+    case 'SURVEIL': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const mode = action.type === 'SCRY' ? 'scry' : 'surveil';
+      const nextZones = startLook(zones, action.count, mode);
+      await updateZones(player.id, nextZones);
+      await logEvent(gameId, action.type, { count: nextZones.pendingLook.length }, actor);
+      break;
+    }
+
+    case 'RESOLVE_LOOK': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const mode = zones.pendingLookMode;
+      const nextZones = resolveLook(zones, action.scryfallId, action.destination);
+      await updateZones(player.id, nextZones);
+      await logEvent(gameId, 'LOOK_RESOLVED', { mode, destination: action.destination }, actor);
       break;
     }
 

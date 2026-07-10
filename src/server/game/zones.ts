@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { ZoneState, BattlefieldCard } from '@/types/game';
+import type { ZoneState, BattlefieldCard, ContentZone, LookMode, LookDestination } from '@/types/game';
 
 export function shuffle<T>(arr: T[]): T[] {
   const copy = [...arr];
@@ -29,16 +29,21 @@ function cloneZones(zones: ZoneState): ZoneState {
     graveyard: [...zones.graveyard],
     exile: [...zones.exile],
     commandZone: [...zones.commandZone],
+    // Fall back for rows persisted before these fields existed.
+    pendingLook: [...(zones.pendingLook ?? [])],
+    pendingLookMode: zones.pendingLookMode ?? null,
   };
 }
 
 export interface MoveCardParams {
-  fromZone: keyof ZoneState;
-  toZone: keyof ZoneState;
+  fromZone: ContentZone;
+  toZone: ContentZone;
   /** Required when fromZone is 'battlefield'. */
   instanceId?: string;
   /** Identifies the card in non-battlefield source zones; omit to take the top (index 0). */
   scryfallId?: string;
+  /** Only meaningful when toZone is 'library'; defaults to 'top'. */
+  position?: 'top' | 'bottom';
 }
 
 export interface MoveCardResult {
@@ -70,9 +75,13 @@ export function moveCard(zones: ZoneState, params: MoveCardParams): MoveCardResu
     const { x, y } = nextBattlefieldSlot(next.battlefield);
     next.battlefield.push({ instanceId: uuidv4(), scryfallId: movedScryfallId, tapped: false, x, y });
   } else if (toZone === 'library') {
-    // index 0 is the top of the library; cards entering the library (e.g. a
-    // "return to top of library" effect) go on top, matching where drawCard reads from.
-    next.library.unshift(movedScryfallId);
+    // index 0 is the top of the library, matching where drawCard reads from.
+    // Cards entering the library default to the top unless bottom is requested.
+    if (params.position === 'bottom') {
+      next.library.push(movedScryfallId);
+    } else {
+      next.library.unshift(movedScryfallId);
+    }
   } else {
     (next[toZone] as string[]).push(movedScryfallId);
   }
@@ -94,4 +103,47 @@ export function drawCard(zones: ZoneState): { zones: ZoneState; drawnScryfallId:
   if (zones.library.length === 0) return { zones, drawnScryfallId: null };
   const result = moveCard(zones, { fromZone: 'library', toZone: 'hand' });
   return { zones: result.zones, drawnScryfallId: result.movedScryfallId };
+}
+
+const MAX_LOOK_COUNT = 20;
+
+/** Pulls the top `count` cards of the library into pendingLook for a scry/surveil. */
+export function startLook(zones: ZoneState, count: number, mode: LookMode): ZoneState {
+  if (zones.pendingLook.length > 0) {
+    throw new Error(`Resolve your current ${zones.pendingLookMode ?? 'look'} before starting another one`);
+  }
+  if (!Number.isInteger(count) || count < 1) {
+    throw new Error('Count must be a positive whole number');
+  }
+  const clamped = Math.min(count, zones.library.length, MAX_LOOK_COUNT);
+  const next = cloneZones(zones);
+  next.pendingLook = next.library.splice(0, clamped);
+  next.pendingLookMode = mode;
+  return next;
+}
+
+const ALLOWED_DESTINATIONS: Record<LookMode, LookDestination[]> = {
+  scry: ['top', 'bottom'],
+  surveil: ['top', 'graveyard'],
+};
+
+/** Resolves one card from an in-progress scry/surveil to its chosen destination. */
+export function resolveLook(zones: ZoneState, scryfallId: string, destination: LookDestination): ZoneState {
+  const mode = zones.pendingLookMode;
+  if (!mode) throw new Error('No scry or surveil in progress');
+  if (!ALLOWED_DESTINATIONS[mode].includes(destination)) {
+    throw new Error(`${destination} is not a valid destination while resolving a ${mode}`);
+  }
+
+  const next = cloneZones(zones);
+  const idx = next.pendingLook.indexOf(scryfallId);
+  if (idx === -1) throw new Error('That card is not part of the current scry/surveil');
+  next.pendingLook.splice(idx, 1);
+
+  if (destination === 'top') next.library.unshift(scryfallId);
+  else if (destination === 'bottom') next.library.push(scryfallId);
+  else next.graveyard.push(scryfallId);
+
+  if (next.pendingLook.length === 0) next.pendingLookMode = null;
+  return next;
 }
