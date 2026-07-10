@@ -84,9 +84,12 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
 export function GameLog({
   events,
   displayName,
+  onClose,
 }: {
   events: GameLogEntry[];
   displayName: (seat: number | null) => string;
+  /** Renders a "✕" header button to collapse/hide the log, when provided. */
+  onClose?: () => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -95,17 +98,27 @@ export function GameLog({
   }, [events.length]);
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto rounded-lg border border-white/10 bg-panel p-3 text-sm">
-      {events.length === 0 && <p className="text-slate-500">No events yet.</p>}
-      {events.map((event) => (
-        <p
-          key={event.id}
-          className={AI_EVENT_TYPES.has(event.type) ? 'italic text-accent2' : 'text-slate-300'}
-        >
-          {describeEvent(event, displayName)}
-        </p>
-      ))}
-      <div ref={bottomRef} />
+    <div className="flex h-full flex-col overflow-hidden rounded-lg border border-white/10 bg-panel text-sm">
+      <div className="flex flex-shrink-0 items-center justify-between border-b border-white/10 px-3 py-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Action log</span>
+        {onClose && (
+          <button onClick={onClose} title="Hide log" className="text-slate-400 hover:text-white">
+            ✕
+          </button>
+        )}
+      </div>
+      <div className="flex-1 overflow-y-auto p-3">
+        {events.length === 0 && <p className="text-slate-500">No events yet.</p>}
+        {events.map((event) => (
+          <p
+            key={event.id}
+            className={AI_EVENT_TYPES.has(event.type) ? 'italic text-accent2' : 'text-slate-300'}
+          >
+            {describeEvent(event, displayName)}
+          </p>
+        ))}
+        <div ref={bottomRef} />
+      </div>
     </div>
   );
 }
