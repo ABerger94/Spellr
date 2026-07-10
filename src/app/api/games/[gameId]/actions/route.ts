@@ -3,6 +3,7 @@ import { requireSession } from '@/server/auth/session';
 import { prisma } from '@/lib/prisma';
 import { actionSchema } from '@/server/game/actionTypes';
 import { execute } from '@/server/game/actionHandler';
+import { buildStateFor } from '@/server/game/stateSerializer';
 
 export async function POST(req: Request, { params }: { params: { gameId: string } }) {
   const auth = await requireSession();
@@ -19,7 +20,11 @@ export async function POST(req: Request, { params }: { params: { gameId: string 
 
   try {
     await execute(params.gameId, { userId: auth.userId, seat: player.seat }, parsed.data);
-    return NextResponse.json({ ok: true });
+    // Return the actor's own fresh state directly rather than relying solely
+    // on the realtime broadcast reaching this same client — Pusher delivery
+    // to *other* players still happens via the broadcast inside execute().
+    const state = await buildStateFor(params.gameId, player.seat);
+    return NextResponse.json({ ok: true, state });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : 'Action failed' }, { status: 400 });
   }

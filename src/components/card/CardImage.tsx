@@ -6,16 +6,17 @@ interface CardImageProps {
   tapped?: boolean;
   selected?: boolean;
   className?: string;
+  title?: string;
   onClick?: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
 }
 
-export function CardImage({ name, imageUrl, tapped, selected, className = '', onClick, onContextMenu }: CardImageProps) {
+export function CardImage({ name, imageUrl, tapped, selected, className = '', title, onClick, onContextMenu }: CardImageProps) {
   return (
     <div
       onClick={onClick}
       onContextMenu={onContextMenu}
-      title={name}
+      title={title ?? name}
       className={`card-image relative inline-block w-full select-none overflow-hidden bg-panelLight shadow-md transition-transform duration-150 ${
         tapped ? 'rotate-90' : ''
       } ${selected ? 'ring-2 ring-accent2' : ''} ${onClick ? 'cursor-pointer hover:scale-[1.03] hover:shadow-xl' : ''} ${className}`}

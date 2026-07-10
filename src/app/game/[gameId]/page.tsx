@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useGameState } from '@/hooks/useGameState';
@@ -18,8 +18,35 @@ import { CardContextMenu, type ContextMenuOption } from '@/components/game/CardC
 export default function GameTablePage() {
   const params = useParams<{ gameId: string }>();
   const { data: session } = useSession();
-  const { state, gameInfo, log, joinError, sendAction, onlineUserIds, refreshState } = useGameState(params.gameId);
+  const { state, gameInfo, log, joinError, actionError, sendAction, onlineUserIds, refreshState } = useGameState(params.gameId);
   const [menu, setMenu] = useState<{ x: number; y: number; options: ContextMenuOption[] } | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
+
+  const isMyTurn = state?.status === 'ACTIVE' && state.currentTurnSeat === state.viewerSeat;
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+      if (!state || state.status !== 'ACTIVE') return;
+
+      if (e.key === 'Escape') {
+        setMenu(null);
+        return;
+      }
+      if (e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        sendAction({ type: 'DRAW_CARD' });
+        return;
+      }
+      if ((e.key === ' ' || e.key === 'Enter') && isMyTurn) {
+        e.preventDefault();
+        sendAction({ type: 'PASS_TURN' });
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [state, isMyTurn, sendAction]);
 
   if (joinError) {
     return (
@@ -62,6 +89,51 @@ export default function GameTablePage() {
   return (
     <div className="flex h-screen flex-col">
       <NavBar />
+
+      <div className="flex items-center justify-between border-b border-white/10 bg-panel px-4 py-1.5 text-xs text-slate-400">
+        <span>
+          Click a card to play/draw it · right-click a card for more options (discard, exile, return to hand) ·
+          keyboard: <kbd className="rounded bg-panelLight px-1">D</kbd> draw, <kbd className="rounded bg-panelLight px-1">Space</kbd> pass turn
+        </span>
+        <button onClick={() => setShowHelp((v) => !v)} className="rounded bg-panelLight px-2 py-0.5 hover:bg-white/10">
+          {showHelp ? 'Hide help' : '? Help'}
+        </button>
+      </div>
+
+      {showHelp && (
+        <div className="border-b border-white/10 bg-panel px-4 py-3 text-sm text-slate-300">
+          <p className="mb-1">
+            <strong>Draw:</strong> click your library (the card-back stack), or press <kbd className="rounded bg-panelLight px-1">D</kbd>.
+          </p>
+          <p className="mb-1">
+            <strong>Play a card:</strong> click it in your hand — lands/creatures/artifacts/etc. go to the battlefield; the
+            platform doesn&apos;t know mana costs or the stack, so anything playable just resolves immediately.
+          </p>
+          <p className="mb-1">
+            <strong>Tap/untap:</strong> click a permanent on your battlefield.
+          </p>
+          <p className="mb-1">
+            <strong>Discard, exile, sacrifice, bounce:</strong> right-click a card (in hand or on the battlefield) for a
+            move-to-zone menu.
+          </p>
+          <p className="mb-1">
+            <strong>Life:</strong> the −/+ buttons next to any player&apos;s name adjust their life (you can adjust
+            opponents&apos; life too — e.g. to deal combat damage — same as you would with paper life pads).
+          </p>
+          <p>
+            <strong>Not yet built:</strong> scry/surveil and other library-peek effects, counters beyond the basics,
+            and combat damage math — those are on the roadmap; for now, resolve them by hand using life adjustments
+            and the move-to-zone menu.
+          </p>
+        </div>
+      )}
+
+      {actionError && (
+        <div className="flex items-center justify-between border-b border-red-500/30 bg-red-500/10 px-4 py-1.5 text-sm text-red-400">
+          <span>{actionError}</span>
+        </div>
+      )}
+
       <div className="flex flex-1 gap-4 overflow-hidden p-4">
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto">
           {/* Opponents */}
