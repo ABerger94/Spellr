@@ -6,11 +6,13 @@ export function PlayerPanel({
   player,
   isViewer,
   isActiveTurn,
+  isOnline,
   onLifeChange,
 }: {
   player: PlayerStateView;
   isViewer: boolean;
   isActiveTurn: boolean;
+  isOnline: boolean;
   onLifeChange?: (delta: number) => void;
 }) {
   return (
@@ -26,7 +28,7 @@ export function PlayerPanel({
           {player.isAI && <span className="ml-1 rounded bg-panelLight px-1 text-[10px] text-slate-400">AI</span>}
         </p>
         <p className="text-xs text-slate-500">
-          Seat {player.seat} · {player.connected ? 'connected' : 'offline'}
+          Seat {player.seat} · {isOnline ? 'connected' : 'offline'}
           {isActiveTurn && <span className="ml-1 text-accent2">· their turn</span>}
         </p>
       </div>
