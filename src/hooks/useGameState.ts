@@ -90,6 +90,9 @@ export function useGameState(gameId: string) {
       presenceChannel.bind('game:log', (event: GameLogEntry) => {
         setLog((prev) => mergeLogEntries(prev, [event]));
       });
+      presenceChannel.bind('game:cancelled', () => {
+        setJoinError('The host cancelled this game.');
+      });
 
       const viewerSeat: number | null = data.state.viewerSeat;
       if (viewerSeat !== null) {

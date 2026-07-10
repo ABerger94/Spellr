@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { GameFormat, DeckFormat, type Deck, type DeckCard } from '@prisma/client';
 import { shuffle } from './zones';
 import { EMPTY_ZONES, type ZoneState } from '@/types/game';
-import { broadcastGameState } from '@/server/realtime/pusherServer';
+import { broadcastGameCancelled, broadcastGameState } from '@/server/realtime/pusherServer';
 import { logEvent } from './gameEvents';
 import { maybeTakeAITurn } from '@/server/ai/aiController';
 
@@ -96,6 +96,22 @@ export async function joinGame(inviteCode: string, userId: string, deckId: strin
 
   await prisma.gamePlayer.create({ data: { gameId: game.id, userId, deckId, seat, isAI: false } });
   return prisma.game.findUnique({ where: { id: game.id }, include: { players: true } });
+}
+
+/** Host-only. Permanently deletes a game that hasn't started yet (cascades
+ * to its GamePlayer/GameEvent rows) and tells anyone else waiting in the
+ * lobby that it's gone. */
+export async function cancelGame(gameId: string, requestingUserId: string) {
+  const game = await prisma.game.findUniqueOrThrow({ where: { id: gameId } });
+  if (game.hostUserId !== requestingUserId) throw new Error('Only the host can cancel the game');
+  if (game.status !== 'LOBBY') throw new Error('That game has already started');
+
+  try {
+    await broadcastGameCancelled(gameId);
+  } catch (err) {
+    console.error('[broadcastGameCancelled]', err);
+  }
+  await prisma.game.delete({ where: { id: gameId } });
 }
 
 export async function getGameForUser(gameId: string, userId: string) {
@@ -217,4 +233,14 @@ export async function restartGame(gameId: string, requestingUserId: string) {
   if (firstPlayer?.isAI) {
     void maybeTakeAITurn(gameId, 0);
   }
+}
+
+/** Host-only. Marks an in-progress game FINISHED — its board and log are
+ * left intact (not deleted), it just drops off the "Your games" list. */
+export async function endGame(gameId: string, requestingUserId: string) {
+  const game = await prisma.game.findUniqueOrThrow({ where: { id: gameId } });
+  if (game.hostUserId !== requestingUserId) throw new Error('Only the host can end the game');
+  if (game.status !== 'ACTIVE') throw new Error('Game is not active');
+
+  await prisma.game.update({ where: { id: gameId }, data: { status: 'FINISHED', endedAt: new Date() } });
 }

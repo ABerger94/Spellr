@@ -9,13 +9,16 @@ export function GameLobbyWait({
   gameInfo,
   isHost,
   onStarted,
+  onCancelled,
 }: {
   state: GameStateView;
   gameInfo: GameInfo;
   isHost: boolean;
   onStarted: () => void | Promise<void>;
+  onCancelled: () => void | Promise<void>;
 }) {
   const [starting, setStarting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleStart() {
@@ -32,6 +35,20 @@ export function GameLobbyWait({
     // directly so a dropped/delayed Pusher message can't strand the host on
     // this screen even though the game did actually start.
     await onStarted();
+  }
+
+  async function handleCancel() {
+    if (!window.confirm('Cancel this game? It will be removed for everyone in the lobby.')) return;
+    setCancelling(true);
+    setError(null);
+    const res = await fetch(`/api/games/${gameInfo.id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error ?? 'Failed to cancel game');
+      setCancelling(false);
+      return;
+    }
+    await onCancelled();
   }
 
   const seats = Array.from({ length: gameInfo.maxSeats }, (_, seat) => state.players.find((p) => p.seat === seat));
@@ -62,13 +79,22 @@ export function GameLobbyWait({
       {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
 
       {isHost ? (
-        <button
-          onClick={handleStart}
-          disabled={starting}
-          className="w-full rounded bg-accent px-4 py-2 font-medium text-white hover:bg-accent/80 disabled:opacity-50"
-        >
-          {starting ? 'Starting…' : 'Start game'}
-        </button>
+        <div className="space-y-2">
+          <button
+            onClick={handleStart}
+            disabled={starting || cancelling}
+            className="w-full rounded bg-accent px-4 py-2 font-medium text-white hover:bg-accent/80 disabled:opacity-50"
+          >
+            {starting ? 'Starting…' : 'Start game'}
+          </button>
+          <button
+            onClick={handleCancel}
+            disabled={starting || cancelling}
+            className="w-full rounded bg-red-500/10 px-4 py-2 font-medium text-red-400 hover:bg-red-500/20 disabled:opacity-50"
+          >
+            {cancelling ? 'Cancelling…' : 'Cancel game'}
+          </button>
+        </div>
       ) : (
         <p className="text-center text-sm text-slate-400">Waiting for the host to start the game…</p>
       )}
