@@ -20,7 +20,7 @@ export function HandZone({
 
   return (
     <div>
-      <p className="mb-1 text-[10px] text-slate-500">Hand — click a card to play it, right-click for discard/exile</p>
+      <p className="mb-1 text-[10px] text-slate-500">Hand — tap a card to play it, tap ⋯ (or right-click) for discard/exile</p>
       <div className="flex gap-2 overflow-x-auto pb-1">
         {hand.map((scryfallId, i) => {
           const facts = cards[scryfallId];
@@ -39,6 +39,7 @@ export function HandZone({
                       }
                     : undefined
                 }
+                onMore={onContextMenu ? (e) => onContextMenu(e, scryfallId) : undefined}
               />
             </div>
           );
