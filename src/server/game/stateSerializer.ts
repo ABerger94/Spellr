@@ -57,6 +57,8 @@ export async function buildStateFor(gameId: string, viewerSeat: number | null): 
         handCount: zones.hand.length,
         pendingLook: isViewer ? zones.pendingLook ?? [] : [],
         pendingLookMode: isViewer ? zones.pendingLookMode ?? null : null,
+        // Mana pool is public information (like life), visible for every player.
+        manaPool: zones.manaPool ?? {},
       };
     });
 

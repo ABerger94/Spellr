@@ -5,6 +5,7 @@ const libraryPosition = z.enum(['top', 'bottom']);
 const lookDestination = z.enum(['top', 'bottom', 'graveyard']);
 
 const percent = z.number().min(0).max(100);
+const manaColor = z.enum(['W', 'U', 'B', 'R', 'G', 'C']);
 
 export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('DRAW_CARD'), count: z.number().int().min(1).max(40).optional() }),
@@ -49,6 +50,8 @@ export const actionSchema = z.discriminatedUnion('type', [
     counterType: z.string().min(1).max(20),
     delta: z.number().int().min(-99).max(99),
   }),
+  z.object({ type: z.literal('ADJUST_MANA'), color: manaColor, delta: z.number().int().min(-99).max(99) }),
+  z.object({ type: z.literal('EMPTY_MANA_POOL') }),
 ]);
 
 export type Action = z.infer<typeof actionSchema>;

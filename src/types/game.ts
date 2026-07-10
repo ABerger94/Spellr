@@ -10,6 +10,8 @@ export interface BattlefieldCard {
 
 export type LookMode = 'scry' | 'surveil';
 
+export type ManaColor = 'W' | 'U' | 'B' | 'R' | 'G' | 'C';
+
 export interface ZoneState {
   library: string[];
   hand: string[];
@@ -20,6 +22,8 @@ export interface ZoneState {
   /** Cards temporarily pulled off the top of the library for a scry/surveil in progress. */
   pendingLook: string[];
   pendingLookMode: LookMode | null;
+  /** Floating mana pool, keyed by color (W/U/B/R/G/C). */
+  manaPool: Record<string, number>;
 }
 
 export const EMPTY_ZONES: ZoneState = {
@@ -31,6 +35,7 @@ export const EMPTY_ZONES: ZoneState = {
   commandZone: [],
   pendingLook: [],
   pendingLookMode: null,
+  manaPool: {},
 };
 
 export interface CardFacts {
@@ -59,6 +64,7 @@ export interface PlayerStateView {
   handCount: number;
   pendingLook: string[]; // only populated for the viewer's own seat
   pendingLookMode: LookMode | null;
+  manaPool: Record<string, number>;
 }
 
 export interface GameStateView {
@@ -113,4 +119,6 @@ export type GameActionPayload =
   | { type: 'MULLIGAN' }
   | { type: 'ROLL_DICE'; sides: number }
   | { type: 'FLIP_COIN' }
-  | { type: 'ADJUST_COUNTER'; instanceId: string; counterType: string; delta: number };
+  | { type: 'ADJUST_COUNTER'; instanceId: string; counterType: string; delta: number }
+  | { type: 'ADJUST_MANA'; color: ManaColor; delta: number }
+  | { type: 'EMPTY_MANA_POOL' };
