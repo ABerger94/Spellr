@@ -1,11 +1,16 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { LookCountPrompt } from './LookCountPrompt';
 
 type CountPrompt = 'drawX' | 'scry' | 'surveil' | 'mill';
 
+const MENU_WIDTH = 200;
+const VIEWPORT_MARGIN = 8;
+
 export function GameActionsMenu({
+  anchorRect,
   onClose,
   lookInProgress,
   onDrawX,
@@ -21,6 +26,10 @@ export function GameActionsMenu({
   onResetLife,
   onResetDeck,
 }: {
+  /** Bounding rect of the trigger button, captured at open time — the menu is
+   * positioned relative to the viewport (not a DOM ancestor) so it can never
+   * be clipped by the scrollable toolbar it's opened from. */
+  anchorRect: DOMRect;
   onClose: () => void;
   lookInProgress: boolean;
   onDrawX: (count: number) => void;
@@ -89,10 +98,20 @@ export function GameActionsMenu({
     );
   }
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  let left = anchorRect.right - MENU_WIDTH;
+  left = Math.max(VIEWPORT_MARGIN, left);
+  left = Math.min(left, viewportWidth - MENU_WIDTH - VIEWPORT_MARGIN);
+  const top = Math.min(anchorRect.bottom + 4, viewportHeight - VIEWPORT_MARGIN);
+
+  return createPortal(
     <div
       ref={ref}
-      className="absolute right-0 top-full z-50 mt-1 min-w-[190px] rounded border border-white/10 bg-panel py-1 shadow-xl"
+      style={{ position: 'fixed', left, top, width: MENU_WIDTH, maxHeight: `${viewportHeight - top - VIEWPORT_MARGIN}px` }}
+      className="z-[200] overflow-y-auto rounded border border-white/10 bg-panel py-1 shadow-2xl"
     >
       <CountRow label="Draw X" prompt="drawX" onConfirm={onDrawX} />
       <CountRow label="Scry" prompt="scry" disabled={lookInProgress} onConfirm={onScry} />
@@ -109,6 +128,7 @@ export function GameActionsMenu({
       <div className="my-1 border-t border-white/10" />
       <Row label="Reset Life" onClick={onResetLife} />
       <Row label="Reset Deck" onClick={onResetDeck} />
-    </div>
+    </div>,
+    document.body,
   );
 }
