@@ -3,7 +3,17 @@
 import { CardBack } from '@/components/card/CardBack';
 import { useDragDrop } from './DragDropContext';
 
-export function LibraryStack({ count, onDraw, draggable }: { count: number; onDraw?: () => void; draggable?: boolean }) {
+export function LibraryStack({
+  count,
+  onDraw,
+  onShuffle,
+  draggable,
+}: {
+  count: number;
+  onDraw?: () => void;
+  onShuffle?: () => void;
+  draggable?: boolean;
+}) {
   const { dragging } = useDragDrop();
   const isHover = draggable && dragging?.hoverZone === 'library';
 
@@ -21,7 +31,19 @@ export function LibraryStack({ count, onDraw, draggable }: { count: number; onDr
       >
         <CardBack count={count} label="Library" />
       </div>
-      {onDraw && <p className="mt-0.5 text-center text-[10px] text-slate-500">Click to draw · drag cards here for top</p>}
+      {onDraw && <p className="mt-0.5 text-center text-[10px] text-slate-500">Click to draw · drag for top</p>}
+      {onShuffle && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onShuffle();
+          }}
+          title="Shuffle your library"
+          className="mt-0.5 w-full rounded bg-panelLight py-0.5 text-center text-[10px] text-slate-300 hover:bg-white/10"
+        >
+          🔀 Shuffle
+        </button>
+      )}
     </div>
   );
 }

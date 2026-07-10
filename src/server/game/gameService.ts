@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { GameFormat, DeckFormat } from '@prisma/client';
+import { GameFormat, DeckFormat, type Deck, type DeckCard } from '@prisma/client';
 import { shuffle } from './zones';
 import { EMPTY_ZONES, type ZoneState } from '@/types/game';
 import { broadcastGameState } from '@/server/realtime/pusherServer';
@@ -13,6 +13,32 @@ const AI_PERSONAS = ['Nissa (AI)', 'Jace (AI)', 'Chandra (AI)', 'Liliana (AI)'];
 // them directly.
 export function deckFormatFor(gameFormat: GameFormat): DeckFormat {
   return gameFormat === 'COMMANDER' ? DeckFormat.COMMANDER : DeckFormat.STANDARD_1V1;
+}
+
+export function startingLifeFor(format: GameFormat): number {
+  return format === 'COMMANDER' ? 40 : 20;
+}
+
+/** Builds a freshly-shuffled library (+ command zone, for Commander) from a
+ * player's deck — the "deal a new hand" logic shared by starting and
+ * restarting a game. */
+function buildFreshZones(deck: (Deck & { cards: DeckCard[] }) | null, format: GameFormat): ZoneState {
+  let library: string[] = [];
+  let commandZone: string[] = [];
+
+  if (deck) {
+    const expanded: string[] = [];
+    for (const dc of deck.cards) {
+      if (dc.isCommander) continue;
+      for (let i = 0; i < dc.quantity; i++) expanded.push(dc.scryfallId);
+    }
+    library = shuffle(expanded);
+    if (format === 'COMMANDER' && deck.commanderCardId) {
+      commandZone = [deck.commanderCardId];
+    }
+  }
+
+  return { ...EMPTY_ZONES, library, commandZone };
 }
 
 export async function listGamesForUser(userId: string) {
@@ -115,26 +141,10 @@ export async function startGame(gameId: string, requestingUserId: string) {
     include: { deck: { include: { cards: true } } },
   });
 
-  const startingLife = game.format === 'COMMANDER' ? 40 : 20;
+  const startingLife = startingLifeFor(game.format);
 
   for (const player of players) {
-    let library: string[] = [];
-    let commandZone: string[] = [];
-
-    if (player.deck) {
-      const expanded: string[] = [];
-      for (const dc of player.deck.cards) {
-        if (dc.isCommander) continue;
-        for (let i = 0; i < dc.quantity; i++) expanded.push(dc.scryfallId);
-      }
-      library = shuffle(expanded);
-      if (game.format === 'COMMANDER' && player.deck.commanderCardId) {
-        commandZone = [player.deck.commanderCardId];
-      }
-    }
-
-    const zones: ZoneState = { ...EMPTY_ZONES, library, commandZone };
-
+    const zones = buildFreshZones(player.deck, game.format);
     await prisma.gamePlayer.update({
       where: { id: player.id },
       data: { life: startingLife, zones: zones as unknown as object, connected: player.isAI },
@@ -153,6 +163,55 @@ export async function startGame(gameId: string, requestingUserId: string) {
   } catch (err) {
     console.error('[broadcastGameState]', err);
   }
+
+  const firstPlayer = players.find((p) => p.seat === 0);
+  if (firstPlayer?.isAI) {
+    void maybeTakeAITurn(gameId, 0);
+  }
+}
+
+/** Puts one player's cards back in their library (reshuffled), returns their
+ * commander to the command zone, and resets their life/counters — a "start
+ * over" for just that seat, without touching anyone else's board. */
+export async function resetPlayerBoard(gameId: string, seat: number) {
+  const game = await prisma.game.findUniqueOrThrow({ where: { id: gameId } });
+  const player = await prisma.gamePlayer.findFirstOrThrow({
+    where: { gameId, seat },
+    include: { deck: { include: { cards: true } } },
+  });
+  const zones = buildFreshZones(player.deck, game.format);
+  await prisma.gamePlayer.update({
+    where: { id: player.id },
+    data: {
+      life: startingLifeFor(game.format),
+      zones: zones as unknown as object,
+      counters: {},
+      commanderDamage: {},
+    },
+  });
+}
+
+/** Resets every player's board and life, and rewinds the turn counter — a
+ * full restart of an in-progress game for the same seats. Host-only. */
+export async function restartGame(gameId: string, requestingUserId: string) {
+  const game = await prisma.game.findUniqueOrThrow({ where: { id: gameId } });
+  if (game.hostUserId !== requestingUserId) throw new Error('Only the host can restart the game');
+
+  const players = await prisma.gamePlayer.findMany({
+    where: { gameId },
+    include: { deck: { include: { cards: true } } },
+  });
+  const startingLife = startingLifeFor(game.format);
+
+  for (const player of players) {
+    const zones = buildFreshZones(player.deck, game.format);
+    await prisma.gamePlayer.update({
+      where: { id: player.id },
+      data: { life: startingLife, zones: zones as unknown as object, counters: {}, commanderDamage: {} },
+    });
+  }
+
+  await prisma.game.update({ where: { id: gameId }, data: { currentTurnSeat: 0, turnNumber: 1 } });
 
   const firstPlayer = players.find((p) => p.seat === 0);
   if (firstPlayer?.isAI) {

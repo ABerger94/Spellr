@@ -14,9 +14,13 @@ import { CommandZone } from '@/components/game/CommandZone';
 import { GameLog } from '@/components/game/GameLog';
 import { GameLobbyWait } from '@/components/game/GameLobbyWait';
 import { ScryModal } from '@/components/game/ScryModal';
-import { MobileActionBar } from '@/components/game/MobileActionBar';
+import { GameActionsBar } from '@/components/game/GameActionsBar';
+import { DiceRoller } from '@/components/game/DiceRoller';
 import { CardContextMenu, type ContextMenuOption } from '@/components/game/CardContextMenu';
 import { DragDropProvider, type DragSource, type DropTarget } from '@/components/game/DragDropContext';
+
+const MIN_ZOOM = 0.6;
+const MAX_ZOOM = 1.3;
 
 export default function GameTablePage() {
   const params = useParams<{ gameId: string }>();
@@ -24,6 +28,7 @@ export default function GameTablePage() {
   const { state, gameInfo, log, joinError, actionError, sendAction, onlineUserIds, refreshState } = useGameState(params.gameId);
   const [menu, setMenu] = useState<{ x: number; y: number; options: ContextMenuOption[] } | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [zoom, setZoom] = useState(1);
 
   const isMyTurn = state?.status === 'ACTIVE' && state.currentTurnSeat === state.viewerSeat;
 
@@ -168,6 +173,25 @@ export default function GameTablePage() {
     });
   }
 
+  function handleResetDeck() {
+    if (window.confirm('Put all your cards back in your library and reshuffle? This also resets your life.')) {
+      sendAction({ type: 'RESET_BOARD' });
+    }
+  }
+
+  function handleRestartGame() {
+    if (
+      window.confirm(
+        'Restart the game for everyone? This reshuffles every library, resets all life totals and boards, and returns to turn 1.',
+      )
+    ) {
+      sendAction({ type: 'RESTART_GAME' });
+    }
+  }
+
+  const viewerUserId = (session?.user as { id?: string } | undefined)?.id;
+  const isHost = !!viewerUserId && viewerUserId === gameInfo.hostUserId;
+
   return (
     <DragDropProvider onDrop={handleDrop}>
     <div className="flex h-screen flex-col">
@@ -175,12 +199,22 @@ export default function GameTablePage() {
 
       <div className="flex items-center justify-between border-b border-white/10 bg-panel px-4 py-1.5 text-xs text-slate-400">
         <span className="hidden truncate sm:inline">
-          Tap or drag a card to play/move it · tap ⋯ on a card for more options · use the bar at the bottom for draw/scry/surveil/pass ·
+          Tap or drag a card to play/move it · tap ⋯ on a card for more options · use the Game actions bar for
+          draw/scry/surveil/mill/pass/etc ·
           keyboard: <kbd className="rounded bg-panelLight px-1">D</kbd> draw, <kbd className="rounded bg-panelLight px-1">Space</kbd> pass turn
         </span>
+        {isHost && (
+          <button
+            onClick={handleRestartGame}
+            title="Restart the game for everyone"
+            className="ml-auto mr-2 rounded bg-red-500/10 px-2 py-0.5 text-red-400 hover:bg-red-500/20 sm:ml-2"
+          >
+            ⟲ Restart game
+          </button>
+        )}
         <button
           onClick={() => setShowHelp((v) => !v)}
-          className="ml-auto rounded bg-panelLight px-2 py-0.5 hover:bg-white/10 sm:ml-0"
+          className={`rounded bg-panelLight px-2 py-0.5 hover:bg-white/10 ${isHost ? '' : 'ml-auto sm:ml-0'}`}
         >
           {showHelp ? 'Hide help' : '? Help'}
         </button>
@@ -214,13 +248,24 @@ export default function GameTablePage() {
             inside to return it to hand, put it on the battlefield, or send it to the top/bottom of your library.
           </p>
           <p className="mb-1">
-            <strong>Scry / Surveil:</strong> use the Scry/Surveil buttons in the bar at the bottom of the screen, pick
-            how many cards, then choose top/bottom (scry) or top/graveyard (surveil) for each card revealed.
+            <strong>Game actions bar:</strong> at the top — Untap All, Draw, Pass are one tap; the Actions ▾ menu adds
+            Draw X, Scry, Surveil, Mill, Exile Top, Look at Top, Random Discard, Reveal Hand, Shuffle, Mulligan, and
+            Reset Deck (cards back to library, reshuffled, life reset). The +/− on the right zooms your battlefield.
+          </p>
+          <p className="mb-1">
+            <strong>Dice &amp; coins:</strong> below the game log — pick a die size and tap Roll, or tap Flip for a
+            coin flip; results post to the log for everyone to see.
           </p>
           <p className="mb-1">
             <strong>Life:</strong> the −/+ buttons next to any player&apos;s name adjust their life (you can adjust
             opponents&apos; life too — e.g. to deal combat damage — same as you would with paper life pads).
           </p>
+          {isHost && (
+            <p className="mb-1">
+              <strong>Restart game:</strong> the host-only Restart game button reshuffles every player&apos;s library,
+              resets everyone&apos;s life and board, and returns to turn 1 — for a mulligan on the whole game.
+            </p>
+          )}
           <p>
             <strong>Not yet built:</strong> counters beyond the basics and combat damage math — for now, resolve
             those by hand using life adjustments and the move-to-zone menu.
@@ -232,6 +277,31 @@ export default function GameTablePage() {
         <div className="flex items-center justify-between border-b border-red-500/30 bg-red-500/10 px-4 py-1.5 text-sm text-red-400">
           <span>{actionError}</span>
         </div>
+      )}
+
+      {me && (
+        <GameActionsBar
+          isMyTurn={!!isMyTurn}
+          lookInProgress={me.pendingLook.length > 0}
+          zoom={zoom}
+          onZoomIn={() => setZoom((z) => Math.min(MAX_ZOOM, +(z + 0.1).toFixed(2)))}
+          onZoomOut={() => setZoom((z) => Math.max(MIN_ZOOM, +(z - 0.1).toFixed(2)))}
+          onUntapAll={() => sendAction({ type: 'UNTAP_ALL' })}
+          onDraw={() => sendAction({ type: 'DRAW_CARD' })}
+          onPassTurn={() => sendAction({ type: 'PASS_TURN' })}
+          onDrawX={(count) => sendAction({ type: 'DRAW_CARD', count })}
+          onScry={(count) => sendAction({ type: 'SCRY', count })}
+          onSurveil={(count) => sendAction({ type: 'SURVEIL', count })}
+          onMill={(count) => sendAction({ type: 'MILL', count })}
+          onExileTop={() => sendAction({ type: 'MOVE_CARD', fromZone: 'library', toZone: 'exile' })}
+          onLookAtTop={() => sendAction({ type: 'SCRY', count: 1 })}
+          onRandomDiscard={() => sendAction({ type: 'RANDOM_DISCARD' })}
+          onRevealHand={() => sendAction({ type: 'REVEAL_HAND' })}
+          onShuffle={() => sendAction({ type: 'SHUFFLE_LIBRARY' })}
+          onMulligan={() => sendAction({ type: 'MULLIGAN' })}
+          onResetLife={() => sendAction({ type: 'RESET_LIFE' })}
+          onResetDeck={handleResetDeck}
+        />
       )}
 
       <div className="flex flex-1 flex-col gap-4 overflow-hidden p-4 lg:flex-row">
@@ -277,7 +347,12 @@ export default function GameTablePage() {
                 onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: me.seat, delta })}
               />
               <div className="mt-2 flex items-center gap-2">
-                <LibraryStack count={me.libraryCount} onDraw={() => sendAction({ type: 'DRAW_CARD' })} draggable />
+                <LibraryStack
+                  count={me.libraryCount}
+                  onDraw={() => sendAction({ type: 'DRAW_CARD' })}
+                  onShuffle={() => sendAction({ type: 'SHUFFLE_LIBRARY' })}
+                  draggable
+                />
                 <PublicZoneStack
                   label="Graveyard"
                   zone="graveyard"
@@ -303,12 +378,7 @@ export default function GameTablePage() {
                   />
                 )}
                 {state.currentTurnSeat === me.seat && (
-                  <button
-                    onClick={() => sendAction({ type: 'PASS_TURN' })}
-                    className="ml-auto rounded bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/80"
-                  >
-                    Pass turn
-                  </button>
+                  <span className="ml-auto rounded bg-accent/20 px-2 py-1 text-xs font-medium text-accent">Your turn</span>
                 )}
               </div>
               <div className="mt-2">
@@ -316,6 +386,7 @@ export default function GameTablePage() {
                   battlefield={me.battlefield}
                   cards={state.cards}
                   interactive
+                  zoom={zoom}
                   onTapToggle={(instanceId, tapped) =>
                     sendAction(tapped ? { type: 'UNTAP_CARD', instanceId } : { type: 'TAP_CARD', instanceId })
                   }
@@ -403,21 +474,16 @@ export default function GameTablePage() {
           )}
         </div>
 
-        <div className="h-40 flex-shrink-0 lg:h-auto lg:w-72">
-          <GameLog events={log} displayName={displayName} />
+        <div className="flex h-40 flex-shrink-0 flex-col lg:h-auto lg:w-72">
+          <div className="min-h-0 flex-1">
+            <GameLog events={log} displayName={displayName} />
+          </div>
+          <DiceRoller
+            onRoll={(sides) => sendAction({ type: 'ROLL_DICE', sides })}
+            onFlip={() => sendAction({ type: 'FLIP_COIN' })}
+          />
         </div>
       </div>
-
-      {me && (
-        <MobileActionBar
-          isMyTurn={!!isMyTurn}
-          lookInProgress={me.pendingLook.length > 0}
-          onDraw={(count) => sendAction({ type: 'DRAW_CARD', count })}
-          onScry={(count) => sendAction({ type: 'SCRY', count })}
-          onSurveil={(count) => sendAction({ type: 'SURVEIL', count })}
-          onPassTurn={() => sendAction({ type: 'PASS_TURN' })}
-        />
-      )}
 
       {menu && <CardContextMenu x={menu.x} y={menu.y} options={menu.options} onClose={() => setMenu(null)} />}
 

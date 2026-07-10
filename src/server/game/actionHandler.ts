@@ -1,11 +1,23 @@
 import { prisma } from '@/lib/prisma';
 import type { GameEvent } from '@prisma/client';
 import type { ZoneState } from '@/types/game';
-import { drawCards, moveCard, resolveLook, startLook, tapCard } from './zones';
+import {
+  drawCards,
+  moveCard,
+  resolveLook,
+  startLook,
+  tapCard,
+  untapAll,
+  shuffleLibrary,
+  millCards,
+  randomDiscard,
+  mulligan,
+} from './zones';
 import { logEvent } from './gameEvents';
 import { broadcastGameState } from '@/server/realtime/pusherServer';
 import type { Action } from './actionTypes';
 import { maybeTakeAITurn } from '@/server/ai/aiController';
+import { resetPlayerBoard, restartGame, startingLifeFor } from './gameService';
 
 export interface ActionActor {
   userId?: string | null;
@@ -162,6 +174,93 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       if (nextPlayer?.isAI) {
         void maybeTakeAITurn(gameId, nextSeat);
       }
+      break;
+    }
+
+    case 'SHUFFLE_LIBRARY': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      await updateZones(player.id, shuffleLibrary(zones));
+      event = await logEvent(gameId, 'SHUFFLE_LIBRARY', {}, actor);
+      break;
+    }
+
+    case 'UNTAP_ALL': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      await updateZones(player.id, untapAll(zones));
+      event = await logEvent(gameId, 'UNTAP_ALL', {}, actor);
+      break;
+    }
+
+    case 'RESET_LIFE': {
+      const player = await getPlayer(gameId, actor.seat);
+      const life = startingLifeFor(game.format);
+      await prisma.gamePlayer.update({ where: { id: player.id }, data: { life } });
+      event = await logEvent(gameId, 'RESET_LIFE', { life }, actor);
+      break;
+    }
+
+    case 'RESET_BOARD': {
+      await resetPlayerBoard(gameId, actor.seat);
+      event = await logEvent(gameId, 'RESET_BOARD', {}, actor);
+      break;
+    }
+
+    case 'RESTART_GAME': {
+      await restartGame(gameId, actor.userId ?? '');
+      event = await logEvent(gameId, 'RESTART_GAME', {}, actor);
+      break;
+    }
+
+    case 'MILL': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const { zones: nextZones, milledScryfallIds } = millCards(zones, action.count);
+      await updateZones(player.id, nextZones);
+      event = await logEvent(gameId, 'MILL', { count: milledScryfallIds.length }, actor);
+      break;
+    }
+
+    case 'RANDOM_DISCARD': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const { zones: nextZones } = randomDiscard(zones);
+      await updateZones(player.id, nextZones);
+      event = await logEvent(gameId, 'RANDOM_DISCARD', {}, actor);
+      break;
+    }
+
+    case 'REVEAL_HAND': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const cardRows = await prisma.cardCache.findMany({
+        where: { scryfallId: { in: zones.hand } },
+        select: { scryfallId: true, name: true },
+      });
+      const namesById = new Map(cardRows.map((c) => [c.scryfallId, c.name]));
+      const cardNames = zones.hand.map((id) => namesById.get(id) ?? id);
+      event = await logEvent(gameId, 'REVEAL_HAND', { cardNames }, actor);
+      break;
+    }
+
+    case 'MULLIGAN': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      await updateZones(player.id, mulligan(zones));
+      event = await logEvent(gameId, 'MULLIGAN', {}, actor);
+      break;
+    }
+
+    case 'ROLL_DICE': {
+      const result = 1 + Math.floor(Math.random() * action.sides);
+      event = await logEvent(gameId, 'ROLL_DICE', { sides: action.sides, result }, actor);
+      break;
+    }
+
+    case 'FLIP_COIN': {
+      const result = Math.random() < 0.5 ? 'heads' : 'tails';
+      event = await logEvent(gameId, 'FLIP_COIN', { result }, actor);
       break;
     }
   }
