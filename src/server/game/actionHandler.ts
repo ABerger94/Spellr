@@ -12,6 +12,21 @@ export interface ActionActor {
   seat: number;
 }
 
+// Serializes all actions for a given game so two concurrent requests (e.g. a
+// double-clicked button, or a human and the AI acting back-to-back) can't
+// race on the same GamePlayer's zones/life with a read-modify-write.
+const gameLocks = new Map<string, Promise<unknown>>();
+
+function withGameLock<T>(gameId: string, fn: () => Promise<T>): Promise<T> {
+  const previous = gameLocks.get(gameId) ?? Promise.resolve();
+  const run = previous.then(fn, fn);
+  gameLocks.set(
+    gameId,
+    run.catch(() => undefined),
+  );
+  return run;
+}
+
 async function getPlayer(gameId: string, seat: number) {
   return prisma.gamePlayer.findFirstOrThrow({ where: { gameId, seat } });
 }
@@ -36,7 +51,11 @@ async function broadcastState(gameId: string) {
   }
 }
 
-export async function execute(gameId: string, actor: ActionActor, action: Action): Promise<void> {
+export function execute(gameId: string, actor: ActionActor, action: Action): Promise<void> {
+  return withGameLock(gameId, () => executeLocked(gameId, actor, action));
+}
+
+async function executeLocked(gameId: string, actor: ActionActor, action: Action): Promise<void> {
   const game = await prisma.game.findUniqueOrThrow({ where: { id: gameId } });
   if (game.status !== 'ACTIVE') throw new Error('Game is not active');
 
@@ -90,7 +109,7 @@ export async function execute(gameId: string, actor: ActionActor, action: Action
 
     case 'ADJUST_LIFE': {
       const player = await getPlayer(gameId, action.seat);
-      await prisma.gamePlayer.update({ where: { id: player.id }, data: { life: player.life + action.delta } });
+      await prisma.gamePlayer.update({ where: { id: player.id }, data: { life: { increment: action.delta } } });
       await logEvent(gameId, 'ADJUST_LIFE', { seat: action.seat, delta: action.delta }, actor);
       break;
     }

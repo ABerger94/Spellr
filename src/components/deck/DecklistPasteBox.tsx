@@ -6,11 +6,13 @@ export function DecklistPasteBox({ deckId, onImported }: { deckId: string; onImp
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ imported: number; warnings: string[] } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleImport() {
     if (!text.trim()) return;
     setLoading(true);
     setResult(null);
+    setError(null);
     try {
       const res = await fetch(`/api/decks/${deckId}/import`, {
         method: 'POST',
@@ -18,11 +20,17 @@ export function DecklistPasteBox({ deckId, onImported }: { deckId: string; onImp
         body: JSON.stringify({ text }),
       });
       const data = await res.json();
+      if (!res.ok || typeof data.imported !== 'number') {
+        setError(data.error ?? 'Import failed');
+        return;
+      }
       setResult(data);
       if (data.imported > 0) {
         setText('');
         onImported();
       }
+    } catch {
+      setError('Import failed — check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -45,6 +53,7 @@ export function DecklistPasteBox({ deckId, onImported }: { deckId: string; onImp
       >
         {loading ? 'Importing…' : 'Import decklist'}
       </button>
+      {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
       {result && (
         <div className="mt-2 text-sm">
           <p className="text-emerald-400">Imported {result.imported} card(s).</p>

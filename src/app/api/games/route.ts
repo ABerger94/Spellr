@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { GameFormat } from '@prisma/client';
 import { requireSession } from '@/server/auth/session';
-import { createGame, listGamesForUser } from '@/server/game/gameService';
+import { createGame, deckFormatFor, listGamesForUser } from '@/server/game/gameService';
 import { prisma } from '@/lib/prisma';
 
 export async function GET() {
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
 
   const deck = await prisma.deck.findFirst({ where: { id: parsed.data.deckId, userId: auth.userId } });
   if (!deck) return NextResponse.json({ error: 'Deck not found' }, { status: 404 });
-  if (deck.format !== parsed.data.format) {
+  if (deck.format !== deckFormatFor(parsed.data.format)) {
     return NextResponse.json({ error: 'Deck format does not match game format' }, { status: 400 });
   }
 

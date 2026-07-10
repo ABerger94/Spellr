@@ -12,6 +12,15 @@ export interface GameLogEntry {
   createdAt: string;
 }
 
+const MAX_LOG_ENTRIES = 500;
+
+function mergeLogEntries(existing: GameLogEntry[], incoming: GameLogEntry[]): GameLogEntry[] {
+  const byId = new Map(existing.map((e) => [e.id, e]));
+  for (const event of incoming) byId.set(event.id, event);
+  const merged = [...byId.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return merged.length > MAX_LOG_ENTRIES ? merged.slice(merged.length - MAX_LOG_ENTRIES) : merged;
+}
+
 export function useGameState(gameId: string) {
   const { socketRef, connected } = useSocket();
   const [state, setState] = useState<GameStateView | null>(null);
@@ -21,7 +30,9 @@ export function useGameState(gameId: string) {
   useEffect(() => {
     fetch(`/api/games/${gameId}/events`)
       .then((res) => res.json())
-      .then((data) => setLog(data.events ?? []))
+      // Merge rather than replace: a game:log event may already have arrived
+      // over the socket before this REST fetch resolves.
+      .then((data) => setLog((prev) => mergeLogEntries(prev, data.events ?? [])))
       .catch(() => undefined);
   }, [gameId]);
 
@@ -33,14 +44,24 @@ export function useGameState(gameId: string) {
       setState(s);
     }
     function onLog(event: GameLogEntry) {
-      setLog((prev) => [...prev, event]);
+      setLog((prev) => mergeLogEntries(prev, [event]));
     }
 
     socket.on('game:state', onState);
     socket.on('game:log', onLog);
 
     socket.emit('game:join', { gameId }, (res: { ok: boolean; error?: string }) => {
-      if (!res.ok) setJoinError(res.error ?? 'Failed to join game');
+      if (res.ok) {
+        setJoinError(null);
+        // Pick up anything logged between the initial REST fetch and this
+        // socket actually joining the room (and thus starting to receive game:log).
+        fetch(`/api/games/${gameId}/events`)
+          .then((r) => r.json())
+          .then((data) => setLog((prev) => mergeLogEntries(prev, data.events ?? [])))
+          .catch(() => undefined);
+      } else {
+        setJoinError(res.error ?? 'Failed to join game');
+      }
     });
 
     return () => {

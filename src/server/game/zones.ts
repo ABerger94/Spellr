@@ -13,8 +13,12 @@ export function shuffle<T>(arr: T[]): T[] {
 const BATTLEFIELD_COLUMNS = 8;
 
 function nextBattlefieldSlot(battlefield: BattlefieldCard[]): { x: number; y: number } {
-  const index = battlefield.length;
-  return { x: index % BATTLEFIELD_COLUMNS, y: Math.floor(index / BATTLEFIELD_COLUMNS) };
+  const occupied = new Set(battlefield.map((c) => `${c.x},${c.y}`));
+  for (let index = 0; ; index++) {
+    const x = index % BATTLEFIELD_COLUMNS;
+    const y = Math.floor(index / BATTLEFIELD_COLUMNS);
+    if (!occupied.has(`${x},${y}`)) return { x, y };
+  }
 }
 
 function cloneZones(zones: ZoneState): ZoneState {
@@ -65,6 +69,10 @@ export function moveCard(zones: ZoneState, params: MoveCardParams): MoveCardResu
   if (toZone === 'battlefield') {
     const { x, y } = nextBattlefieldSlot(next.battlefield);
     next.battlefield.push({ instanceId: uuidv4(), scryfallId: movedScryfallId, tapped: false, x, y });
+  } else if (toZone === 'library') {
+    // index 0 is the top of the library; cards entering the library (e.g. a
+    // "return to top of library" effect) go on top, matching where drawCard reads from.
+    next.library.unshift(movedScryfallId);
   } else {
     (next[toZone] as string[]).push(movedScryfallId);
   }
@@ -73,6 +81,9 @@ export function moveCard(zones: ZoneState, params: MoveCardParams): MoveCardResu
 }
 
 export function tapCard(zones: ZoneState, instanceId: string, tapped: boolean): ZoneState {
+  if (!zones.battlefield.some((c) => c.instanceId === instanceId)) {
+    throw new Error('Card not found on battlefield');
+  }
   return {
     ...cloneZones(zones),
     battlefield: zones.battlefield.map((c) => (c.instanceId === instanceId ? { ...c, tapped } : c)),

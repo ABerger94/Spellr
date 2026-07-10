@@ -22,10 +22,15 @@ export function CardContextMenu({
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        // Capture-phase + stopPropagation so the click that dismisses this menu
+        // doesn't also fall through to whatever card/button is underneath it.
+        e.stopPropagation();
+        onClose();
+      }
     }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('click', handleClick, true);
+    return () => document.removeEventListener('click', handleClick, true);
   }, [onClose]);
 
   return (

@@ -55,7 +55,12 @@ export async function getCardById(scryfallId: string) {
 }
 
 export async function getCardByExactName(name: string) {
-  const existing = await prisma.cardCache.findFirst({ where: { name: { equals: name, mode: 'insensitive' } } });
+  // Multiple printings can share a name; order deterministically so repeated
+  // lookups (e.g. re-importing the same decklist) always resolve to the same row.
+  const existing = await prisma.cardCache.findFirst({
+    where: { name: { equals: name, mode: 'insensitive' } },
+    orderBy: { fetchedAt: 'asc' },
+  });
   if (existing) return existing;
 
   const card = await scryfall.getCardByExactName(name);

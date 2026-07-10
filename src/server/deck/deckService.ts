@@ -60,24 +60,29 @@ export async function importDecklist(deckId: string, text: string): Promise<Impo
   const warnings: string[] = [];
   let imported = 0;
 
+  // Merge duplicate lines (e.g. the same card pasted twice) so the final
+  // quantity is their sum rather than the last line silently overwriting the rest.
+  const quantityByName = new Map<string, number>();
   for (const line of lines) {
-    let card;
+    quantityByName.set(line.cardName, (quantityByName.get(line.cardName) ?? 0) + line.quantity);
+  }
+
+  for (const [cardName, quantity] of quantityByName) {
     try {
-      card = await getCardByExactName(line.cardName);
+      const card = await getCardByExactName(cardName);
+      if (!card) {
+        warnings.push(`Could not find a card named "${cardName}"`);
+        continue;
+      }
+      await prisma.deckCard.upsert({
+        where: { deckId_scryfallId: { deckId, scryfallId: card.scryfallId } },
+        create: { deckId, scryfallId: card.scryfallId, quantity },
+        update: { quantity },
+      });
+      imported += 1;
     } catch (err) {
-      warnings.push(`Lookup failed for "${line.cardName}": ${err instanceof Error ? err.message : 'unknown error'}`);
-      continue;
+      warnings.push(`Could not import "${cardName}": ${err instanceof Error ? err.message : 'unknown error'}`);
     }
-    if (!card) {
-      warnings.push(`Could not find a card named "${line.cardName}"`);
-      continue;
-    }
-    await prisma.deckCard.upsert({
-      where: { deckId_scryfallId: { deckId, scryfallId: card.scryfallId } },
-      create: { deckId, scryfallId: card.scryfallId, quantity: line.quantity },
-      update: { quantity: line.quantity },
-    });
-    imported += 1;
   }
 
   return { imported, warnings };

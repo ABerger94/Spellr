@@ -17,6 +17,7 @@ export function CardSearchAutocomplete({ onAdd }: { onAdd: (scryfallId: string, 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -24,13 +25,16 @@ export function CardSearchAutocomplete({ onAdd }: { onAdd: (scryfallId: string, 
       return;
     }
     clearTimeout(debounceRef.current);
+    const requestId = ++requestIdRef.current;
     debounceRef.current = setTimeout(async () => {
       try {
         const res = await fetch(`/api/cards/autocomplete?q=${encodeURIComponent(query)}`);
         const data = await res.json();
+        // Ignore this response if a newer query has since been typed.
+        if (requestId !== requestIdRef.current) return;
         setSuggestions(data.names ?? []);
       } catch {
-        setSuggestions([]);
+        if (requestId === requestIdRef.current) setSuggestions([]);
       }
     }, 200);
     return () => clearTimeout(debounceRef.current);

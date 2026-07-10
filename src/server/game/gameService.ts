@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { GameFormat } from '@prisma/client';
+import { GameFormat, DeckFormat } from '@prisma/client';
 import { shuffle } from './zones';
 import { EMPTY_ZONES, type ZoneState } from '@/types/game';
 import { getIO, gameRoom } from '@/server/socket/io';
@@ -8,6 +8,13 @@ import { logEvent } from './gameEvents';
 import { maybeTakeAITurn } from '@/server/ai/aiController';
 
 const AI_PERSONAS = ['Nissa (AI)', 'Jace (AI)', 'Chandra (AI)', 'Liliana (AI)'];
+
+// GameFormat and DeckFormat are separate enums with different string values
+// for the non-Commander case ('ONE_V_ONE' vs 'STANDARD_1V1') — never compare
+// them directly.
+export function deckFormatFor(gameFormat: GameFormat): DeckFormat {
+  return gameFormat === 'COMMANDER' ? DeckFormat.COMMANDER : DeckFormat.STANDARD_1V1;
+}
 
 export async function listGamesForUser(userId: string) {
   return prisma.game.findMany({

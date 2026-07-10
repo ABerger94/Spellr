@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireSession } from '@/server/auth/session';
-import { joinGame } from '@/server/game/gameService';
+import { deckFormatFor, joinGame } from '@/server/game/gameService';
 import { prisma } from '@/lib/prisma';
 
 const joinSchema = z.object({
@@ -21,6 +21,12 @@ export async function POST(req: Request) {
 
   const deck = await prisma.deck.findFirst({ where: { id: parsed.data.deckId, userId: auth.userId } });
   if (!deck) return NextResponse.json({ error: 'Deck not found' }, { status: 404 });
+
+  const game = await prisma.game.findUnique({ where: { inviteCode: parsed.data.inviteCode } });
+  if (!game) return NextResponse.json({ error: 'Game not found' }, { status: 404 });
+  if (deck.format !== deckFormatFor(game.format)) {
+    return NextResponse.json({ error: 'Deck format does not match game format' }, { status: 400 });
+  }
 
   try {
     const game = await joinGame(parsed.data.inviteCode, auth.userId, parsed.data.deckId);

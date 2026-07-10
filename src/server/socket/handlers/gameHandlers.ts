@@ -39,6 +39,14 @@ export function registerGameHandlers(io: Server, socket: Socket) {
         return;
       }
 
+      // A socket that previously joined a different game must leave that
+      // room first, or it keeps receiving (and being counted toward) that
+      // game's state broadcasts under its new seat/game — leaking hand data.
+      const previousGameId = socket.data.gameId as string | undefined;
+      if (previousGameId && previousGameId !== payload.gameId) {
+        await socket.leave(gameRoom(previousGameId));
+      }
+
       socket.data.gameId = payload.gameId;
       socket.data.seat = player.seat;
       await socket.join(gameRoom(payload.gameId));
@@ -84,6 +92,13 @@ export function registerGameHandlers(io: Server, socket: Socket) {
     const gameId = socket.data.gameId as string | undefined;
     if (!gameId) return;
     try {
+      // Another tab/socket for the same user may still be connected to this
+      // game (multiple tabs, or a fresh reconnect racing this teardown) —
+      // only mark the player offline if no other socket of theirs remains.
+      const remaining = await io.in(gameRoom(gameId)).fetchSockets();
+      const stillConnected = remaining.some((s) => s.id !== socket.id && s.data.userId === userId);
+      if (stillConnected) return;
+
       await prisma.gamePlayer.updateMany({ where: { gameId, userId }, data: { connected: false } });
       await broadcastStateToRoom(io, gameId);
     } catch (err) {

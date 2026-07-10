@@ -4,6 +4,7 @@ export interface DecklistLine {
 }
 
 const LINE_RE = /^(\d+)\s*x?\s+(.+)$/i;
+const MAX_QUANTITY = 99;
 
 export function parseDecklist(text: string): DecklistLine[] {
   const lines: DecklistLine[] = [];
@@ -17,6 +18,7 @@ export function parseDecklist(text: string): DecklistLine[] {
     if (!match) continue;
 
     const quantity = parseInt(match[1], 10);
+    if (quantity < 1 || quantity > MAX_QUANTITY) continue;
     // Strip common set/collector-number suffixes like "(NEO) 123" if present.
     const cardName = match[2].replace(/\s*\([A-Za-z0-9]{2,6}\)\s*\d*\s*$/, '').trim();
     if (!cardName) continue;
