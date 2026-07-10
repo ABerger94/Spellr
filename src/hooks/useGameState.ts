@@ -38,6 +38,7 @@ export function useGameState(gameId: string) {
   const [gameInfo, setGameInfo] = useState<GameInfo | null>(null);
   const [log, setLog] = useState<GameLogEntry[]>([]);
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
   const stateRef = useRef<GameStateView | null>(null);
 
@@ -126,9 +127,19 @@ export function useGameState(gameId: string) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        console.error('[sendAction]', data.error ?? 'Action failed');
+        setActionError(data.error ?? 'Action failed');
+        return;
+      }
+      setActionError(null);
+      // Apply our own resulting state immediately rather than waiting on the
+      // realtime broadcast — this is what made every action (draw, tap, life
+      // changes, ...) look like it silently did nothing when the broadcast
+      // was slow, dropped, or never configured correctly.
+      if (data.state) {
+        setState(data.state);
+        stateRef.current = data.state;
       }
     },
     [gameId],
@@ -155,5 +166,5 @@ export function useGameState(gameId: string) {
     }
   }, [gameId]);
 
-  return { state, gameInfo, log, joinError, sendAction, onlineUserIds, refreshState };
+  return { state, gameInfo, log, joinError, actionError, sendAction, onlineUserIds, refreshState };
 }

@@ -19,27 +19,31 @@ export function HandZone({
   }
 
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1">
-      {hand.map((scryfallId, i) => {
-        const facts = cards[scryfallId];
-        return (
-          <div key={`${scryfallId}-${i}`} className="w-28 flex-shrink-0">
-            <CardImage
-              name={facts?.name ?? scryfallId}
-              imageUrl={facts?.imageNormal}
-              onClick={() => onPlay(scryfallId)}
-              onContextMenu={
-                onContextMenu
-                  ? (e) => {
-                      e.preventDefault();
-                      onContextMenu(e, scryfallId);
-                    }
-                  : undefined
-              }
-            />
-          </div>
-        );
-      })}
+    <div>
+      <p className="mb-1 text-[10px] text-slate-500">Hand — click a card to play it, right-click for discard/exile</p>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {hand.map((scryfallId, i) => {
+          const facts = cards[scryfallId];
+          return (
+            <div key={`${scryfallId}-${i}`} className="w-28 flex-shrink-0">
+              <CardImage
+                name={facts?.name ?? scryfallId}
+                imageUrl={facts?.imageNormal}
+                onClick={() => onPlay(scryfallId)}
+                title={`Click to play ${facts?.name ?? 'this card'}`}
+                onContextMenu={
+                  onContextMenu
+                    ? (e) => {
+                        e.preventDefault();
+                        onContextMenu(e, scryfallId);
+                      }
+                    : undefined
+                }
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
