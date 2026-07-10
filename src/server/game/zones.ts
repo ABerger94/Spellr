@@ -11,13 +11,21 @@ export function shuffle<T>(arr: T[]): T[] {
 }
 
 const BATTLEFIELD_COLUMNS = 8;
+const COLUMN_WIDTH_PERCENT = 11;
+const ROW_HEIGHT_PERCENT = 20;
 
+function clampPercent(n: number): number {
+  return Math.min(100, Math.max(0, n));
+}
+
+/** Picks a default slot (as a percentage position) for a card newly entering
+ * the battlefield without an explicit drop position. */
 function nextBattlefieldSlot(battlefield: BattlefieldCard[]): { x: number; y: number } {
-  const occupied = new Set(battlefield.map((c) => `${c.x},${c.y}`));
+  const occupied = new Set(battlefield.map((c) => `${Math.round(c.x)},${Math.round(c.y)}`));
   for (let index = 0; ; index++) {
-    const x = index % BATTLEFIELD_COLUMNS;
-    const y = Math.floor(index / BATTLEFIELD_COLUMNS);
-    if (!occupied.has(`${x},${y}`)) return { x, y };
+    const x = (index % BATTLEFIELD_COLUMNS) * COLUMN_WIDTH_PERCENT;
+    const y = Math.floor(index / BATTLEFIELD_COLUMNS) * ROW_HEIGHT_PERCENT;
+    if (!occupied.has(`${Math.round(x)},${Math.round(y)}`)) return { x, y };
   }
 }
 
@@ -44,6 +52,9 @@ export interface MoveCardParams {
   scryfallId?: string;
   /** Only meaningful when toZone is 'library'; defaults to 'top'. */
   position?: 'top' | 'bottom';
+  /** Freeform drop position (percentage 0-100); only meaningful when toZone is 'battlefield'. */
+  x?: number;
+  y?: number;
 }
 
 export interface MoveCardResult {
@@ -54,6 +65,20 @@ export interface MoveCardResult {
 export function moveCard(zones: ZoneState, params: MoveCardParams): MoveCardResult {
   const { fromZone, toZone } = params;
   const next = cloneZones(zones);
+
+  // Repositioning a card within the battlefield (e.g. dragging it to a new
+  // spot) must preserve its identity/tapped state/counters, not re-enter it
+  // as a brand-new permanent — handle it as its own case up front.
+  if (fromZone === 'battlefield' && toZone === 'battlefield') {
+    const idx = next.battlefield.findIndex((c) => c.instanceId === params.instanceId);
+    if (idx === -1) throw new Error('Card not found on battlefield');
+    const existing = next.battlefield[idx];
+    const x = params.x !== undefined ? clampPercent(params.x) : existing.x;
+    const y = params.y !== undefined ? clampPercent(params.y) : existing.y;
+    next.battlefield[idx] = { ...existing, x, y };
+    return { zones: next, movedScryfallId: existing.scryfallId };
+  }
+
   let movedScryfallId: string;
 
   if (fromZone === 'battlefield') {
@@ -72,8 +97,11 @@ export function moveCard(zones: ZoneState, params: MoveCardParams): MoveCardResu
   }
 
   if (toZone === 'battlefield') {
-    const { x, y } = nextBattlefieldSlot(next.battlefield);
-    next.battlefield.push({ instanceId: uuidv4(), scryfallId: movedScryfallId, tapped: false, x, y });
+    const pos =
+      params.x !== undefined && params.y !== undefined
+        ? { x: clampPercent(params.x), y: clampPercent(params.y) }
+        : nextBattlefieldSlot(next.battlefield);
+    next.battlefield.push({ instanceId: uuidv4(), scryfallId: movedScryfallId, tapped: false, x: pos.x, y: pos.y });
   } else if (toZone === 'library') {
     // index 0 is the top of the library, matching where drawCard reads from.
     // Cards entering the library default to the top unless bottom is requested.

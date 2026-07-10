@@ -1,7 +1,8 @@
 'use client';
 
 import type { CardFacts } from '@/types/game';
-import { CardImage } from '@/components/card/CardImage';
+import { DraggableCard } from './DraggableCard';
+import { useDragDrop } from './DragDropContext';
 
 export function HandZone({
   hand,
@@ -14,23 +15,34 @@ export function HandZone({
   onPlay: (scryfallId: string) => void;
   onContextMenu?: (e: React.MouseEvent, scryfallId: string) => void;
 }) {
-  if (hand.length === 0) {
-    return <div className="flex h-28 items-center justify-center text-xs text-slate-600">Your hand is empty</div>;
-  }
+  const { dragging } = useDragDrop();
+  const isHover = dragging?.hoverZone === 'hand';
 
   return (
     <div>
-      <p className="mb-1 text-[10px] text-slate-500">Hand — tap a card to play it, tap ⋯ (or right-click) for discard/exile</p>
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <p className="mb-1 text-[10px] text-slate-500">
+        Hand — tap a card to play it, drag it onto a zone, tap ⋯ (or right-click) for more options
+      </p>
+      <div
+        data-dropzone="true"
+        data-zone="hand"
+        className={`flex min-h-[7.5rem] gap-2 overflow-x-auto rounded pb-1 ${
+          isHover ? 'bg-accent/10 ring-2 ring-accent' : ''
+        }`}
+      >
+        {hand.length === 0 && (
+          <div className="flex w-full items-center justify-center text-xs text-slate-600">Your hand is empty</div>
+        )}
         {hand.map((scryfallId, i) => {
           const facts = cards[scryfallId];
           return (
             <div key={`${scryfallId}-${i}`} className="w-28 flex-shrink-0">
-              <CardImage
+              <DraggableCard
+                source={{ zone: 'hand', scryfallId }}
                 name={facts?.name ?? scryfallId}
                 imageUrl={facts?.imageNormal}
                 onClick={() => onPlay(scryfallId)}
-                title={`Click to play ${facts?.name ?? 'this card'}`}
+                title={`Click or drag to play ${facts?.name ?? 'this card'}`}
                 onContextMenu={
                   onContextMenu
                     ? (e) => {

@@ -21,6 +21,9 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
     case 'UNTAP_CARD':
       return `${who} untapped a card.`;
     case 'MOVE_CARD':
+      if (event.payload.fromZone === event.payload.toZone) {
+        return `${who} repositioned a card on the battlefield.`;
+      }
       return `${who} moved a card from ${event.payload.fromZone} to ${event.payload.toZone}.`;
     case 'SCRY':
       return `${who} scries ${event.payload.count}.`;

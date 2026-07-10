@@ -16,6 +16,7 @@ import { GameLobbyWait } from '@/components/game/GameLobbyWait';
 import { ScryModal } from '@/components/game/ScryModal';
 import { MobileActionBar } from '@/components/game/MobileActionBar';
 import { CardContextMenu, type ContextMenuOption } from '@/components/game/CardContextMenu';
+import { DragDropProvider, type DragSource, type DropTarget } from '@/components/game/DragDropContext';
 
 export default function GameTablePage() {
   const params = useParams<{ gameId: string }>();
@@ -88,13 +89,93 @@ export default function GameTablePage() {
   const displayName = (seat: number | null) =>
     seat === null ? 'System' : state.players.find((p) => p.seat === seat)?.displayName ?? `Seat ${seat}`;
 
+  function handleDrop(source: DragSource, target: DropTarget) {
+    if (!me) return;
+    // Dropped back onto the zone it came from — no-op (battlefield is the
+    // exception: dropping there always means "move to this exact spot").
+    if (source.zone === target.zone && source.zone !== 'battlefield') return;
+
+    if (source.zone === 'battlefield' && target.zone === 'battlefield') {
+      if (!source.instanceId) return;
+      sendAction({
+        type: 'MOVE_CARD',
+        fromZone: 'battlefield',
+        toZone: 'battlefield',
+        instanceId: source.instanceId,
+        x: target.xPercent,
+        y: target.yPercent,
+      });
+      return;
+    }
+
+    if (target.zone === 'battlefield' && (source.zone === 'hand' || source.zone === 'commandZone')) {
+      if (!source.scryfallId) return;
+      sendAction({
+        type: 'PLAY_CARD',
+        fromZone: source.zone,
+        scryfallId: source.scryfallId,
+        x: target.xPercent,
+        y: target.yPercent,
+      });
+      return;
+    }
+
+    if (source.zone === 'battlefield') {
+      if (!source.instanceId) return;
+      sendAction({
+        type: 'MOVE_CARD',
+        fromZone: 'battlefield',
+        toZone: target.zone,
+        instanceId: source.instanceId,
+        position: target.zone === 'library' ? 'top' : undefined,
+      });
+      return;
+    }
+
+    if (source.scryfallId) {
+      sendAction({
+        type: 'MOVE_CARD',
+        fromZone: source.zone,
+        toZone: target.zone,
+        scryfallId: source.scryfallId,
+        position: target.zone === 'library' ? 'top' : undefined,
+      });
+    }
+  }
+
+  function openPileMenu(e: React.MouseEvent, zone: 'graveyard' | 'exile', scryfallId: string) {
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      options: [
+        {
+          label: 'Return to hand',
+          onClick: () => sendAction({ type: 'MOVE_CARD', fromZone: zone, toZone: 'hand', scryfallId }),
+        },
+        {
+          label: 'Put on battlefield',
+          onClick: () => sendAction({ type: 'MOVE_CARD', fromZone: zone, toZone: 'battlefield', scryfallId }),
+        },
+        {
+          label: 'Put on top of library',
+          onClick: () => sendAction({ type: 'MOVE_CARD', fromZone: zone, toZone: 'library', scryfallId, position: 'top' }),
+        },
+        {
+          label: 'Put on bottom of library',
+          onClick: () => sendAction({ type: 'MOVE_CARD', fromZone: zone, toZone: 'library', scryfallId, position: 'bottom' }),
+        },
+      ],
+    });
+  }
+
   return (
+    <DragDropProvider onDrop={handleDrop}>
     <div className="flex h-screen flex-col">
       <NavBar />
 
       <div className="flex items-center justify-between border-b border-white/10 bg-panel px-4 py-1.5 text-xs text-slate-400">
         <span className="hidden truncate sm:inline">
-          Tap a card to play/draw it · tap ⋯ on a card for more options · use the bar at the bottom for draw/scry/surveil/pass ·
+          Tap or drag a card to play/move it · tap ⋯ on a card for more options · use the bar at the bottom for draw/scry/surveil/pass ·
           keyboard: <kbd className="rounded bg-panelLight px-1">D</kbd> draw, <kbd className="rounded bg-panelLight px-1">Space</kbd> pass turn
         </span>
         <button
@@ -113,15 +194,24 @@ export default function GameTablePage() {
             screen lets you pick a number first — e.g. draw 7 for your opening hand.
           </p>
           <p className="mb-1">
-            <strong>Play a card:</strong> tap it in your hand — lands/creatures/artifacts/etc. go to the battlefield; the
-            platform doesn&apos;t know mana costs or the stack, so anything playable just resolves immediately.
+            <strong>Play a card:</strong> tap it in your hand to send it straight to the battlefield, or drag it there
+            to drop it exactly where you want; the platform doesn&apos;t know mana costs or the stack, so anything
+            playable just resolves immediately.
           </p>
           <p className="mb-1">
             <strong>Tap/untap:</strong> tap a permanent on your battlefield.
           </p>
           <p className="mb-1">
-            <strong>Discard, exile, sacrifice, bounce, top/bottom of library:</strong> tap the ⋯ button on a card (in
-            hand or on the battlefield) — or right-click it on desktop — for a move-to-zone menu.
+            <strong>Rearrange the battlefield:</strong> drag a permanent to any spot — positions are freeform, not a grid.
+          </p>
+          <p className="mb-1">
+            <strong>Discard, exile, sacrifice, bounce, top/bottom of library:</strong> drag a card from your hand or
+            battlefield onto the graveyard/exile/library icon, or tap the ⋯ button on it (or right-click on desktop)
+            for a move-to-zone menu.
+          </p>
+          <p className="mb-1">
+            <strong>Graveyard / exile piles:</strong> tap the pile to view its contents; tap ⋯ (or right-click) a card
+            inside to return it to hand, put it on the battlefield, or send it to the top/bottom of your library.
           </p>
           <p className="mb-1">
             <strong>Scry / Surveil:</strong> use the Scry/Surveil buttons in the bar at the bottom of the screen, pick
@@ -159,8 +249,8 @@ export default function GameTablePage() {
                 />
                 <div className="mt-2 flex items-center gap-2">
                   <LibraryStack count={p.libraryCount} />
-                  <PublicZoneStack label="Graveyard" scryfallIds={p.graveyard} cards={state.cards} />
-                  <PublicZoneStack label="Exile" scryfallIds={p.exile} cards={state.cards} />
+                  <PublicZoneStack label="Graveyard" zone="graveyard" scryfallIds={p.graveyard} cards={state.cards} />
+                  <PublicZoneStack label="Exile" zone="exile" scryfallIds={p.exile} cards={state.cards} />
                   {state.format === 'COMMANDER' && <CommandZone scryfallIds={p.commandZone} cards={state.cards} />}
                   <span className="text-xs text-slate-500">Hand: {p.handCount}</span>
                 </div>
@@ -187,14 +277,29 @@ export default function GameTablePage() {
                 onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: me.seat, delta })}
               />
               <div className="mt-2 flex items-center gap-2">
-                <LibraryStack count={me.libraryCount} onDraw={() => sendAction({ type: 'DRAW_CARD' })} />
-                <PublicZoneStack label="Graveyard" scryfallIds={me.graveyard} cards={state.cards} />
-                <PublicZoneStack label="Exile" scryfallIds={me.exile} cards={state.cards} />
+                <LibraryStack count={me.libraryCount} onDraw={() => sendAction({ type: 'DRAW_CARD' })} draggable />
+                <PublicZoneStack
+                  label="Graveyard"
+                  zone="graveyard"
+                  scryfallIds={me.graveyard}
+                  cards={state.cards}
+                  draggable
+                  onCardAction={(e, scryfallId) => openPileMenu(e, 'graveyard', scryfallId)}
+                />
+                <PublicZoneStack
+                  label="Exile"
+                  zone="exile"
+                  scryfallIds={me.exile}
+                  cards={state.cards}
+                  draggable
+                  onCardAction={(e, scryfallId) => openPileMenu(e, 'exile', scryfallId)}
+                />
                 {state.format === 'COMMANDER' && (
                   <CommandZone
                     scryfallIds={me.commandZone}
                     cards={state.cards}
                     onPlay={(scryfallId) => sendAction({ type: 'PLAY_CARD', scryfallId, fromZone: 'commandZone' })}
+                    draggable
                   />
                 )}
                 {state.currentTurnSeat === me.seat && (
@@ -325,5 +430,6 @@ export default function GameTablePage() {
         />
       )}
     </div>
+    </DragDropProvider>
   );
 }

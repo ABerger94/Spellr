@@ -73,6 +73,8 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
         fromZone: action.fromZone,
         toZone: 'battlefield',
         scryfallId: action.scryfallId,
+        x: action.x,
+        y: action.y,
       });
       await updateZones(player.id, nextZones);
       event = await logEvent(gameId, 'PLAY_CARD', { scryfallId: action.scryfallId, fromZone: action.fromZone }, actor);
@@ -98,6 +100,8 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
         instanceId: action.instanceId,
         scryfallId: action.scryfallId,
         position: action.position,
+        x: action.x,
+        y: action.y,
       });
       await updateZones(player.id, nextZones);
       event = await logEvent(
