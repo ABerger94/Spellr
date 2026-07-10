@@ -21,31 +21,31 @@ export function BattlefieldZone({
   }
 
   return (
-    <div
-      className="grid gap-2"
-      style={{ gridTemplateColumns: 'repeat(8, minmax(0, 1fr))' }}
-    >
-      {battlefield.map((c) => {
-        const facts = cards[c.scryfallId];
-        return (
-          <div key={c.instanceId} style={{ gridColumn: c.x + 1, gridRow: c.y + 1 }}>
-            <CardImage
-              name={facts?.name ?? c.scryfallId}
-              imageUrl={facts?.imageNormal}
-              tapped={c.tapped}
-              onClick={interactive && onTapToggle ? () => onTapToggle(c.instanceId, c.tapped) : undefined}
-              onContextMenu={
-                interactive && onContextMenu
-                  ? (e) => {
-                      e.preventDefault();
-                      onContextMenu(e, c);
-                    }
-                  : undefined
-              }
-            />
-          </div>
-        );
-      })}
+    <div className="overflow-x-auto">
+      <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(8, minmax(64px, 1fr))' }}>
+        {battlefield.map((c) => {
+          const facts = cards[c.scryfallId];
+          return (
+            <div key={c.instanceId} style={{ gridColumn: c.x + 1, gridRow: c.y + 1 }}>
+              <CardImage
+                name={facts?.name ?? c.scryfallId}
+                imageUrl={facts?.imageNormal}
+                tapped={c.tapped}
+                onClick={interactive && onTapToggle ? () => onTapToggle(c.instanceId, c.tapped) : undefined}
+                onContextMenu={
+                  interactive && onContextMenu
+                    ? (e) => {
+                        e.preventDefault();
+                        onContextMenu(e, c);
+                      }
+                    : undefined
+                }
+                onMore={interactive && onContextMenu ? (e) => onContextMenu(e, c) : undefined}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

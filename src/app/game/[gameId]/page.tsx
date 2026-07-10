@@ -14,7 +14,7 @@ import { CommandZone } from '@/components/game/CommandZone';
 import { GameLog } from '@/components/game/GameLog';
 import { GameLobbyWait } from '@/components/game/GameLobbyWait';
 import { ScryModal } from '@/components/game/ScryModal';
-import { LookCountPrompt } from '@/components/game/LookCountPrompt';
+import { MobileActionBar } from '@/components/game/MobileActionBar';
 import { CardContextMenu, type ContextMenuOption } from '@/components/game/CardContextMenu';
 
 export default function GameTablePage() {
@@ -23,7 +23,6 @@ export default function GameTablePage() {
   const { state, gameInfo, log, joinError, actionError, sendAction, onlineUserIds, refreshState } = useGameState(params.gameId);
   const [menu, setMenu] = useState<{ x: number; y: number; options: ContextMenuOption[] } | null>(null);
   const [showHelp, setShowHelp] = useState(false);
-  const [lookPrompt, setLookPrompt] = useState<'scry' | 'surveil' | null>(null);
 
   const isMyTurn = state?.status === 'ACTIVE' && state.currentTurnSeat === state.viewerSeat;
 
@@ -94,12 +93,14 @@ export default function GameTablePage() {
       <NavBar />
 
       <div className="flex items-center justify-between border-b border-white/10 bg-panel px-4 py-1.5 text-xs text-slate-400">
-        <span>
-          Click a card to play/draw it · right-click a card for more options (discard, exile, top/bottom of library) ·
-          Scry/Surveil buttons are next to your library · keyboard: <kbd className="rounded bg-panelLight px-1">D</kbd> draw,{' '}
-          <kbd className="rounded bg-panelLight px-1">Space</kbd> pass turn
+        <span className="hidden truncate sm:inline">
+          Tap a card to play/draw it · tap ⋯ on a card for more options · use the bar at the bottom for draw/scry/surveil/pass ·
+          keyboard: <kbd className="rounded bg-panelLight px-1">D</kbd> draw, <kbd className="rounded bg-panelLight px-1">Space</kbd> pass turn
         </span>
-        <button onClick={() => setShowHelp((v) => !v)} className="rounded bg-panelLight px-2 py-0.5 hover:bg-white/10">
+        <button
+          onClick={() => setShowHelp((v) => !v)}
+          className="ml-auto rounded bg-panelLight px-2 py-0.5 hover:bg-white/10 sm:ml-0"
+        >
           {showHelp ? 'Hide help' : '? Help'}
         </button>
       </div>
@@ -107,22 +108,23 @@ export default function GameTablePage() {
       {showHelp && (
         <div className="border-b border-white/10 bg-panel px-4 py-3 text-sm text-slate-300">
           <p className="mb-1">
-            <strong>Draw:</strong> click your library (the card-back stack), or press <kbd className="rounded bg-panelLight px-1">D</kbd>.
+            <strong>Draw:</strong> tap your library (the card-back stack), the Draw button at the bottom of the
+            screen, or press <kbd className="rounded bg-panelLight px-1">D</kbd> on a keyboard.
           </p>
           <p className="mb-1">
-            <strong>Play a card:</strong> click it in your hand — lands/creatures/artifacts/etc. go to the battlefield; the
+            <strong>Play a card:</strong> tap it in your hand — lands/creatures/artifacts/etc. go to the battlefield; the
             platform doesn&apos;t know mana costs or the stack, so anything playable just resolves immediately.
           </p>
           <p className="mb-1">
-            <strong>Tap/untap:</strong> click a permanent on your battlefield.
+            <strong>Tap/untap:</strong> tap a permanent on your battlefield.
           </p>
           <p className="mb-1">
-            <strong>Discard, exile, sacrifice, bounce, top/bottom of library:</strong> right-click a card (in hand or
-            on the battlefield) for a move-to-zone menu.
+            <strong>Discard, exile, sacrifice, bounce, top/bottom of library:</strong> tap the ⋯ button on a card (in
+            hand or on the battlefield) — or right-click it on desktop — for a move-to-zone menu.
           </p>
           <p className="mb-1">
-            <strong>Scry / Surveil:</strong> click the Scry or Surveil button next to your library, pick how many
-            cards, then choose top/bottom (scry) or top/graveyard (surveil) for each card revealed.
+            <strong>Scry / Surveil:</strong> use the Scry/Surveil buttons in the bar at the bottom of the screen, pick
+            how many cards, then choose top/bottom (scry) or top/graveyard (surveil) for each card revealed.
           </p>
           <p className="mb-1">
             <strong>Life:</strong> the −/+ buttons next to any player&apos;s name adjust their life (you can adjust
@@ -141,7 +143,7 @@ export default function GameTablePage() {
         </div>
       )}
 
-      <div className="flex flex-1 gap-4 overflow-hidden p-4">
+      <div className="flex flex-1 flex-col gap-4 overflow-hidden p-4 lg:flex-row">
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto">
           {/* Opponents */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -184,35 +186,7 @@ export default function GameTablePage() {
                 onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: me.seat, delta })}
               />
               <div className="mt-2 flex items-center gap-2">
-                <div className="relative">
-                  <LibraryStack count={me.libraryCount} onDraw={() => sendAction({ type: 'DRAW_CARD' })} />
-                  <div className="mt-1 flex gap-1">
-                    <button
-                      onClick={() => setLookPrompt('scry')}
-                      disabled={me.pendingLook.length > 0}
-                      className="rounded bg-panelLight px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-white/10 disabled:opacity-40"
-                    >
-                      Scry
-                    </button>
-                    <button
-                      onClick={() => setLookPrompt('surveil')}
-                      disabled={me.pendingLook.length > 0}
-                      className="rounded bg-panelLight px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-white/10 disabled:opacity-40"
-                    >
-                      Surveil
-                    </button>
-                  </div>
-                  {lookPrompt && (
-                    <LookCountPrompt
-                      label={lookPrompt === 'scry' ? 'Scry' : 'Surveil'}
-                      onConfirm={(count) => {
-                        sendAction({ type: lookPrompt === 'scry' ? 'SCRY' : 'SURVEIL', count });
-                        setLookPrompt(null);
-                      }}
-                      onCancel={() => setLookPrompt(null)}
-                    />
-                  )}
-                </div>
+                <LibraryStack count={me.libraryCount} onDraw={() => sendAction({ type: 'DRAW_CARD' })} />
                 <PublicZoneStack label="Graveyard" scryfallIds={me.graveyard} cards={state.cards} />
                 <PublicZoneStack label="Exile" scryfallIds={me.exile} cards={state.cards} />
                 {state.format === 'COMMANDER' && (
@@ -323,10 +297,21 @@ export default function GameTablePage() {
           )}
         </div>
 
-        <div className="w-72 flex-shrink-0">
+        <div className="h-40 flex-shrink-0 lg:h-auto lg:w-72">
           <GameLog events={log} displayName={displayName} />
         </div>
       </div>
+
+      {me && (
+        <MobileActionBar
+          isMyTurn={!!isMyTurn}
+          lookInProgress={me.pendingLook.length > 0}
+          onDraw={() => sendAction({ type: 'DRAW_CARD' })}
+          onScry={(count) => sendAction({ type: 'SCRY', count })}
+          onSurveil={(count) => sendAction({ type: 'SURVEIL', count })}
+          onPassTurn={() => sendAction({ type: 'PASS_TURN' })}
+        />
+      )}
 
       {menu && <CardContextMenu x={menu.x} y={menu.y} options={menu.options} onClose={() => setMenu(null)} />}
 

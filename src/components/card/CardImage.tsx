@@ -9,9 +9,23 @@ interface CardImageProps {
   title?: string;
   onClick?: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
+  /** Tap-friendly equivalent of onContextMenu — right-click doesn't exist on
+   * touch devices, so this renders a visible "more options" button instead
+   * of relying on long-press. Called with the same handler shape. */
+  onMore?: (e: React.MouseEvent) => void;
 }
 
-export function CardImage({ name, imageUrl, tapped, selected, className = '', title, onClick, onContextMenu }: CardImageProps) {
+export function CardImage({
+  name,
+  imageUrl,
+  tapped,
+  selected,
+  className = '',
+  title,
+  onClick,
+  onContextMenu,
+  onMore,
+}: CardImageProps) {
   return (
     <div
       onClick={onClick}
@@ -29,6 +43,19 @@ export function CardImage({ name, imageUrl, tapped, selected, className = '', ti
         <div className="flex h-full w-full items-center justify-center p-2 text-center text-[10px] leading-tight text-slate-300">
           {name}
         </div>
+      )}
+      {onMore && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onMore(e);
+          }}
+          title="More options"
+          className="absolute right-0.5 top-0.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs text-white hover:bg-black/90"
+        >
+          ⋯
+        </button>
       )}
     </div>
   );
