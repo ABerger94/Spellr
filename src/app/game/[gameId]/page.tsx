@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { useGameState } from '@/hooks/useGameState';
 import { NavBar } from '@/components/layout/NavBar';
 import { PlayerPanel } from '@/components/game/PlayerPanel';
@@ -11,11 +12,13 @@ import { LibraryStack } from '@/components/game/LibraryStack';
 import { PublicZoneStack } from '@/components/game/PublicZoneStack';
 import { CommandZone } from '@/components/game/CommandZone';
 import { GameLog } from '@/components/game/GameLog';
+import { GameLobbyWait } from '@/components/game/GameLobbyWait';
 import { CardContextMenu, type ContextMenuOption } from '@/components/game/CardContextMenu';
 
 export default function GameTablePage() {
   const params = useParams<{ gameId: string }>();
-  const { state, log, joinError, sendAction, onlineUserIds } = useGameState(params.gameId);
+  const { data: session } = useSession();
+  const { state, gameInfo, log, joinError, sendAction, onlineUserIds, refreshState } = useGameState(params.gameId);
   const [menu, setMenu] = useState<{ x: number; y: number; options: ContextMenuOption[] } | null>(null);
 
   if (joinError) {
@@ -29,13 +32,23 @@ export default function GameTablePage() {
     );
   }
 
-  if (!state) {
+  if (!state || !gameInfo) {
     return (
       <div>
         <NavBar />
         <main className="mx-auto max-w-3xl px-6 py-8">
           <p className="text-slate-400">Loading game…</p>
         </main>
+      </div>
+    );
+  }
+
+  if (state.status === 'LOBBY') {
+    const userId = (session?.user as { id?: string } | undefined)?.id;
+    return (
+      <div>
+        <NavBar />
+        <GameLobbyWait state={state} gameInfo={gameInfo} isHost={userId === gameInfo.hostUserId} onStarted={refreshState} />
       </div>
     );
   }
