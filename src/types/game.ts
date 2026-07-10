@@ -2,6 +2,7 @@ export interface BattlefieldCard {
   instanceId: string;
   scryfallId: string;
   tapped: boolean;
+  /** Freeform position as a percentage (0-100) of the battlefield container's width/height. */
   x: number;
   y: number;
   counters?: Record<string, number>;
@@ -80,7 +81,7 @@ export type ContentZone = 'library' | 'hand' | 'battlefield' | 'graveyard' | 'ex
 
 export type GameActionPayload =
   | { type: 'DRAW_CARD'; count?: number }
-  | { type: 'PLAY_CARD'; scryfallId: string; fromZone: 'hand' | 'commandZone' }
+  | { type: 'PLAY_CARD'; scryfallId: string; fromZone: 'hand' | 'commandZone'; x?: number; y?: number }
   | { type: 'TAP_CARD'; instanceId: string }
   | { type: 'UNTAP_CARD'; instanceId: string }
   | {
@@ -92,6 +93,9 @@ export type GameActionPayload =
       scryfallId?: string;
       targetSeat?: number; // defaults to actor's own seat; used for e.g. giving control (future)
       position?: LibraryPosition; // only meaningful when toZone === 'library'; defaults to 'top'
+      // Freeform battlefield drop position (percentage 0-100); only meaningful when toZone === 'battlefield'.
+      x?: number;
+      y?: number;
     }
   | { type: 'ADJUST_LIFE'; seat: number; delta: number }
   | { type: 'PASS_TURN' }

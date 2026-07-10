@@ -3,25 +3,39 @@
 import { useState } from 'react';
 import type { CardFacts } from '@/types/game';
 import { CardImage } from '@/components/card/CardImage';
+import { useDragDrop } from './DragDropContext';
 
 export function PublicZoneStack({
   label,
+  zone,
   scryfallIds,
   cards,
-  onCardClick,
+  draggable,
+  onCardAction,
 }: {
   label: string;
+  zone: 'graveyard' | 'exile';
   scryfallIds: string[];
   cards: Record<string, CardFacts>;
-  onCardClick?: (scryfallId: string) => void;
+  /** Whether this stack is a valid drop target (only true for the viewer's own zone). */
+  draggable?: boolean;
+  /** Opens a move-to-zone menu for a card inside the pile viewer modal. */
+  onCardAction?: (e: React.MouseEvent, scryfallId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const { dragging } = useDragDrop();
+  const isHover = draggable && dragging?.hoverZone === zone;
   const topId = scryfallIds[scryfallIds.length - 1];
   const topFacts = topId ? cards[topId] : undefined;
 
   return (
     <>
-      <div className="w-20 cursor-pointer" onClick={() => scryfallIds.length > 0 && setOpen(true)}>
+      <div
+        data-dropzone={draggable ? 'true' : undefined}
+        data-zone={zone}
+        className={`w-20 cursor-pointer rounded ${isHover ? 'bg-accent/10 ring-2 ring-accent' : ''}`}
+        onClick={() => scryfallIds.length > 0 && setOpen(true)}
+      >
         {scryfallIds.length > 0 ? (
           <div className="relative">
             <CardImage name={topFacts?.name ?? topId} imageUrl={topFacts?.imageNormal} />
@@ -50,13 +64,24 @@ export function PublicZoneStack({
                 ✕
               </button>
             </div>
+            {onCardAction && (
+              <p className="mb-2 text-[11px] text-slate-500">Tap ⋯ (or right-click) a card to move it elsewhere.</p>
+            )}
             <div className="grid grid-cols-4 gap-3 sm:grid-cols-6">
               {[...scryfallIds].reverse().map((id, i) => (
                 <div key={`${id}-${i}`} className="w-full">
                   <CardImage
                     name={cards[id]?.name ?? id}
                     imageUrl={cards[id]?.imageNormal}
-                    onClick={onCardClick ? () => onCardClick(id) : undefined}
+                    onContextMenu={
+                      onCardAction
+                        ? (e) => {
+                            e.preventDefault();
+                            onCardAction(e, id);
+                          }
+                        : undefined
+                    }
+                    onMore={onCardAction ? (e) => onCardAction(e, id) : undefined}
                   />
                 </div>
               ))}
