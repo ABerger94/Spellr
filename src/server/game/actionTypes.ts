@@ -43,6 +43,12 @@ export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('MULLIGAN') }),
   z.object({ type: z.literal('ROLL_DICE'), sides: z.number().int().refine((n) => [4, 6, 8, 10, 12, 20, 100].includes(n), 'Unsupported die size') }),
   z.object({ type: z.literal('FLIP_COIN') }),
+  z.object({
+    type: z.literal('ADJUST_COUNTER'),
+    instanceId: z.string(),
+    counterType: z.string().min(1).max(20),
+    delta: z.number().int().min(-99).max(99),
+  }),
 ]);
 
 export type Action = z.infer<typeof actionSchema>;

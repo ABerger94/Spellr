@@ -134,6 +134,37 @@ export function untapAll(zones: ZoneState): ZoneState {
   };
 }
 
+const PLUS_ONE_COUNTER = '+1/+1';
+const MINUS_ONE_COUNTER = '-1/-1';
+
+/** Adds (or with a negative delta, removes) counters of the given type on a
+ * battlefield card. Counts never go below zero, and a zeroed-out type is
+ * dropped entirely rather than left at 0. +1/+1 and -1/-1 counters cancel
+ * each other out in matching pairs, per MTG rule 122.3. */
+export function adjustCounter(zones: ZoneState, instanceId: string, counterType: string, delta: number): ZoneState {
+  const idx = zones.battlefield.findIndex((c) => c.instanceId === instanceId);
+  if (idx === -1) throw new Error('Card not found on battlefield');
+
+  const next = cloneZones(zones);
+  const card = next.battlefield[idx];
+  const counters = { ...(card.counters ?? {}) };
+
+  const updated = Math.max(0, (counters[counterType] ?? 0) + delta);
+  if (updated === 0) delete counters[counterType];
+  else counters[counterType] = updated;
+
+  if (counters[PLUS_ONE_COUNTER] && counters[MINUS_ONE_COUNTER]) {
+    const cancel = Math.min(counters[PLUS_ONE_COUNTER], counters[MINUS_ONE_COUNTER]);
+    counters[PLUS_ONE_COUNTER] -= cancel;
+    counters[MINUS_ONE_COUNTER] -= cancel;
+    if (counters[PLUS_ONE_COUNTER] === 0) delete counters[PLUS_ONE_COUNTER];
+    if (counters[MINUS_ONE_COUNTER] === 0) delete counters[MINUS_ONE_COUNTER];
+  }
+
+  next.battlefield[idx] = { ...card, counters };
+  return next;
+}
+
 export function shuffleLibrary(zones: ZoneState): ZoneState {
   return { ...cloneZones(zones), library: shuffle(zones.library) };
 }

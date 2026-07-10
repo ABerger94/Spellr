@@ -12,6 +12,7 @@ import {
   millCards,
   randomDiscard,
   mulligan,
+  adjustCounter,
 } from './zones';
 import { logEvent } from './gameEvents';
 import { broadcastGameState } from '@/server/realtime/pusherServer';
@@ -261,6 +262,20 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
     case 'FLIP_COIN': {
       const result = Math.random() < 0.5 ? 'heads' : 'tails';
       event = await logEvent(gameId, 'FLIP_COIN', { result }, actor);
+      break;
+    }
+
+    case 'ADJUST_COUNTER': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const nextZones = adjustCounter(zones, action.instanceId, action.counterType, action.delta);
+      await updateZones(player.id, nextZones);
+      event = await logEvent(
+        gameId,
+        'ADJUST_COUNTER',
+        { instanceId: action.instanceId, counterType: action.counterType, delta: action.delta },
+        actor,
+      );
       break;
     }
   }
