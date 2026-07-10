@@ -112,4 +112,5 @@ export type GameActionPayload =
   | { type: 'REVEAL_HAND' }
   | { type: 'MULLIGAN' }
   | { type: 'ROLL_DICE'; sides: number }
-  | { type: 'FLIP_COIN' };
+  | { type: 'FLIP_COIN' }
+  | { type: 'ADJUST_COUNTER'; instanceId: string; counterType: string; delta: number };

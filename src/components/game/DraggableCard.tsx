@@ -13,6 +13,7 @@ export function DraggableCard({
   tapped,
   className,
   title,
+  counters,
   onClick,
   onContextMenu,
   onMore,
@@ -25,6 +26,7 @@ export function DraggableCard({
   tapped?: boolean;
   className?: string;
   title?: string;
+  counters?: Record<string, number>;
   onClick?: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
   onMore?: (e: React.MouseEvent) => void;
@@ -91,6 +93,7 @@ export function DraggableCard({
         tapped={tapped}
         className={className}
         title={title}
+        counters={counters}
         onClick={onClick}
         onContextMenu={onContextMenu}
         onMore={onMore}

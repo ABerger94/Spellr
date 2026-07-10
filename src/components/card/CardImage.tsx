@@ -7,12 +7,26 @@ interface CardImageProps {
   selected?: boolean;
   className?: string;
   title?: string;
+  /** Counter type -> count (e.g. { '+1/+1': 2 }), rendered as small badges. */
+  counters?: Record<string, number>;
   onClick?: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
   /** Tap-friendly equivalent of onContextMenu — right-click doesn't exist on
    * touch devices, so this renders a visible "more options" button instead
    * of relying on long-press. Called with the same handler shape. */
   onMore?: (e: React.MouseEvent) => void;
+}
+
+function counterLabel(type: string, count: number): string {
+  if (type === '+1/+1') return `+${count}/+${count}`;
+  if (type === '-1/-1') return `-${count}/-${count}`;
+  return `${type} ${count}`;
+}
+
+function counterColor(type: string): string {
+  if (type === '+1/+1') return 'bg-green-600/90';
+  if (type === '-1/-1') return 'bg-red-600/90';
+  return 'bg-slate-600/90';
 }
 
 export function CardImage({
@@ -22,10 +36,13 @@ export function CardImage({
   selected,
   className = '',
   title,
+  counters,
   onClick,
   onContextMenu,
   onMore,
 }: CardImageProps) {
+  const counterEntries = Object.entries(counters ?? {}).filter(([, count]) => count > 0);
+
   return (
     <div
       onClick={onClick}
@@ -56,6 +73,18 @@ export function CardImage({
         >
           ⋯
         </button>
+      )}
+      {counterEntries.length > 0 && (
+        <div className="absolute bottom-0.5 left-0.5 right-0.5 z-10 flex flex-wrap gap-0.5">
+          {counterEntries.map(([type, count]) => (
+            <span
+              key={type}
+              className={`rounded px-1 text-[9px] font-bold leading-tight text-white ${counterColor(type)}`}
+            >
+              {counterLabel(type, count)}
+            </span>
+          ))}
+        </div>
       )}
     </div>
   );

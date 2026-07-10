@@ -66,6 +66,13 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
       return `${who} rolled a d${event.payload.sides}: ${event.payload.result}.`;
     case 'FLIP_COIN':
       return `${who} flipped a coin: ${event.payload.result}.`;
+    case 'ADJUST_COUNTER': {
+      const counterType = event.payload.counterType as string;
+      const delta = event.payload.delta as number;
+      const verb = delta > 0 ? 'added' : 'removed';
+      const count = Math.abs(delta);
+      return `${who} ${verb} ${count} ${counterType} counter${count === 1 ? '' : 's'}.`;
+    }
     case 'ATTACK_DECLARED':
       return `${who} declares an attack.`;
     case 'AI_REASONING':

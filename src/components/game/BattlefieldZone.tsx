@@ -49,6 +49,7 @@ export function BattlefieldZone({
                 name={facts?.name ?? c.scryfallId}
                 imageUrl={facts?.imageNormal}
                 tapped={c.tapped}
+                counters={c.counters}
                 onClick={interactive && onTapToggle ? () => onTapToggle(c.instanceId, c.tapped) : undefined}
                 onContextMenu={
                   interactive && onContextMenu

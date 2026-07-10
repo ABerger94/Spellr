@@ -17,6 +17,7 @@ import { ScryModal } from '@/components/game/ScryModal';
 import { GameActionsBar } from '@/components/game/GameActionsBar';
 import { DiceRoller } from '@/components/game/DiceRoller';
 import { CardContextMenu, type ContextMenuOption } from '@/components/game/CardContextMenu';
+import { CounterEditor } from '@/components/game/CounterEditor';
 import { DragDropProvider, type DragSource, type DropTarget } from '@/components/game/DragDropContext';
 
 const MIN_ZOOM = 0.5;
@@ -30,6 +31,7 @@ export default function GameTablePage() {
   const [showHelp, setShowHelp] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [showLog, setShowLog] = useState(true);
+  const [counterEditor, setCounterEditor] = useState<{ instanceId: string; name: string } | null>(null);
 
   const isMyTurn = state?.status === 'ACTIVE' && state.currentTurnSeat === state.viewerSeat;
 
@@ -279,6 +281,11 @@ export default function GameTablePage() {
             <strong>Life:</strong> the −/+ buttons next to any player&apos;s name adjust their life (you can adjust
             opponents&apos; life too — e.g. to deal combat damage — same as you would with paper life pads).
           </p>
+          <p className="mb-1">
+            <strong>Counters:</strong> tap ⋯ (or right-click) a permanent on your battlefield and choose
+            &quot;Edit counters&quot; for +1/+1, -1/-1 (they cancel each other out automatically), or any custom
+            counter you name — counts show as small badges on the card.
+          </p>
           {isHost && (
             <p className="mb-1">
               <strong>Restart game:</strong> the host-only Restart game button reshuffles every player&apos;s library,
@@ -286,8 +293,8 @@ export default function GameTablePage() {
             </p>
           )}
           <p>
-            <strong>Not yet built:</strong> counters beyond the basics and combat damage math — for now, resolve
-            those by hand using life adjustments and the move-to-zone menu.
+            <strong>Not yet built:</strong> combat damage math — for now, resolve that by hand using life
+            adjustments and counters.
           </p>
         </div>
       )}
@@ -415,6 +422,14 @@ export default function GameTablePage() {
                       y: e.clientY,
                       options: [
                         {
+                          label: 'Edit counters',
+                          onClick: () =>
+                            setCounterEditor({
+                              instanceId: card.instanceId,
+                              name: state.cards[card.scryfallId]?.name ?? card.scryfallId,
+                            }),
+                        },
+                        {
                           label: 'Move to graveyard',
                           onClick: () =>
                             sendAction({ type: 'MOVE_CARD', fromZone: 'battlefield', toZone: 'graveyard', instanceId: card.instanceId }),
@@ -517,6 +532,22 @@ export default function GameTablePage() {
           onResolve={(scryfallId, destination) => sendAction({ type: 'RESOLVE_LOOK', scryfallId, destination })}
         />
       )}
+
+      {counterEditor &&
+        (() => {
+          const card = me?.battlefield.find((c) => c.instanceId === counterEditor.instanceId);
+          if (!card) return null;
+          return (
+            <CounterEditor
+              cardName={counterEditor.name}
+              counters={card.counters ?? {}}
+              onAdjust={(counterType, delta) =>
+                sendAction({ type: 'ADJUST_COUNTER', instanceId: counterEditor.instanceId, counterType, delta })
+              }
+              onClose={() => setCounterEditor(null)}
+            />
+          );
+        })()}
     </div>
     </DragDropProvider>
   );
