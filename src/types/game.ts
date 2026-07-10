@@ -76,6 +76,10 @@ export interface GameStateView {
   viewerSeat: number | null;
   players: PlayerStateView[];
   cards: Record<string, CardFacts>;
+  /** Whether the server has a GEMINI_API_KEY configured — when false, every
+   * AI seat will just pass its turn instead of playing. Surfaced so players
+   * can tell "AI is intentionally sitting out" apart from "AI is broken". */
+  aiEnabled: boolean;
 }
 
 export type LibraryPosition = 'top' | 'bottom';

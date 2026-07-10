@@ -394,6 +394,7 @@ export default function GameTablePage() {
                   isViewer={false}
                   isActiveTurn={state.currentTurnSeat === p.seat}
                   isOnline={p.isAI || (p.userId !== null && onlineUserIds.has(p.userId))}
+                  aiKeyMissing={!state.aiEnabled}
                   onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: p.seat, delta })}
                 />
                 <ManaPool pool={p.manaPool} interactive={false} />

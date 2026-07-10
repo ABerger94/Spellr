@@ -76,6 +76,12 @@ export function GameLobbyWait({
         ))}
       </div>
 
+      {!state.aiEnabled && seats.some((p) => p?.isAI) && (
+        <p className="mb-4 rounded bg-amber-500/10 px-3 py-2 text-sm text-amber-400">
+          No GEMINI_API_KEY is configured on the server, so AI seats will just pass their turn instead of playing.
+        </p>
+      )}
+
       {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
 
       {isHost ? (
