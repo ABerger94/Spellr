@@ -32,9 +32,11 @@ Spellr is a **virtual tabletop**, not a rules engine: it gives every player real
 ## Deploying to Vercel
 
 1. Push the repo to GitHub, then **Add New Project** in the Vercel dashboard and import it. Vercel auto-detects Next.js — no build config changes needed.
-2. Provision a hosted Postgres (Vercel Postgres / Neon / Supabase all work) and set `DATABASE_URL` to its connection string in the Vercel project's environment variables.
+2. Provision a hosted Postgres (Vercel Postgres / Neon / Supabase all work) and set `DATABASE_URL` and `DIRECT_URL` in the Vercel project's environment variables:
+   - **Supabase**: in the Supabase dashboard, go to Project Settings → Database → Connection string. Use the **Transaction pooler** URI (port `6543`, includes `?pgbouncer=true`) as `DATABASE_URL`, and the **Direct connection** URI (port `5432`) as `DIRECT_URL`. The pooler is required because Vercel's serverless functions open many short-lived connections that a small Postgres instance can't handle directly; the direct URL is only used for running migrations. If you connected Supabase via Vercel's own Supabase integration, it auto-injects several `*_POSTGRES_*` variables — copy the pooled one's value into `DATABASE_URL` and the non-pooling one's value into `DIRECT_URL` (Prisma specifically needs those two exact variable names).
+   - **Vercel Postgres / Neon**: both also offer pooled + direct connection strings the same way — same mapping applies.
 3. Set `NEXTAUTH_SECRET`, `NEXTAUTH_URL` (your production URL, e.g. `https://your-app.vercel.app`), the four `PUSHER_*` vars from your Pusher app, and optionally `GEMINI_API_KEY`.
-4. Run `npx prisma migrate deploy` against the production `DATABASE_URL` once (locally, or as part of your deploy pipeline) to create the tables.
+4. Run `npx prisma migrate deploy` once against `DATABASE_URL`/`DIRECT_URL` (locally, with those two env vars set to the production values) to create the tables.
 5. Deploy. Every push auto-redeploys.
 
 Note: Pusher's free tier caps concurrent connections and daily messages — fine for casual play, but worth checking if you expect heavy usage.
