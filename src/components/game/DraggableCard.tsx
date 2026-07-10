@@ -16,6 +16,7 @@ export function DraggableCard({
   onClick,
   onContextMenu,
   onMore,
+  touchAction = 'none',
 }: {
   /** Pass null to disable dragging (e.g. opponents' cards, read-only views). */
   source: DragSource | null;
@@ -27,6 +28,9 @@ export function DraggableCard({
   onClick?: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
   onMore?: (e: React.MouseEvent) => void;
+  /** 'pan-x' lets a horizontal swipe fall through to a scrollable ancestor
+   * (e.g. the hand strip) instead of always being claimed for dragging. */
+  touchAction?: 'none' | 'pan-x';
 }) {
   const { startDrag, updateDrag, endDrag, cancelDrag } = useDragDrop();
   const elRef = useRef<HTMLDivElement>(null);
@@ -80,7 +84,7 @@ export function DraggableCard({
   }
 
   return (
-    <div ref={elRef} onPointerDown={handlePointerDown} style={source ? { touchAction: 'none' } : undefined}>
+    <div ref={elRef} onPointerDown={handlePointerDown} style={source ? { touchAction } : undefined}>
       <CardImage
         name={name}
         imageUrl={imageUrl}

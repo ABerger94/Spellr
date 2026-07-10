@@ -112,7 +112,7 @@ export function GameActionsBar({
       <div className="ml-auto flex flex-shrink-0 items-center gap-1">
         <button
           onClick={onZoomOut}
-          title="Zoom out battlefield"
+          title="Zoom out the whole table"
           className="rounded bg-panelLight px-2 py-1.5 text-sm text-white hover:bg-white/10"
         >
           −
@@ -120,7 +120,7 @@ export function GameActionsBar({
         <span className="w-10 text-center text-xs text-slate-400">{Math.round(zoom * 100)}%</span>
         <button
           onClick={onZoomIn}
-          title="Zoom in battlefield"
+          title="Zoom in the whole table"
           className="rounded bg-panelLight px-2 py-1.5 text-sm text-white hover:bg-white/10"
         >
           +
