@@ -5,6 +5,15 @@ import type { GameLogEntry } from '@/hooks/useGameState';
 
 const AI_EVENT_TYPES = new Set(['AI_REASONING', 'AI_SKIPPED_NO_KEY', 'AI_ERROR', 'AI_TURN_CAPPED']);
 
+const MANA_COLOR_NAMES: Record<string, string> = {
+  W: 'White',
+  U: 'Blue',
+  B: 'Black',
+  R: 'Red',
+  G: 'Green',
+  C: 'Colorless',
+};
+
 function describeEvent(event: GameLogEntry, displayName: (seat: number | null) => string): string {
   const who = displayName(event.actorSeat);
   switch (event.type) {
@@ -73,6 +82,15 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
       const count = Math.abs(delta);
       return `${who} ${verb} ${count} ${counterType} counter${count === 1 ? '' : 's'}.`;
     }
+    case 'ADJUST_MANA': {
+      const color = event.payload.color as string;
+      const delta = event.payload.delta as number;
+      const verb = delta > 0 ? 'floated' : 'spent';
+      const count = Math.abs(delta);
+      return `${who} ${verb} ${count} ${MANA_COLOR_NAMES[color] ?? color} mana.`;
+    }
+    case 'EMPTY_MANA_POOL':
+      return `${who} emptied their mana pool.`;
     case 'ATTACK_DECLARED':
       return `${who} declares an attack.`;
     case 'AI_REASONING':

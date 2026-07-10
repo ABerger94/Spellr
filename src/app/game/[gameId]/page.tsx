@@ -18,7 +18,9 @@ import { GameActionsBar } from '@/components/game/GameActionsBar';
 import { DiceRoller } from '@/components/game/DiceRoller';
 import { CardContextMenu, type ContextMenuOption } from '@/components/game/CardContextMenu';
 import { CounterEditor } from '@/components/game/CounterEditor';
+import { ManaPool } from '@/components/game/ManaPool';
 import { DragDropProvider, type DragSource, type DropTarget } from '@/components/game/DragDropContext';
+import type { ManaColor } from '@/types/game';
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 1.5;
@@ -286,6 +288,11 @@ export default function GameTablePage() {
             &quot;Edit counters&quot; for +1/+1, -1/-1 (they cancel each other out automatically), or any custom
             counter you name — counts show as small badges on the card.
           </p>
+          <p className="mb-1">
+            <strong>Mana pool:</strong> tap a colored pip under your name to float a mana of that color (W/U/B/R/G/C),
+            tap − to spend it, or tap Empty to clear your whole pool at once — everyone can see how much mana
+            everyone has floating, same as real mana.
+          </p>
           {isHost && (
             <p className="mb-1">
               <strong>Restart game:</strong> the host-only Restart game button reshuffles every player&apos;s library,
@@ -344,6 +351,7 @@ export default function GameTablePage() {
                   isOnline={p.isAI || (p.userId !== null && onlineUserIds.has(p.userId))}
                   onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: p.seat, delta })}
                 />
+                <ManaPool pool={p.manaPool} interactive={false} />
                 <div className="mt-2 flex items-center gap-2">
                   <LibraryStack count={p.libraryCount} />
                   <PublicZoneStack label="Graveyard" zone="graveyard" scryfallIds={p.graveyard} cards={state.cards} />
@@ -373,6 +381,14 @@ export default function GameTablePage() {
                 isOnline
                 onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: me.seat, delta })}
               />
+              <div className="mt-2">
+                <ManaPool
+                  pool={me.manaPool}
+                  interactive
+                  onAdjust={(color, delta) => sendAction({ type: 'ADJUST_MANA', color: color as ManaColor, delta })}
+                  onEmpty={() => sendAction({ type: 'EMPTY_MANA_POOL' })}
+                />
+              </div>
               <div className="mt-2 flex items-center gap-2">
                 <LibraryStack
                   count={me.libraryCount}

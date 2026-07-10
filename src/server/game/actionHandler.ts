@@ -13,6 +13,8 @@ import {
   randomDiscard,
   mulligan,
   adjustCounter,
+  adjustMana,
+  emptyManaPool,
 } from './zones';
 import { logEvent } from './gameEvents';
 import { broadcastGameState } from '@/server/realtime/pusherServer';
@@ -276,6 +278,24 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
         { instanceId: action.instanceId, counterType: action.counterType, delta: action.delta },
         actor,
       );
+      break;
+    }
+
+    case 'ADJUST_MANA': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const nextZones = adjustMana(zones, action.color, action.delta);
+      await updateZones(player.id, nextZones);
+      event = await logEvent(gameId, 'ADJUST_MANA', { color: action.color, delta: action.delta }, actor);
+      break;
+    }
+
+    case 'EMPTY_MANA_POOL': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const nextZones = emptyManaPool(zones);
+      await updateZones(player.id, nextZones);
+      event = await logEvent(gameId, 'EMPTY_MANA_POOL', {}, actor);
       break;
     }
   }

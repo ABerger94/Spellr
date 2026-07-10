@@ -40,6 +40,7 @@ function cloneZones(zones: ZoneState): ZoneState {
     // Fall back for rows persisted before these fields existed.
     pendingLook: [...(zones.pendingLook ?? [])],
     pendingLookMode: zones.pendingLookMode ?? null,
+    manaPool: { ...(zones.manaPool ?? {}) },
   };
 }
 
@@ -163,6 +164,22 @@ export function adjustCounter(zones: ZoneState, instanceId: string, counterType:
 
   next.battlefield[idx] = { ...card, counters };
   return next;
+}
+
+/** Floats (or with a negative delta, spends/removes) mana of a given color
+ * in the player's mana pool. Never goes below zero, and a zeroed-out color
+ * is dropped entirely rather than left at 0. */
+export function adjustMana(zones: ZoneState, color: string, delta: number): ZoneState {
+  const next = cloneZones(zones);
+  const updated = Math.max(0, (next.manaPool[color] ?? 0) + delta);
+  if (updated === 0) delete next.manaPool[color];
+  else next.manaPool[color] = updated;
+  return next;
+}
+
+/** Clears every color out of the mana pool at once (e.g. end of phase/turn cleanup). */
+export function emptyManaPool(zones: ZoneState): ZoneState {
+  return { ...cloneZones(zones), manaPool: {} };
 }
 
 export function shuffleLibrary(zones: ZoneState): ZoneState {
