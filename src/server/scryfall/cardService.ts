@@ -68,6 +68,51 @@ export async function getCardByExactName(name: string) {
   return upsertCard(card);
 }
 
+/**
+ * Resolves many card names at once (e.g. for a decklist import), checking
+ * the cache first and only round-tripping to Scryfall's bulk /cards/collection
+ * endpoint for the misses — a couple of requests total instead of one per
+ * name, which is what actually trips Scryfall's rate limit on a 100-card list.
+ */
+export async function getCardsByNames(names: string[]) {
+  const result = new Map<string, Awaited<ReturnType<typeof upsertCard>> | null>();
+  if (names.length === 0) return result;
+
+  const uniqueNames = [...new Set(names)];
+
+  const cachedRows = await prisma.cardCache.findMany({
+    where: { name: { in: uniqueNames, mode: 'insensitive' } },
+    orderBy: { fetchedAt: 'asc' },
+  });
+  const cacheByLowerName = new Map<string, (typeof cachedRows)[number]>();
+  for (const row of cachedRows) {
+    const key = row.name.toLowerCase();
+    if (!cacheByLowerName.has(key)) cacheByLowerName.set(key, row); // earliest-cached wins, deterministic
+  }
+
+  const missingNames: string[] = [];
+  for (const name of uniqueNames) {
+    const hit = cacheByLowerName.get(name.toLowerCase());
+    if (hit) {
+      result.set(name, hit);
+    } else {
+      missingNames.push(name);
+    }
+  }
+
+  if (missingNames.length > 0) {
+    const { found } = await scryfall.getCardsByNames(missingNames);
+    const upserted = await Promise.all(found.map((card) => upsertCard(card)));
+    const upsertedByLowerName = new Map(upserted.map((row) => [row.name.toLowerCase(), row]));
+
+    for (const name of missingNames) {
+      result.set(name, upsertedByLowerName.get(name.toLowerCase()) ?? null);
+    }
+  }
+
+  return result;
+}
+
 export async function searchCards(query: string, page = 1): Promise<{ cards: CardSummary[]; hasMore: boolean; totalCards: number }> {
   const { cards, hasMore, totalCards } = await scryfall.searchCards(query, page);
 

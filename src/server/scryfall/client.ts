@@ -54,9 +54,12 @@ interface ScryfallSearchResponse {
   details?: string;
 }
 
-async function scryfallFetch<T>(path: string): Promise<T> {
+async function scryfallFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return enqueueScryfallCall(async () => {
-    const res = await fetch(`${BASE_URL}${path}`, { headers: HEADERS });
+    const res = await fetch(`${BASE_URL}${path}`, {
+      ...init,
+      headers: { ...HEADERS, ...(init?.headers ?? {}) },
+    });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       throw new ScryfallError(
@@ -102,6 +105,41 @@ export async function getCardByExactName(name: string): Promise<ScryfallCard | n
     if (err instanceof ScryfallError && err.status === 404) return null;
     throw err;
   }
+}
+
+const COLLECTION_BATCH_SIZE = 75; // Scryfall's hard limit per /cards/collection request.
+
+/**
+ * Resolves many card names in as few requests as possible via Scryfall's
+ * bulk lookup endpoint, instead of one request per name — the difference
+ * between ~2 calls and 100 calls (and the rate-limit that comes with the
+ * latter) for a typical decklist import.
+ */
+export async function getCardsByNames(names: string[]): Promise<{ found: ScryfallCard[]; notFound: string[] }> {
+  const found: ScryfallCard[] = [];
+  const notFound: string[] = [];
+
+  for (let i = 0; i < names.length; i += COLLECTION_BATCH_SIZE) {
+    const batch = names.slice(i, i + COLLECTION_BATCH_SIZE);
+    try {
+      const data = await scryfallFetch<{ data: ScryfallCard[]; not_found: Array<{ name?: string }> }>('/cards/collection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifiers: batch.map((name) => ({ name })) }),
+      });
+      found.push(...(data.data ?? []));
+      for (const miss of data.not_found ?? []) {
+        if (miss.name) notFound.push(miss.name);
+      }
+    } catch (err) {
+      // One failed chunk (e.g. a transient network error) shouldn't lose the
+      // names resolved by other chunks — surface these as unresolved instead.
+      console.error('[getCardsByNames] chunk failed', err);
+      notFound.push(...batch);
+    }
+  }
+
+  return { found, notFound };
 }
 
 export async function autocomplete(query: string): Promise<string[]> {

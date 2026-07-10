@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { DeckFormat } from '@prisma/client';
 import { parseDecklist } from './decklistParser';
-import { getCardByExactName, getCardById } from '@/server/scryfall/cardService';
+import { getCardById, getCardsByNames } from '@/server/scryfall/cardService';
 
 export async function listDecksForUser(userId: string) {
   return prisma.deck.findMany({
@@ -67,13 +67,26 @@ export async function importDecklist(deckId: string, text: string): Promise<Impo
     quantityByName.set(line.cardName, (quantityByName.get(line.cardName) ?? 0) + line.quantity);
   }
 
+  // Resolve every name in (at most a couple of) batched requests rather than
+  // one Scryfall call per card — a 100-card decklist otherwise easily trips
+  // Scryfall's rate limit.
+  let resolved: Awaited<ReturnType<typeof getCardsByNames>>;
+  try {
+    resolved = await getCardsByNames([...quantityByName.keys()]);
+  } catch (err) {
+    return {
+      imported: 0,
+      warnings: [`Card lookup failed: ${err instanceof Error ? err.message : 'unknown error'}`],
+    };
+  }
+
   for (const [cardName, quantity] of quantityByName) {
+    const card = resolved.get(cardName);
+    if (!card) {
+      warnings.push(`Could not find a card named "${cardName}"`);
+      continue;
+    }
     try {
-      const card = await getCardByExactName(cardName);
-      if (!card) {
-        warnings.push(`Could not find a card named "${cardName}"`);
-        continue;
-      }
       await prisma.deckCard.upsert({
         where: { deckId_scryfallId: { deckId, scryfallId: card.scryfallId } },
         create: { deckId, scryfallId: card.scryfallId, quantity },
