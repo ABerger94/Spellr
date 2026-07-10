@@ -32,10 +32,11 @@ Spellr is a **virtual tabletop**, not a rules engine: it gives every player real
 ## Deploying to Vercel
 
 1. Push the repo to GitHub, then **Add New Project** in the Vercel dashboard and import it. Vercel auto-detects Next.js — no build config changes needed.
-2. Provision a hosted Postgres (Vercel Postgres / Neon / Supabase all work) and set `DATABASE_URL` to its connection string in the Vercel project's environment variables.
+2. Provision a hosted Postgres (Vercel Postgres / Neon / Supabase all work) and set `DATABASE_URL` and `DIRECT_URL` in the Vercel project's environment variables. Prisma needs those two exact names — a pooled connection is required at runtime because Vercel's serverless functions open many short-lived connections that a small Postgres instance can't handle directly, while migrations need a direct (non-pooled) connection:
+   - **Via Vercel's Supabase integration**: it auto-injects several `POSTGRES_*` variables. Copy `POSTGRES_PRISMA_URL`'s value into `DATABASE_URL`, and `POSTGRES_URL_NON_POOLING`'s value into `DIRECT_URL`.
+   - **Manually (Supabase, Neon, etc.)**: in the provider's dashboard, find the pooled/"transaction mode" connection string (Supabase: port `6543`, `?pgbouncer=true`) for `DATABASE_URL`, and the direct/non-pooled one (port `5432`) for `DIRECT_URL`.
 3. Set `NEXTAUTH_SECRET`, `NEXTAUTH_URL` (your production URL, e.g. `https://your-app.vercel.app`), the four `PUSHER_*` vars from your Pusher app, and optionally `GEMINI_API_KEY`.
-4. Run `npx prisma migrate deploy` against the production `DATABASE_URL` once (locally, or as part of your deploy pipeline) to create the tables.
-5. Deploy. Every push auto-redeploys.
+4. Deploy. The build runs `prisma migrate deploy` automatically before `next build`, so the database schema is created/updated on every deploy — no manual migration step needed. Every push auto-redeploys.
 
 Note: Pusher's free tier caps concurrent connections and daily messages — fine for casual play, but worth checking if you expect heavy usage.
 
