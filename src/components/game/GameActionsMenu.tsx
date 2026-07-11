@@ -13,6 +13,8 @@ export function GameActionsMenu({
   anchorRect,
   onClose,
   lookInProgress,
+  isMyTurn,
+  onPassTurn,
   onDrawX,
   onScry,
   onSurveil,
@@ -25,6 +27,8 @@ export function GameActionsMenu({
   onMulligan,
   onResetLife,
   onResetDeck,
+  voiceJoined,
+  onVoiceLeave,
 }: {
   /** Bounding rect of the trigger button, captured at open time — the menu is
    * positioned relative to the viewport (not a DOM ancestor) so it can never
@@ -32,6 +36,8 @@ export function GameActionsMenu({
   anchorRect: DOMRect;
   onClose: () => void;
   lookInProgress: boolean;
+  isMyTurn: boolean;
+  onPassTurn: () => void;
   onDrawX: (count: number) => void;
   onScry: (count: number) => void;
   onSurveil: (count: number) => void;
@@ -44,6 +50,8 @@ export function GameActionsMenu({
   onMulligan: () => void;
   onResetLife: () => void;
   onResetDeck: () => void;
+  voiceJoined: boolean;
+  onVoiceLeave: () => void;
 }) {
   const [countPrompt, setCountPrompt] = useState<CountPrompt | null>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -113,6 +121,8 @@ export function GameActionsMenu({
       style={{ position: 'fixed', left, top, width: MENU_WIDTH, maxHeight: `${viewportHeight - top - VIEWPORT_MARGIN}px` }}
       className="z-[200] overflow-y-auto rounded border border-white/10 bg-panel py-1 shadow-2xl"
     >
+      <Row label="Pass Turn" onClick={onPassTurn} disabled={!isMyTurn} />
+      <div className="my-1 border-t border-white/10" />
       <CountRow label="Draw X" prompt="drawX" onConfirm={onDrawX} />
       <CountRow label="Scry" prompt="scry" disabled={lookInProgress} onConfirm={onScry} />
       <CountRow label="Surveil" prompt="surveil" disabled={lookInProgress} onConfirm={onSurveil} />
@@ -128,6 +138,12 @@ export function GameActionsMenu({
       <div className="my-1 border-t border-white/10" />
       <Row label="Reset Life" onClick={onResetLife} />
       <Row label="Reset Deck" onClick={onResetDeck} />
+      {voiceJoined && (
+        <>
+          <div className="my-1 border-t border-white/10" />
+          <Row label="Leave Voice Chat" onClick={onVoiceLeave} />
+        </>
+      )}
     </div>,
     document.body,
   );
