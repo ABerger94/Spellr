@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { NavBar } from '@/components/layout/NavBar';
+import { useOnlineCount } from '@/components/layout/OnlineCountProvider';
 
 interface Deck {
   id: string;
@@ -34,13 +35,13 @@ interface GameSummary {
 
 export default function LobbyPage() {
   const router = useRouter();
+  const onlineCount = useOnlineCount();
   const [decks, setDecks] = useState<Deck[]>([]);
   const [games, setGames] = useState<GameSummary[]>([]);
   const [openGames, setOpenGames] = useState<GameSummary[]>([]);
   const [format, setFormat] = useState<'COMMANDER' | 'ONE_V_ONE'>('COMMANDER');
   const [deckId, setDeckId] = useState('');
   const [seatCount, setSeatCount] = useState(4);
-  const [fillAI, setFillAI] = useState(true);
   const [isPublic, setIsPublic] = useState(true);
   const [inviteCode, setInviteCode] = useState('');
   const [joinDeckId, setJoinDeckId] = useState('');
@@ -79,7 +80,6 @@ export default function LobbyPage() {
         format,
         deckId,
         seatCount: format === 'COMMANDER' ? seatCount : undefined,
-        fillAI,
         isPublic,
       }),
     });
@@ -133,7 +133,13 @@ export default function LobbyPage() {
     <div>
       <NavBar />
       <main className="mx-auto max-w-5xl px-6 py-8">
-        <h1 className="mb-6 text-2xl font-semibold text-white">Lobby</h1>
+        <div className="mb-6 flex items-center gap-3">
+          <h1 className="text-2xl font-semibold text-white">Lobby</h1>
+          <span className="flex items-center gap-1.5 rounded-full bg-panel px-2.5 py-1 text-xs text-slate-400">
+            <span className={`h-1.5 w-1.5 rounded-full ${onlineCount !== null ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+            {onlineCount !== null ? `${onlineCount} player${onlineCount === 1 ? '' : 's'} online` : 'Connecting…'}
+          </span>
+        </div>
 
         {error && <p className="mb-4 rounded bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>}
 
@@ -183,10 +189,6 @@ export default function LobbyPage() {
                   ))}
                 </select>
               </div>
-              <label className="flex items-center gap-2 text-sm text-slate-300">
-                <input type="checkbox" checked={fillAI} onChange={(e) => setFillAI(e.target.checked)} />
-                Fill remaining seats with AI
-              </label>
               <label className="flex items-center gap-2 text-sm text-slate-300">
                 <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
                 Public — listed in Open games below for anyone to join (uncheck for invite-only)

@@ -8,7 +8,12 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: 'ManaVerse',
-    statusBarStyle: 'black-translucent',
+    // 'black-translucent' draws page content underneath the iOS status bar
+    // in standalone mode — on several iOS versions that shifts the
+    // WebView's touch hit-testing enough to swallow taps app-wide,
+    // including taps meant to focus text inputs (no keyboard ever appears).
+    // 'default' avoids that at the cost of a plain status bar.
+    statusBarStyle: 'default',
   },
 };
 
