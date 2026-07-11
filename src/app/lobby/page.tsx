@@ -35,7 +35,7 @@ interface GameSummary {
 
 export default function LobbyPage() {
   const router = useRouter();
-  const onlineCount = useOnlineCount();
+  const { count: onlineCount, errored: onlineCountErrored } = useOnlineCount();
   const [decks, setDecks] = useState<Deck[]>([]);
   const [games, setGames] = useState<GameSummary[]>([]);
   const [openGames, setOpenGames] = useState<GameSummary[]>([]);
@@ -136,8 +136,16 @@ export default function LobbyPage() {
         <div className="mb-6 flex items-center gap-3">
           <h1 className="text-2xl font-semibold text-white">Lobby</h1>
           <span className="flex items-center gap-1.5 rounded-full bg-panel px-2.5 py-1 text-xs text-slate-400">
-            <span className={`h-1.5 w-1.5 rounded-full ${onlineCount !== null ? 'bg-emerald-400' : 'bg-slate-600'}`} />
-            {onlineCount !== null ? `${onlineCount} player${onlineCount === 1 ? '' : 's'} online` : 'Connecting…'}
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                onlineCountErrored ? 'bg-red-400' : onlineCount !== null ? 'bg-emerald-400' : 'bg-slate-600'
+              }`}
+            />
+            {onlineCountErrored
+              ? 'Realtime unavailable'
+              : onlineCount !== null
+                ? `${onlineCount} player${onlineCount === 1 ? '' : 's'} online`
+                : 'Connecting…'}
           </span>
         </div>
 
