@@ -704,17 +704,17 @@ export default function GameTablePage() {
                           }}
                           className="rounded bg-accent px-2 py-1 text-sm text-white hover:bg-accent/80"
                         >
-                          To hand
+                          to hand
                         </button>
                         <button
                           type="button"
                           onClick={() => {
-                            sendAction({ type: 'MOVE_CARD', fromZone: 'library', toZone: 'exile', scryfallId });
+                            sendAction({ type: 'MOVE_CARD', fromZone: 'library', toZone: 'library', scryfallId, position: 'top' });
                             setLibrarySearchOpen(false);
                           }}
                           className="rounded bg-slate-700 px-2 py-1 text-sm text-white hover:bg-slate-600"
                         >
-                          Exile
+                          to top of library
                         </button>
                       </div>
                     </div>
