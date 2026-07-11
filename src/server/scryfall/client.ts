@@ -2,7 +2,7 @@ import { enqueueScryfallCall } from './queue';
 
 const BASE_URL = 'https://api.scryfall.com';
 const HEADERS = {
-  'User-Agent': 'Spellr/0.1 (https://github.com/aberger94/spellr)',
+  'User-Agent': 'ManaVerse/0.1 (https://github.com/aberger94/spellr)',
   Accept: 'application/json;q=0.9,*/*;q=0.8',
 };
 

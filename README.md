@@ -1,8 +1,8 @@
-# Spellr
+# ManaVerse
 
 A web platform for playing Magic: The Gathering online — with friends, with strangers, and against (or alongside) an AI player, including as a seat in a Commander pod. Card data and images come from the [Scryfall API](https://scryfall.com/docs/api).
 
-Spellr is a **virtual tabletop**, not a rules engine: it gives every player real zones (library, hand, battlefield, graveyard, exile, command zone), real card images, life totals, and a shared game log — but it does not enforce Magic's rules (no stack, no priority, no mana pool, no automatic triggers or combat damage). Players move cards and adjust life manually, the same way you would with paper cards, just online and with an AI seat available if you want one.
+ManaVerse is a **virtual tabletop**, not a rules engine: it gives every player real zones (library, hand, battlefield, graveyard, exile, command zone), real card images, life totals, and a shared game log — but it does not enforce Magic's rules (no stack, no priority, no mana pool, no automatic triggers or combat damage). Players move cards and adjust life manually, the same way you would with paper cards, just online and with an AI seat available if you want one.
 
 ## Stack
 
@@ -49,6 +49,7 @@ Note: Pusher's free tier caps concurrent connections and daily messages — fine
 - Game log and online/offline status delivered over a shared presence channel per game
 - Every player (human or AI) is dealt a fresh 7-card opening hand automatically when a game starts, and can mulligan (Actions ▾ → Mulligan / the AI's `mulligan` function) during their first turn — a proper London mulligan: each one shuffles the hand back and deals a new 7, and the player owes that many cards on the bottom of their library once they keep
 - An AI seat powered by function-calling, with up to four free-tier providers stacked as automatic fallbacks (Gemini → Groq → Cerebras → OpenRouter, whichever have keys configured), which acts through the exact same action handler as human players (no special-cased "AI rules"), capped at 12 actions per turn, and degrades gracefully (logs why, then passes) if no provider key is configured or every configured provider fails. It's given each of its own cards' rules text so it can decide when to adjust life (shock lands, burn, lifegain, unblocked combat damage) and when to mulligan a bad opening hand; a couple of things are handled automatically for every player regardless of AI involvement — a card drawn at the start of every turn, and lands/permanents that unconditionally read "enters the battlefield tapped" actually entering tapped (conditional ones like shock lands are left as a real choice, not auto-tapped)
+- Each AI seat gets its own real, Scryfall-backed precon deck instead of a copy of the host's — a small library of four full 100-card mono-color Commander decks (99 cards + commander, like a real Commander decklist) and two 60-card 1v1 decks (`src/server/ai/aiPreconDecks.ts`), owned by a dedicated system account and built lazily on first use. Which precon lands on which AI seat is randomized per game (and, when there are enough for the format, no two AI seats in the same game share one)
 
 ## Explicitly not in this first pass
 
