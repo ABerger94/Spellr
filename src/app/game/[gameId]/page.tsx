@@ -15,8 +15,10 @@ import { GameActionsBar } from '@/components/game/GameActionsBar';
 import { DiceRoller } from '@/components/game/DiceRoller';
 import { CardContextMenu, type ContextMenuOption } from '@/components/game/CardContextMenu';
 import { CounterEditor } from '@/components/game/CounterEditor';
+import { AttachPicker } from '@/components/game/AttachPicker';
+import { CardPreviewProvider } from '@/components/game/CardPreviewContext';
 import { DragDropProvider, type DragSource, type DropTarget } from '@/components/game/DragDropContext';
-import type { ManaColor } from '@/types/game';
+import type { BattlefieldCard, ManaColor } from '@/types/game';
 
 // Fills the viewport with a fixed grid of player quadrants (2x1 for two
 // players, 2x2 for three-to-four) so a whole board is visible without
@@ -36,6 +38,7 @@ export default function GameTablePage() {
   const [showHelp, setShowHelp] = useState(false);
   const [showLog, setShowLog] = useState(true);
   const [counterEditor, setCounterEditor] = useState<{ instanceId: string; name: string } | null>(null);
+  const [attachPicker, setAttachPicker] = useState<{ instanceId: string; name: string } | null>(null);
 
   const isMyTurn = state?.status === 'ACTIVE' && state.currentTurnSeat === state.viewerSeat;
 
@@ -137,6 +140,17 @@ export default function GameTablePage() {
 
     if (source.zone === 'battlefield' && target.zone === 'battlefield') {
       if (!source.instanceId) return;
+      // Dropped directly on top of another card — attach to it instead of
+      // just repositioning. If that card is itself attached to something
+      // (e.g. you dropped on a peeking equipment), attach to its host instead.
+      if (target.targetInstanceId) {
+        const targetCard = me.battlefield.find((c) => c.instanceId === target.targetInstanceId);
+        const effectiveTargetId = targetCard?.attachedTo ?? target.targetInstanceId;
+        if (effectiveTargetId !== source.instanceId) {
+          sendAction({ type: 'ATTACH_CARD', instanceId: source.instanceId, targetInstanceId: effectiveTargetId });
+          return;
+        }
+      }
       sendAction({
         type: 'MOVE_CARD',
         fromZone: 'battlefield',
@@ -208,7 +222,11 @@ export default function GameTablePage() {
     });
   }
 
-  const openBattlefieldCardMenu = (e: React.MouseEvent, card: { instanceId: string; scryfallId: string }) => {
+  const openBattlefieldCardMenu = (e: React.MouseEvent, card: BattlefieldCard) => {
+    const cardName = state.cards[card.scryfallId]?.name ?? card.scryfallId;
+    const hasBackFace = !!state.cards[card.scryfallId]?.backFace;
+    const hasDependents = !!me?.battlefield.some((c) => c.attachedTo === card.instanceId);
+
     setMenu({
       x: e.clientX,
       y: e.clientY,
@@ -218,9 +236,23 @@ export default function GameTablePage() {
           onClick: () =>
             setCounterEditor({
               instanceId: card.instanceId,
-              name: state.cards[card.scryfallId]?.name ?? card.scryfallId,
+              name: cardName,
             }),
         },
+        ...(hasBackFace
+          ? [{ label: 'Flip card', onClick: () => sendAction({ type: 'FLIP_CARD', instanceId: card.instanceId }) }]
+          : []),
+        ...(card.attachedTo
+          ? [
+              {
+                label: 'Detach',
+                onClick: () => sendAction({ type: 'ATTACH_CARD', instanceId: card.instanceId, targetInstanceId: null }),
+              },
+            ]
+          : []),
+        ...(!hasDependents && !card.attachedTo
+          ? [{ label: 'Attach to…', onClick: () => setAttachPicker({ instanceId: card.instanceId, name: cardName }) }]
+          : []),
         {
           label: 'Move to graveyard',
           onClick: () =>
@@ -286,8 +318,9 @@ export default function GameTablePage() {
   const isHost = !!viewerUserId && viewerUserId === gameInfo.hostUserId;
 
   return (
+    <CardPreviewProvider>
     <DragDropProvider onDrop={handleDrop}>
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="flex min-h-[100dvh] flex-col">
       <NavBar />
 
       <div className="flex items-center justify-between border-b border-white/10 bg-panel px-4 py-1.5 text-xs text-slate-400">
@@ -370,6 +403,23 @@ export default function GameTablePage() {
             sized to fit without scrolling — yours is always top-left. Your hand is the strip along the bottom.
           </p>
           <p className="mb-1">
+            <strong>Arrange your battlefield:</strong> drag any permanent to wherever you want it within your
+            quadrant — it stays put until you move it again.
+          </p>
+          <p className="mb-1">
+            <strong>Attach equipment/auras:</strong> drag a permanent onto another one on your battlefield to attach
+            it — it renders stacked underneath, peeking out. Tap ⋯ → &quot;Detach&quot; to unattach, or use ⋯ →
+            &quot;Attach to…&quot; instead of dragging.
+          </p>
+          <p className="mb-1">
+            <strong>Two-sided cards:</strong> transform/modal-DFC permanents get a &quot;Flip card&quot; option in
+            their ⋯ menu once they&apos;re on the battlefield, to show the other face.
+          </p>
+          <p className="mb-1">
+            <strong>See a card bigger:</strong> hover your mouse over any card (or tap the 🔍 on it) to see it
+            enlarged with its full text — tap/click anywhere to dismiss.
+          </p>
+          <p className="mb-1">
             <strong>Dice &amp; coins:</strong> below the game log — pick a die size and tap Roll, or tap Flip for a
             coin flip; results post to the log for everyone to see.
           </p>
@@ -443,8 +493,10 @@ export default function GameTablePage() {
         />
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-2 lg:flex-row lg:gap-3 lg:p-3">
-        <div className={`grid min-h-0 flex-1 gap-2 ${quadrantGridClass(orderedPlayers.length)}`}>
+      <div className="flex flex-1 flex-col gap-2 p-2 lg:flex-row lg:gap-3 lg:p-3">
+        <div
+          className={`grid min-h-[320px] flex-1 gap-2 ${quadrantGridClass(orderedPlayers.length)}`}
+        >
           {orderedPlayers.map((p) => {
             const isViewer = p.seat === state.viewerSeat;
             return (
@@ -559,7 +611,21 @@ export default function GameTablePage() {
             />
           );
         })()}
+
+      {attachPicker && me && (
+        <AttachPicker
+          cardName={attachPicker.name}
+          candidates={me.battlefield.filter((c) => c.instanceId !== attachPicker.instanceId && !c.attachedTo)}
+          cards={state.cards}
+          onPick={(targetInstanceId) => {
+            sendAction({ type: 'ATTACH_CARD', instanceId: attachPicker.instanceId, targetInstanceId });
+            setAttachPicker(null);
+          }}
+          onClose={() => setAttachPicker(null)}
+        />
+      )}
     </div>
     </DragDropProvider>
+    </CardPreviewProvider>
   );
 }

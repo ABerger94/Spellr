@@ -50,6 +50,8 @@ export const actionSchema = z.discriminatedUnion('type', [
     counterType: z.string().min(1).max(20),
     delta: z.number().int().min(-99).max(99),
   }),
+  z.object({ type: z.literal('FLIP_CARD'), instanceId: z.string() }),
+  z.object({ type: z.literal('ATTACH_CARD'), instanceId: z.string(), targetInstanceId: z.string().nullable() }),
   z.object({ type: z.literal('ADJUST_MANA'), color: manaColor, delta: z.number().int().min(-99).max(99) }),
   z.object({ type: z.literal('EMPTY_MANA_POOL') }),
   z.object({ type: z.literal('END_GAME') }),

@@ -63,6 +63,11 @@ export function HandZone({
                   onClick={() => onPlay(scryfallId)}
                   title={`Click or drag to play ${facts?.name ?? 'this card'}`}
                   touchAction="pan-x"
+                  manaCost={facts?.manaCost}
+                  typeLine={facts?.typeLine}
+                  oracleText={facts?.oracleText}
+                  power={facts?.power}
+                  toughness={facts?.toughness}
                   onContextMenu={
                     onContextMenu
                       ? (e) => {

@@ -6,6 +6,11 @@ export interface BattlefieldCard {
   x: number;
   y: number;
   counters?: Record<string, number>;
+  /** True when a two-sided (transform/MDFC) card is showing its back face. */
+  transformed?: boolean;
+  /** instanceId of another battlefield card this one is attached to (e.g. an
+   * aura/equipment on a creature) — rendered stacked underneath its host. */
+  attachedTo?: string | null;
 }
 
 export type LookMode = 'scry' | 'surveil';
@@ -43,6 +48,15 @@ export const EMPTY_ZONES: ZoneState = {
   mulliganCount: 0,
 };
 
+export interface CardFace {
+  name: string;
+  imageNormal: string | null;
+  typeLine: string | null;
+  oracleText: string | null;
+  power: string | null;
+  toughness: string | null;
+}
+
 export interface CardFacts {
   scryfallId: string;
   name: string;
@@ -52,6 +66,8 @@ export interface CardFacts {
   oracleText: string | null;
   power: string | null;
   toughness: string | null;
+  /** The other face of a two-sided (transform/MDFC) card, if any. */
+  backFace?: CardFace | null;
 }
 
 export interface PlayerStateView {
@@ -133,6 +149,8 @@ export type GameActionPayload =
   | { type: 'ROLL_DICE'; sides: number }
   | { type: 'FLIP_COIN' }
   | { type: 'ADJUST_COUNTER'; instanceId: string; counterType: string; delta: number }
+  | { type: 'FLIP_CARD'; instanceId: string }
+  | { type: 'ATTACH_CARD'; instanceId: string; targetInstanceId: string | null }
   | { type: 'ADJUST_MANA'; color: ManaColor; delta: number }
   | { type: 'EMPTY_MANA_POOL' }
   | { type: 'END_GAME' }

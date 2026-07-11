@@ -1,6 +1,34 @@
 import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
-import type { GameStateView, PlayerStateView, ZoneState, CardFacts } from '@/types/game';
+import type { GameStateView, PlayerStateView, ZoneState, CardFacts, CardFace } from '@/types/game';
+
+interface RawScryfallFace {
+  name?: string;
+  type_line?: string;
+  oracle_text?: string;
+  power?: string;
+  toughness?: string;
+  image_uris?: { normal?: string };
+}
+
+/** Two-sided cards (transform/MDFC/battle) store each face's own image under
+ * card_faces — split cards (Fire // Ice) also have card_faces but share a
+ * single top-level image, so only a face with its own image counts as a
+ * real flippable back. */
+function extractBackFace(raw: unknown): CardFace | null {
+  const faces = (raw as { card_faces?: RawScryfallFace[] } | null)?.card_faces;
+  if (!Array.isArray(faces) || faces.length < 2) return null;
+  const back = faces[1];
+  if (!back?.image_uris?.normal) return null;
+  return {
+    name: back.name ?? 'Back face',
+    imageNormal: back.image_uris.normal,
+    typeLine: back.type_line ?? null,
+    oracleText: back.oracle_text ?? null,
+    power: back.power ?? null,
+    toughness: back.toughness ?? null,
+  };
+}
 
 export async function buildStateFor(gameId: string, viewerSeat: number | null): Promise<GameStateView> {
   const game = await prisma.game.findUniqueOrThrow({
@@ -35,6 +63,7 @@ export async function buildStateFor(gameId: string, viewerSeat: number | null): 
       oracleText: row.oracleText,
       power: row.power,
       toughness: row.toughness,
+      backFace: extractBackFace(row.raw),
     };
   }
 

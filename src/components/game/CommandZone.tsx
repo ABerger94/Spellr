@@ -44,6 +44,11 @@ export function CommandZone({
               name={cards[id]?.name ?? id}
               imageUrl={cards[id]?.imageNormal}
               onClick={onPlay ? () => onPlay(id) : undefined}
+              manaCost={cards[id]?.manaCost}
+              typeLine={cards[id]?.typeLine}
+              oracleText={cards[id]?.oracleText}
+              power={cards[id]?.power}
+              toughness={cards[id]?.toughness}
             />
           </div>
         ))
