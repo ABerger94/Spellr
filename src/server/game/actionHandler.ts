@@ -1,5 +1,4 @@
 import { prisma } from '@/lib/prisma';
-import { waitUntil } from '@vercel/functions';
 import type { GameEvent } from '@prisma/client';
 import type { ZoneState } from '@/types/game';
 import {
@@ -20,7 +19,6 @@ import {
 import { logEvent } from './gameEvents';
 import { broadcastGameState } from '@/server/realtime/pusherServer';
 import type { Action } from './actionTypes';
-import { maybeTakeAITurn } from '@/server/ai/aiController';
 import { endGame, resetPlayerBoard, restartGame, startingLifeFor } from './gameService';
 
 export interface ActionActor {
@@ -173,16 +171,11 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
         data: { currentTurnSeat: nextSeat, turnNumber: wrapped ? game.turnNumber + 1 : game.turnNumber },
       });
       event = await logEvent(gameId, 'TURN_PASSED', { nextSeat }, actor);
-
-      const nextPlayer = players.find((p) => p.seat === nextSeat);
-      if (nextPlayer?.isAI) {
-        // Fire-and-forget from the human's perspective (don't make them wait
-        // for the AI's whole turn), but keep the serverless function alive
-        // until it finishes — an unawaited promise can otherwise get frozen
-        // the instant this request's response is sent, silently dropping the
-        // AI's turn (including its no-key/error fallbacks) entirely.
-        waitUntil(maybeTakeAITurn(gameId, nextSeat));
-      }
+      // If the next seat is AI, a connected client's useGameState hook
+      // notices via the returned state and calls POST /api/games/[gameId]/ai-turn
+      // itself — a real, fully-awaited request, not backgrounded off of this
+      // one (backgrounded work only stays alive up to this request's own
+      // duration limit, which isn't enough for a multi-step AI turn).
       break;
     }
 

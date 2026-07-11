@@ -17,10 +17,28 @@ function createDriver(provider: ProviderName): AITurnDriver {
   return provider === 'gemini' ? createGeminiDriver() : createGroqDriver();
 }
 
+// Guards against two concurrent requests (e.g. two connected players' clients
+// both noticing it's the AI's turn at once) triggering the same seat's turn
+// twice — a second call for a key already in flight just piggybacks on the
+// first's promise instead of starting a redundant one.
+const aiTurnLocks = new Map<string, Promise<void>>();
+
+export function runAITurnOnce(gameId: string, seat: number): Promise<void> {
+  const key = `${gameId}:${seat}`;
+  const existing = aiTurnLocks.get(key);
+  if (existing) return existing;
+
+  const run = maybeTakeAITurn(gameId, seat).finally(() => {
+    aiTurnLocks.delete(key);
+  });
+  aiTurnLocks.set(key, run);
+  return run;
+}
+
 // Gemini is tried first when both are configured — Groq is the fallback for
 // when Gemini is down, rate-limited, or misconfigured, not a load-balanced
 // peer, since its open models are less reliable at multi-step tool calling.
-export async function maybeTakeAITurn(gameId: string, seat: number): Promise<void> {
+async function maybeTakeAITurn(gameId: string, seat: number): Promise<void> {
   const providers: ProviderName[] = [];
   if (env.geminiApiKey) providers.push('gemini');
   if (env.groqApiKey) providers.push('groq');

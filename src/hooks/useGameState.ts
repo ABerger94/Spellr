@@ -175,5 +175,38 @@ export function useGameState(gameId: string) {
     }
   }, [gameId]);
 
+  // Nobody "owns" an AI seat's browser tab, so whichever connected human
+  // client notices it's an AI's turn is responsible for kicking it off — a
+  // real, fully-awaited request (not backgrounded off of someone else's
+  // action) so it isn't at the mercy of another request's duration limit.
+  // The ref dedupes so this client only fires once per seat/turn even
+  // though `state` updates (and this effect re-runs) several times while
+  // waiting on the request to resolve.
+  const aiTurnTriggeredRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!state || state.status !== 'ACTIVE' || state.currentTurnSeat === null) return;
+    const currentPlayer = state.players.find((p) => p.seat === state.currentTurnSeat);
+    if (!currentPlayer?.isAI) return;
+
+    const key = `${state.currentTurnSeat}:${state.turnNumber}`;
+    if (aiTurnTriggeredRef.current === key) return;
+    aiTurnTriggeredRef.current = key;
+
+    let cancelled = false;
+    fetch(`/api/games/${gameId}/ai-turn`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seat: state.currentTurnSeat }),
+    })
+      .then(() => {
+        if (!cancelled) return refreshState();
+      })
+      .catch((err) => console.error('[useGameState] ai-turn trigger failed', err));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [state, gameId, refreshState]);
+
   return { state, gameInfo, log, joinError, actionError, sendAction, onlineUserIds, refreshState };
 }
