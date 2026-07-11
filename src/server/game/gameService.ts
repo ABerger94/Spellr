@@ -71,24 +71,9 @@ export async function createGame(
   hostUserId: string,
   format: GameFormat,
   deckId: string,
-  opts: { seatCount?: number; fillAI?: boolean; isPublic?: boolean } = {},
+  opts: { seatCount?: number; isPublic?: boolean } = {},
 ) {
   const maxSeats = format === 'COMMANDER' ? Math.min(Math.max(opts.seatCount ?? 4, 2), 4) : 2;
-
-  let extraSeats: { seat: number; isAI: boolean; aiPersona: string; deckId: string }[] = [];
-  if (opts.fillAI) {
-    const aiSeatCount = maxSeats - 1;
-    // Each AI seat gets its own precon, cycled randomly, instead of a copy
-    // of the host's deck — deckId falls back to the host's deck only if
-    // precon seeding itself failed (e.g. Scryfall unreachable).
-    const aiDeckIds = await pickAIPreconDeckIds(deckFormatFor(format), aiSeatCount);
-    extraSeats = Array.from({ length: aiSeatCount }, (_, i) => ({
-      seat: i + 1,
-      isAI: true,
-      aiPersona: AI_PERSONAS[i % AI_PERSONAS.length],
-      deckId: aiDeckIds[i % aiDeckIds.length] ?? deckId,
-    }));
-  }
 
   return prisma.game.create({
     data: {
@@ -97,7 +82,7 @@ export async function createGame(
       maxSeats,
       isPublic: opts.isPublic ?? true,
       players: {
-        create: [{ userId: hostUserId, deckId, seat: 0, isAI: false }, ...extraSeats],
+        create: [{ userId: hostUserId, deckId, seat: 0, isAI: false }],
       },
     },
     include: { players: true },
@@ -145,6 +130,57 @@ export async function cancelGame(gameId: string, requestingUserId: string) {
   await prisma.game.delete({ where: { id: gameId } });
 }
 
+/** Adds an AI player (its own precon deck, cycled randomly) to every seat
+ * still empty in a LOBBY game — shared by the explicit host action below and
+ * by starting a game, so "Start" never blocks on unfilled seats even if the
+ * host never used the explicit action. No-ops if every seat is already
+ * taken, or if the host's own seat/deck can't be found. */
+async function fillEmptySeats(
+  gameId: string,
+  maxSeats: number,
+  format: GameFormat,
+  players: { seat: number; deckId: string | null }[],
+): Promise<void> {
+  const takenSeats = new Set(players.map((p) => p.seat));
+  const hostDeckId = players.find((p) => p.seat === 0)?.deckId;
+  if (!hostDeckId) return;
+
+  const newAiSeats: number[] = [];
+  for (let seat = 1; seat < maxSeats; seat++) {
+    if (!takenSeats.has(seat)) newAiSeats.push(seat);
+  }
+  if (newAiSeats.length === 0) return;
+
+  const aiDeckIds = await pickAIPreconDeckIds(deckFormatFor(format), newAiSeats.length);
+  await prisma.gamePlayer.createMany({
+    data: newAiSeats.map((seat, i) => ({
+      gameId,
+      seat,
+      isAI: true,
+      aiPersona: AI_PERSONAS[i % AI_PERSONAS.length],
+      deckId: aiDeckIds[i % aiDeckIds.length] ?? hostDeckId,
+    })),
+  });
+}
+
+/** Host-only, explicit "fill remaining seats with AI" action available while
+ * still waiting in the lobby — lets the host see who's actually joined
+ * before deciding to add AI opponents, instead of committing to it blindly
+ * at game-creation time. */
+export async function fillRemainingSeatsWithAI(gameId: string, requestingUserId: string): Promise<void> {
+  const game = await prisma.game.findUniqueOrThrow({ where: { id: gameId }, include: { players: true } });
+  if (game.hostUserId !== requestingUserId) throw new Error('Only the host can fill seats with AI');
+  if (game.status !== 'LOBBY') throw new Error('That game has already started');
+
+  await fillEmptySeats(gameId, game.maxSeats, game.format, game.players);
+
+  try {
+    await broadcastGameState(gameId);
+  } catch (err) {
+    console.error('[broadcastGameState]', err);
+  }
+}
+
 export async function getGameForUser(gameId: string, userId: string) {
   return prisma.game.findFirst({
     where: { id: gameId, players: { some: { userId } } },
@@ -162,27 +198,9 @@ export async function startGame(gameId: string, requestingUserId: string) {
   if (game.status !== 'LOBBY') throw new Error('That game has already started');
 
   // Backfill any seats the host left empty with AI players so "Start" never
-  // blocks on waiting for more humans to join.
-  const takenSeats = new Set(game.players.map((p) => p.seat));
-  const hostDeckId = game.players.find((p) => p.seat === 0)?.deckId;
-  const newAiSeats: number[] = [];
-  for (let seat = 1; seat < game.maxSeats; seat++) {
-    if (!takenSeats.has(seat) && hostDeckId) {
-      newAiSeats.push(seat);
-    }
-  }
-  if (newAiSeats.length > 0) {
-    const aiDeckIds = await pickAIPreconDeckIds(deckFormatFor(game.format), newAiSeats.length);
-    await prisma.gamePlayer.createMany({
-      data: newAiSeats.map((seat, i) => ({
-        gameId,
-        seat,
-        isAI: true,
-        aiPersona: AI_PERSONAS[i % AI_PERSONAS.length],
-        deckId: aiDeckIds[i % aiDeckIds.length] ?? hostDeckId,
-      })),
-    });
-  }
+  // blocks on waiting for more humans to join, even if the host never used
+  // the explicit "fill remaining seats with AI" action while waiting.
+  await fillEmptySeats(gameId, game.maxSeats, game.format, game.players);
 
   const players = await prisma.gamePlayer.findMany({
     where: { gameId },

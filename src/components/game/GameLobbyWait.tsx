@@ -10,15 +10,18 @@ export function GameLobbyWait({
   isHost,
   onStarted,
   onCancelled,
+  onSeatsChanged,
 }: {
   state: GameStateView;
   gameInfo: GameInfo;
   isHost: boolean;
   onStarted: () => void | Promise<void>;
   onCancelled: () => void | Promise<void>;
+  onSeatsChanged: () => void | Promise<void>;
 }) {
   const [starting, setStarting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [fillingAI, setFillingAI] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleStart() {
@@ -35,6 +38,20 @@ export function GameLobbyWait({
     // directly so a dropped/delayed Pusher message can't strand the host on
     // this screen even though the game did actually start.
     await onStarted();
+  }
+
+  async function handleFillAI() {
+    setFillingAI(true);
+    setError(null);
+    const res = await fetch(`/api/games/${gameInfo.id}/fill-ai`, { method: 'POST' });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error ?? 'Failed to fill seats with AI');
+      setFillingAI(false);
+      return;
+    }
+    await onSeatsChanged();
+    setFillingAI(false);
   }
 
   async function handleCancel() {
@@ -86,16 +103,25 @@ export function GameLobbyWait({
 
       {isHost ? (
         <div className="space-y-2">
+          {seats.some((p) => !p) && (
+            <button
+              onClick={handleFillAI}
+              disabled={starting || cancelling || fillingAI}
+              className="w-full rounded bg-panelLight px-4 py-2 font-medium text-white hover:bg-white/10 disabled:opacity-50"
+            >
+              {fillingAI ? 'Filling…' : 'Fill remaining seats with AI'}
+            </button>
+          )}
           <button
             onClick={handleStart}
-            disabled={starting || cancelling}
+            disabled={starting || cancelling || fillingAI}
             className="w-full rounded bg-accent px-4 py-2 font-medium text-white hover:bg-accent/80 disabled:opacity-50"
           >
             {starting ? 'Starting…' : 'Start game'}
           </button>
           <button
             onClick={handleCancel}
-            disabled={starting || cancelling}
+            disabled={starting || cancelling || fillingAI}
             className="w-full rounded bg-red-500/10 px-4 py-2 font-medium text-red-400 hover:bg-red-500/20 disabled:opacity-50"
           >
             {cancelling ? 'Cancelling…' : 'Cancel game'}

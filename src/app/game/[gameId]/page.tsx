@@ -96,6 +96,7 @@ export default function GameTablePage() {
           isHost={userId === gameInfo.hostUserId}
           onStarted={refreshState}
           onCancelled={() => router.push('/lobby')}
+          onSeatsChanged={refreshState}
         />
       </div>
     );

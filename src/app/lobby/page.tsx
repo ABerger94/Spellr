@@ -40,7 +40,6 @@ export default function LobbyPage() {
   const [format, setFormat] = useState<'COMMANDER' | 'ONE_V_ONE'>('COMMANDER');
   const [deckId, setDeckId] = useState('');
   const [seatCount, setSeatCount] = useState(4);
-  const [fillAI, setFillAI] = useState(true);
   const [isPublic, setIsPublic] = useState(true);
   const [inviteCode, setInviteCode] = useState('');
   const [joinDeckId, setJoinDeckId] = useState('');
@@ -79,7 +78,6 @@ export default function LobbyPage() {
         format,
         deckId,
         seatCount: format === 'COMMANDER' ? seatCount : undefined,
-        fillAI,
         isPublic,
       }),
     });
@@ -183,10 +181,6 @@ export default function LobbyPage() {
                   ))}
                 </select>
               </div>
-              <label className="flex items-center gap-2 text-sm text-slate-300">
-                <input type="checkbox" checked={fillAI} onChange={(e) => setFillAI(e.target.checked)} />
-                Fill remaining seats with AI
-              </label>
               <label className="flex items-center gap-2 text-sm text-slate-300">
                 <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
                 Public — listed in Open games below for anyone to join (uncheck for invite-only)

@@ -44,7 +44,7 @@ Note: Pusher's free tier caps concurrent connections and daily messages — fine
 
 - Email/password auth, protected routes
 - Deck builder: Scryfall-backed search/autocomplete, paste-a-decklist import (`1 Sol Ring` format), commander selection
-- Lobby: create a 1v1 or 2-4 player Commander game, invite-code join, optional AI-filled seats
+- Lobby: create a 1v1 or 2-4 player Commander game, invite-code join, and a host-only "fill remaining seats with AI" action while waiting for players (also happens automatically on Start if any seats are still empty)
 - Live multiplayer game table: battlefield/hand/library/graveyard/exile/command zone per seat, tap-to-tap, right-click "move to..." menu, life totals, turn tracker, realtime sync over Pusher, and hand privacy enforced server-side — each player has their own private channel carrying only their own redacted view, authorized per-request against who actually owns that seat, so opponents' hands are never sent to your browser (you only ever see their card count)
 - Game log and online/offline status delivered over a shared presence channel per game
 - Every player (human or AI) is dealt a fresh 7-card opening hand automatically when a game starts, and can mulligan (Actions ▾ → Mulligan / the AI's `mulligan` function) during their first turn — a proper London mulligan: each one shuffles the hand back and deals a new 7, and the player owes that many cards on the bottom of their library once they keep
