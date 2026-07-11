@@ -89,7 +89,7 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
   const game = await prisma.game.findUniqueOrThrow({ where: { id: gameId } });
   if (game.status !== 'ACTIVE') throw new Error('Game is not active');
 
-  let event: GameEvent;
+  let event: GameEvent | undefined;
 
   switch (action.type) {
     case 'DRAW_CARD': {
@@ -116,7 +116,7 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
         }
       }
 
-      const { zones: nextZones } = mulliganHand(zones, requiredBottomCards, action.bottomCardScryfallIds);
+      const { zones: nextZones } = mulliganWithBottomCards(zones, requiredBottomCards, action.bottomCardScryfallIds);
       const nextCounters = { ...counters, mulliganCount: mulliganCount + 1 };
 
       await prisma.gamePlayer.update({
@@ -412,6 +412,10 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       event = await logEvent(gameId, 'CHAT_MESSAGE', { text: action.text }, actor);
       break;
     }
+  }
+
+  if (!event) {
+    throw new Error('Unhandled action type');
   }
 
   await broadcastState(gameId);

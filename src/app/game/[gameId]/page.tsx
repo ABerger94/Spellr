@@ -18,9 +18,7 @@ import { ScryModal } from '@/components/game/ScryModal';
 import { GameActionsBar } from '@/components/game/GameActionsBar';
 import { DiceRoller } from '@/components/game/DiceRoller';
 import { CardContextMenu, type ContextMenuOption } from '@/components/game/CardContextMenu';
-<<<<<<< HEAD
 import { CardImage } from '@/components/card/CardImage';
-=======
 import { CounterEditor } from '@/components/game/CounterEditor';
 import { AttachPicker } from '@/components/game/AttachPicker';
 import { CardPreviewProvider } from '@/components/game/CardPreviewContext';
@@ -30,7 +28,6 @@ import type { BattlefieldCard, ManaColor } from '@/types/game';
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 1.5;
->>>>>>> 1fa834cf83b85c96962ca71e647fd951538a06c3
 
 export default function GameTablePage() {
   const params = useParams<{ gameId: string }>();
@@ -38,11 +35,9 @@ export default function GameTablePage() {
   const { data: session } = useSession();
   const { state, gameInfo, log, joinError, actionError, sendAction, onlineUserIds, refreshState } = useGameState(params.gameId);
   const [menu, setMenu] = useState<{ x: number; y: number; options: ContextMenuOption[] } | null>(null);
-<<<<<<< HEAD
   const [librarySearchOpen, setLibrarySearchOpen] = useState(false);
   const [mulliganOpen, setMulliganOpen] = useState(false);
   const [selectedBottomCards, setSelectedBottomCards] = useState<string[]>([]);
-=======
   const [showHelp, setShowHelp] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [showLog, setShowLog] = useState(true);
@@ -74,7 +69,6 @@ export default function GameTablePage() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [state, isMyTurn, sendAction]);
->>>>>>> 1fa834cf83b85c96962ca71e647fd951538a06c3
 
   if (joinError) {
     return (
@@ -557,12 +551,7 @@ export default function GameTablePage() {
                 <LibraryStack
                   count={me.libraryCount}
                   onDraw={() => sendAction({ type: 'DRAW_CARD' })}
-<<<<<<< HEAD
                   onSearch={() => setLibrarySearchOpen(true)}
-                />
-                <PublicZoneStack label="Graveyard" scryfallIds={me.graveyard} cards={state.cards} />
-                <PublicZoneStack label="Exile" scryfallIds={me.exile} cards={state.cards} />
-=======
                   onShuffle={() => sendAction({ type: 'SHUFFLE_LIBRARY' })}
                   draggable
                 />
@@ -582,7 +571,6 @@ export default function GameTablePage() {
                   draggable
                   onCardAction={(e, scryfallId) => openPileMenu(e, 'exile', scryfallId)}
                 />
->>>>>>> 1fa834cf83b85c96962ca71e647fd951538a06c3
                 {state.format === 'COMMANDER' && (
                   <CommandZone
                     scryfallIds={me.commandZone}
@@ -591,7 +579,6 @@ export default function GameTablePage() {
                     draggable
                   />
                 )}
-<<<<<<< HEAD
                 <div className="ml-auto flex items-center gap-2">
                   {me.hand && me.hand.length > 0 && (
                     <button
@@ -618,11 +605,6 @@ export default function GameTablePage() {
                     </button>
                   )}
                 </div>
-=======
-                {state.currentTurnSeat === me.seat && (
-                  <span className="ml-auto rounded bg-accent/20 px-2 py-1 text-xs font-medium text-accent">Your turn</span>
-                )}
->>>>>>> 1fa834cf83b85c96962ca71e647fd951538a06c3
               </div>
               <div className="mt-2">
                 <FreeformBattlefield
@@ -693,7 +675,6 @@ export default function GameTablePage() {
 
       {menu && <CardContextMenu x={menu.x} y={menu.y} options={menu.options} onClose={() => setMenu(null)} />}
 
-<<<<<<< HEAD
       {librarySearchOpen && me && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="max-h-[85vh] w-full max-w-5xl overflow-y-auto rounded-lg border border-white/10 bg-slate-900 p-4 shadow-2xl">
@@ -811,7 +792,8 @@ export default function GameTablePage() {
             </div>
           </div>
         </div>
-=======
+      )}
+
       {me && me.pendingLookMode && me.pendingLook.length > 0 && (
         <ScryModal
           mode={me.pendingLookMode}
@@ -848,7 +830,6 @@ export default function GameTablePage() {
           }}
           onClose={() => setAttachPicker(null)}
         />
->>>>>>> 1fa834cf83b85c96962ca71e647fd951538a06c3
       )}
     </div>
     </DragDropProvider>

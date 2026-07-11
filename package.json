@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma migrate deploy && next build",
+    "build": "sh -c 'if [ -z \"$DIRECT_URL\" ] && [ -n \"$DATABASE_URL\" ]; then export DIRECT_URL=\"$DATABASE_URL\"; fi; prisma migrate deploy && next build'",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",

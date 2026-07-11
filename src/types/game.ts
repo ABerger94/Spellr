@@ -87,12 +87,9 @@ export interface PlayerStateView {
   library: string[] | null; // full contents only for the viewer's own seat
   hand: string[] | null; // full contents only for the viewer's own seat
   handCount: number;
-<<<<<<< HEAD
-=======
   pendingLook: string[]; // only populated for the viewer's own seat
   pendingLookMode: LookMode | null;
   manaPool: Record<string, number>;
->>>>>>> 1fa834cf83b85c96962ca71e647fd951538a06c3
   mulliganCount: number;
 }
 

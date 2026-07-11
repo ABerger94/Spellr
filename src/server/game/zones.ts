@@ -355,5 +355,4 @@ export function resolveLook(zones: ZoneState, scryfallId: string, destination: L
 
   if (next.pendingLook.length === 0) next.pendingLookMode = null;
   return next;
->>>>>>> 1fa834cf83b85c96962ca71e647fd951538a06c3
 }
