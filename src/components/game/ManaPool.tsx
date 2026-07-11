@@ -29,6 +29,7 @@ export function ManaPool({
 
   const pipSize = compact ? 'h-4 w-4' : 'h-6 w-6';
   const countSize = compact ? 'h-4 w-4' : 'h-6 w-5';
+  const minusSize = compact ? 'h-4 w-4' : 'h-6 w-5';
   const textSize = compact ? 'text-[9px]' : 'text-[11px]';
 
   return (
@@ -51,12 +52,12 @@ export function ManaPool({
             <span className={`flex items-center justify-center bg-panelLight font-medium text-white ${countSize} ${textSize}`}>
               {count}
             </span>
-            {interactive && onAdjust && !compact && (
+            {interactive && onAdjust && (
               <button
                 type="button"
                 onClick={() => onAdjust(code, -1)}
                 disabled={count === 0}
-                className="flex h-6 w-5 items-center justify-center bg-panelLight text-xs text-white hover:bg-white/10 disabled:opacity-30"
+                className={`flex items-center justify-center bg-panelLight text-white hover:bg-white/10 disabled:opacity-30 ${minusSize} ${textSize}`}
               >
                 −
               </button>
@@ -64,11 +65,11 @@ export function ManaPool({
           </div>
         );
       })}
-      {interactive && onEmpty && hasAny && !compact && (
+      {interactive && onEmpty && hasAny && (
         <button
           type="button"
           onClick={onEmpty}
-          className="ml-1 rounded bg-panelLight px-2 py-1 text-[10px] text-slate-300 hover:bg-white/10"
+          className={`ml-1 rounded bg-panelLight text-slate-300 hover:bg-white/10 ${compact ? 'px-1 py-0 text-[8px]' : 'px-2 py-1 text-[10px]'}`}
         >
           Empty
         </button>
