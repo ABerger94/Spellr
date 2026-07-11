@@ -105,6 +105,16 @@ export async function joinGameById(gameId: string, userId: string, deckId: strin
   if (seat >= game.maxSeats) throw new Error('That game is full');
 
   await prisma.gamePlayer.create({ data: { gameId: game.id, userId, deckId, seat, isAI: false } });
+
+  // Without this, the host (and anyone else already waiting) never finds out
+  // a new player joined until they manually reload — nothing else broadcasts
+  // on a fresh join.
+  try {
+    await broadcastGameState(gameId);
+  } catch (err) {
+    console.error('[broadcastGameState]', err);
+  }
+
   return prisma.game.findUnique({ where: { id: game.id }, include: { players: true } });
 }
 

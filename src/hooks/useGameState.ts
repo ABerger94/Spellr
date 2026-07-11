@@ -175,6 +175,20 @@ export function useGameState(gameId: string) {
     }
   }, [gameId]);
 
+  // Realtime push (Pusher) is the primary sync path, but a message can be
+  // dropped, delayed, or simply never arrive if the socket connection is
+  // broken/misconfigured — with no visible symptom other than a screen that
+  // silently stops updating (e.g. a new player joining the lobby, or an
+  // opponent passing their turn, never showing up without a manual reload).
+  // Poll on a short interval as a guaranteed backstop so the same requests
+  // refreshState() already makes eventually catch anything the push missed.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refreshState();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [refreshState]);
+
   // Nobody "owns" an AI seat's browser tab, so whichever connected human
   // client notices it's an AI's turn is responsible for kicking it off — a
   // real, fully-awaited request (not backgrounded off of someone else's
