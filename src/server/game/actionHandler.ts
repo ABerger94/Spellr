@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import type { ZoneState } from '@/types/game';
-import { drawCard, moveCard, tapCard } from './zones';
+import { drawCard, moveCard, mulliganHand, tapCard } from './zones';
 import { buildStateFor } from './stateSerializer';
 import { logEvent } from './gameEvents';
 import { getIO, gameRoom } from '@/server/socket/io';
@@ -67,6 +67,31 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       if (!drawnScryfallId) throw new Error('Library is empty');
       await updateZones(player.id, nextZones);
       await logEvent(gameId, 'DRAW_CARD', {}, actor);
+      break;
+    }
+
+    case 'MULLIGAN': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const counters = (player.counters as Record<string, number> | null) ?? {};
+      const mulliganCount = counters.mulliganCount ?? 0;
+      const requiredBottomCards = Math.max(0, mulliganCount);
+
+      if (requiredBottomCards > 0) {
+        const selectedCards = action.bottomCardScryfallIds ?? [];
+        if (selectedCards.length !== requiredBottomCards) {
+          throw new Error(`Choose ${requiredBottomCards} card${requiredBottomCards === 1 ? '' : 's'} to put on the bottom of your library`);
+        }
+      }
+
+      const { zones: nextZones } = mulliganHand(zones, requiredBottomCards, action.bottomCardScryfallIds);
+      const nextCounters = { ...counters, mulliganCount: mulliganCount + 1 };
+
+      await prisma.gamePlayer.update({
+        where: { id: player.id },
+        data: { zones: nextZones as unknown as object, counters: nextCounters as unknown as object },
+      });
+      await logEvent(gameId, 'MULLIGAN', { mulliganCount: mulliganCount + 1, bottomCardScryfallIds: action.bottomCardScryfallIds ?? [] }, actor);
       break;
     }
 

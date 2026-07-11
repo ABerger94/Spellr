@@ -4,6 +4,7 @@ const zoneName = z.enum(['library', 'hand', 'battlefield', 'graveyard', 'exile',
 
 export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('DRAW_CARD') }),
+  z.object({ type: z.literal('MULLIGAN'), bottomCardScryfallIds: z.array(z.string()).optional() }),
   z.object({ type: z.literal('PLAY_CARD'), scryfallId: z.string(), fromZone: z.enum(['hand', 'commandZone']) }),
   z.object({ type: z.literal('TAP_CARD'), instanceId: z.string() }),
   z.object({ type: z.literal('UNTAP_CARD'), instanceId: z.string() }),

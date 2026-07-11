@@ -47,8 +47,10 @@ export interface PlayerStateView {
   exile: string[];
   commandZone: string[];
   libraryCount: number;
+  library: string[] | null; // full contents only for the viewer's own seat
   hand: string[] | null; // full contents only for the viewer's own seat
   handCount: number;
+  mulliganCount: number;
 }
 
 export interface GameStateView {
@@ -64,6 +66,7 @@ export interface GameStateView {
 
 export type GameActionPayload =
   | { type: 'DRAW_CARD' }
+  | { type: 'MULLIGAN'; bottomCardScryfallIds?: string[] }
   | { type: 'PLAY_CARD'; scryfallId: string; fromZone: 'hand' | 'commandZone' }
   | { type: 'TAP_CARD'; instanceId: string }
   | { type: 'UNTAP_CARD'; instanceId: string }

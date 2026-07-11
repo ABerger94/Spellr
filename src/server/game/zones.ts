@@ -90,6 +90,31 @@ export function tapCard(zones: ZoneState, instanceId: string, tapped: boolean): 
   };
 }
 
+export interface MulliganResult {
+  zones: ZoneState;
+  drawnScryfallIds: string[];
+}
+
+export function mulliganHand(zones: ZoneState, bottomCardCount: number, bottomCardScryfallIds?: Array<string | null> | null): MulliganResult {
+  const next = cloneZones(zones);
+  const handCards = [...next.hand];
+  const bottomCards: string[] = [];
+
+  for (const scryfallId of bottomCardScryfallIds ?? []) {
+    if (!scryfallId) continue;
+    const index = handCards.indexOf(scryfallId);
+    if (index === -1) throw new Error('Card not found in hand');
+    bottomCards.push(handCards.splice(index, 1)[0]);
+  }
+
+  next.library = shuffle([...next.library, ...handCards]);
+  if (bottomCards.length > 0) next.library.push(...bottomCards);
+
+  const drawnScryfallIds = next.library.splice(0, 7);
+  next.hand = drawnScryfallIds;
+  return { zones: next, drawnScryfallIds };
+}
+
 export function drawCard(zones: ZoneState): { zones: ZoneState; drawnScryfallId: string | null } {
   if (zones.library.length === 0) return { zones, drawnScryfallId: null };
   const result = moveCard(zones, { fromZone: 'library', toZone: 'hand' });

@@ -16,7 +16,10 @@ export async function buildStateFor(gameId: string, viewerSeat: number | null): 
     zones.graveyard.forEach((id) => allIds.add(id));
     zones.exile.forEach((id) => allIds.add(id));
     zones.commandZone.forEach((id) => allIds.add(id));
-    if (p.seat === viewerSeat) zones.hand.forEach((id) => allIds.add(id));
+    if (p.seat === viewerSeat) {
+      zones.library.forEach((id) => allIds.add(id));
+      zones.hand.forEach((id) => allIds.add(id));
+    }
   }
 
   const cardRows = allIds.size > 0 ? await prisma.cardCache.findMany({ where: { scryfallId: { in: [...allIds] } } }) : [];
@@ -50,8 +53,10 @@ export async function buildStateFor(gameId: string, viewerSeat: number | null): 
         exile: zones.exile,
         commandZone: zones.commandZone,
         libraryCount: zones.library.length,
+        library: isViewer ? zones.library : null,
         hand: isViewer ? zones.hand : null,
         handCount: zones.hand.length,
+        mulliganCount: ((p.counters as Record<string, number> | null)?.mulliganCount ?? 0),
       };
     });
 
