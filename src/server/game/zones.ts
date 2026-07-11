@@ -41,6 +41,7 @@ function cloneZones(zones: ZoneState): ZoneState {
     pendingLook: [...(zones.pendingLook ?? [])],
     pendingLookMode: zones.pendingLookMode ?? null,
     manaPool: { ...(zones.manaPool ?? {}) },
+    mulliganCount: zones.mulliganCount ?? 0,
   };
 }
 
@@ -226,15 +227,20 @@ export function randomDiscard(zones: ZoneState): { zones: ZoneState; discardedSc
   return { zones: next, discardedScryfallId: scryfallId };
 }
 
-/** Shuffles the current hand back into the library and draws the same
- * number of cards back — a quick "start this hand over" utility. */
+export const OPENING_HAND_SIZE = 7;
+
+/** London mulligan: shuffle the current hand back into the library, draw a
+ * fresh 7, and record that a mulligan was taken. The player is expected to
+ * put a number of cards equal to zones.mulliganCount on the bottom of their
+ * library once they keep — nothing here enforces that part, same as every
+ * other judgment call on this virtual tabletop. */
 export function mulligan(zones: ZoneState): ZoneState {
-  const handSize = zones.hand.length;
   const shuffled = cloneZones(zones);
   shuffled.library = shuffle([...shuffled.library, ...shuffled.hand]);
   shuffled.hand = [];
+  shuffled.mulliganCount += 1;
   let current = shuffled;
-  for (let i = 0; i < handSize && current.library.length > 0; i++) {
+  for (let i = 0; i < OPENING_HAND_SIZE && current.library.length > 0; i++) {
     const result = moveCard(current, { fromZone: 'library', toZone: 'hand' });
     current = result.zones;
   }

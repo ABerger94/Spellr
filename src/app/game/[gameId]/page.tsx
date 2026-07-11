@@ -305,6 +305,12 @@ export default function GameTablePage() {
             in and out — handy for fitting more on screen or seeing a crowded board at a glance.
           </p>
           <p className="mb-1">
+            <strong>Opening hand:</strong> everyone is dealt a fresh 7-card hand automatically when the game starts.
+            Not happy with it? Actions ▾ → Mulligan shuffles your hand back in and deals you another 7 — only
+            available during your first turn. Each mulligan taken means you owe that many cards on the bottom of
+            your library once you keep (drag them onto the library, or tap ⋯ → bottom of library on each one).
+          </p>
+          <p className="mb-1">
             <strong>More room:</strong> each battlefield is a scrollable canvas, not just the visible box — scroll
             (or drag) to reach cards placed further out. Your hand strip scrolls too; use the ‹ › arrows if it&apos;s
             hard to swipe, especially with lots of cards.

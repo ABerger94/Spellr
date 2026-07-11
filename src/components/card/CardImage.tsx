@@ -69,13 +69,13 @@ export function CardImage({
             onMore(e);
           }}
           title="More options"
-          className="absolute right-0.5 top-0.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs text-white hover:bg-black/90"
+          className="absolute bottom-0.5 left-0.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs text-white hover:bg-black/90"
         >
           ⋯
         </button>
       )}
       {counterEntries.length > 0 && (
-        <div className="absolute bottom-0.5 left-0.5 right-0.5 z-10 flex flex-wrap gap-0.5">
+        <div className={`absolute bottom-0.5 right-0.5 z-10 flex flex-wrap justify-end gap-0.5 ${onMore ? 'left-7' : 'left-0.5'}`}>
           {counterEntries.map(([type, count]) => (
             <span
               key={type}

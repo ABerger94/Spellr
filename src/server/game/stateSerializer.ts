@@ -63,6 +63,10 @@ export async function buildStateFor(gameId: string, viewerSeat: number | null): 
         pendingLookMode: isViewer ? zones.pendingLookMode ?? null : null,
         // Mana pool is public information (like life), visible for every player.
         manaPool: zones.manaPool ?? {},
+        // How many mulligans taken is also public (everyone watches you draw
+        // and reshuffle at the table), needed by the AI to know how many
+        // cards it owes on the bottom of its library once it keeps a hand.
+        mulliganCount: zones.mulliganCount ?? 0,
       };
     });
 

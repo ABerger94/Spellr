@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { GameFormat, DeckFormat, type Deck, type DeckCard } from '@prisma/client';
-import { shuffle } from './zones';
+import { shuffle, drawCards } from './zones';
 import { EMPTY_ZONES, type ZoneState } from '@/types/game';
 import { broadcastGameCancelled, broadcastGameState } from '@/server/realtime/pusherServer';
 import { logEvent } from './gameEvents';
@@ -37,7 +37,10 @@ function buildFreshZones(deck: (Deck & { cards: DeckCard[] }) | null, format: Ga
     }
   }
 
-  return { ...EMPTY_ZONES, library, commandZone };
+  // Deal a real opening hand (up to 7, or fewer for a very small/test deck)
+  // rather than leaving every player to draw it manually one card at a time.
+  const { zones: dealt } = drawCards({ ...EMPTY_ZONES, library, commandZone }, 7);
+  return dealt;
 }
 
 export async function listGamesForUser(userId: string) {

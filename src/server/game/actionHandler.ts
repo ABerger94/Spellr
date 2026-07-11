@@ -285,10 +285,14 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
     }
 
     case 'MULLIGAN': {
+      if (game.turnNumber !== 1) {
+        throw new Error('You can only mulligan during the first turn of the game');
+      }
       const player = await getPlayer(gameId, actor.seat);
       const zones = player.zones as unknown as ZoneState;
-      await updateZones(player.id, mulligan(zones));
-      event = await logEvent(gameId, 'MULLIGAN', {}, actor);
+      const nextZones = mulligan(zones);
+      await updateZones(player.id, nextZones);
+      event = await logEvent(gameId, 'MULLIGAN', { mulliganCount: nextZones.mulliganCount }, actor);
       break;
     }
 
