@@ -38,9 +38,13 @@ export async function POST(req: Request, { params }: { params: { gameId: string 
     // the client, so a signal can't be spoofed as coming from someone else.
     await broadcastVoiceSignal(params.gameId, { ...parsed.data, from: auth.userId });
   } catch (err) {
-    // Same as game-state broadcasts: Pusher being unreachable shouldn't fail
-    // the request, it just means peers won't get this particular signal.
+    // Unlike game-state broadcasts, a lost voice signal has no persistence
+    // or polling fallback to recover it — the offer/answer/candidate is just
+    // gone. Surface the failure instead of swallowing it, so the client can
+    // at least tell the player their voice connection attempt failed rather
+    // than silently never connecting.
     console.error('[broadcastVoiceSignal]', err);
+    return NextResponse.json({ error: 'Failed to relay voice signal' }, { status: 502 });
   }
   return NextResponse.json({ ok: true });
 }
