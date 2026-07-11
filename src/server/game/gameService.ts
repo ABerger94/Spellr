@@ -1,11 +1,9 @@
 import { prisma } from '@/lib/prisma';
-import { waitUntil } from '@vercel/functions';
 import { GameFormat, DeckFormat, type Deck, type DeckCard } from '@prisma/client';
 import { shuffle } from './zones';
 import { EMPTY_ZONES, type ZoneState } from '@/types/game';
 import { broadcastGameCancelled, broadcastGameState } from '@/server/realtime/pusherServer';
 import { logEvent } from './gameEvents';
-import { maybeTakeAITurn } from '@/server/ai/aiController';
 
 const AI_PERSONAS = ['Nissa (AI)', 'Jace (AI)', 'Chandra (AI)', 'Liliana (AI)'];
 
@@ -180,14 +178,8 @@ export async function startGame(gameId: string, requestingUserId: string) {
   } catch (err) {
     console.error('[broadcastGameState]', err);
   }
-
-  const firstPlayer = players.find((p) => p.seat === 0);
-  if (firstPlayer?.isAI) {
-    // See the comment on the equivalent PASS_TURN call in actionHandler.ts —
-    // waitUntil keeps this serverless invocation alive long enough for the
-    // AI's turn to actually run instead of it being silently dropped.
-    waitUntil(maybeTakeAITurn(gameId, 0));
-  }
+  // If seat 0 is AI, a connected client's useGameState hook notices via the
+  // returned state and calls POST /api/games/[gameId]/ai-turn itself.
 }
 
 /** Puts one player's cards back in their library (reshuffled), returns their
@@ -232,11 +224,8 @@ export async function restartGame(gameId: string, requestingUserId: string) {
   }
 
   await prisma.game.update({ where: { id: gameId }, data: { currentTurnSeat: 0, turnNumber: 1 } });
-
-  const firstPlayer = players.find((p) => p.seat === 0);
-  if (firstPlayer?.isAI) {
-    waitUntil(maybeTakeAITurn(gameId, 0));
-  }
+  // If seat 0 is AI, a connected client's useGameState hook notices via the
+  // returned state and calls POST /api/games/[gameId]/ai-turn itself.
 }
 
 /** Host-only. Marks an in-progress game FINISHED — its board and log are

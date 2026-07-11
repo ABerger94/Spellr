@@ -56,6 +56,8 @@ export interface MoveCardParams {
   /** Freeform drop position (percentage 0-100); only meaningful when toZone is 'battlefield'. */
   x?: number;
   y?: number;
+  /** Whether this permanent should enter tapped; only meaningful when toZone is 'battlefield'. */
+  enterTapped?: boolean;
 }
 
 export interface MoveCardResult {
@@ -102,7 +104,7 @@ export function moveCard(zones: ZoneState, params: MoveCardParams): MoveCardResu
       params.x !== undefined && params.y !== undefined
         ? { x: clampPercent(params.x), y: clampPercent(params.y) }
         : nextBattlefieldSlot(next.battlefield);
-    next.battlefield.push({ instanceId: uuidv4(), scryfallId: movedScryfallId, tapped: false, x: pos.x, y: pos.y });
+    next.battlefield.push({ instanceId: uuidv4(), scryfallId: movedScryfallId, tapped: params.enterTapped ?? false, x: pos.x, y: pos.y });
   } else if (toZone === 'library') {
     // index 0 is the top of the library, matching where drawCard reads from.
     // Cards entering the library default to the top unless bottom is requested.

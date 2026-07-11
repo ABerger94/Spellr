@@ -7,9 +7,16 @@ export const AI_SYSTEM_INSTRUCTION =
   'You are playing Magic: The Gathering on a virtual tabletop. The platform does not enforce rules, ' +
   'the stack, mana costs, or combat math — you are responsible for playing reasonably and honestly within ' +
   "the spirit of the game. You can only see your own hand and library size; other players' hands are hidden " +
-  'except for their card counts. Take a small number of sensible actions for your turn (play a land, cast ' +
-  'spells you can reasonably afford, attack if favorable) using the provided functions, briefly explaining ' +
-  'your reasoning in the text alongside each function call, then call pass_turn to end your turn.';
+  'except for their card counts. You already drew for turn automatically, and any land you play that ' +
+  'unconditionally enters tapped is tapped for you automatically — you never need to call anything for either ' +
+  'of those. Cards you control are shown with their rules text in curly braces, e.g. Name [Type] {rules text}; ' +
+  'read it and act on it yourself: if a card you cast or a land you play would make you or another player gain ' +
+  'or lose life (shock lands, painlands, burn spells, lifegain effects, etc.), call adjust_life for the right ' +
+  'seat and amount as part of resolving it — do not just leave life totals unchanged. Likewise use adjust_life ' +
+  'for combat damage on an attack you are confident is unblocked. Take a small number of sensible actions for ' +
+  'your turn (play a land, cast spells you can reasonably afford, attack if favorable) using the provided ' +
+  'functions, briefly explaining your reasoning in the text alongside each function call, then call pass_turn ' +
+  'to end your turn.';
 
 const zoneEnum = ['library', 'hand', 'battlefield', 'graveyard', 'exile', 'commandZone'];
 
@@ -46,7 +53,10 @@ export const AI_ACTIONS: AIActionSpec[] = [
   },
   {
     name: 'attack_with',
-    description: 'Declare an attack with an untapped creature you control. There is no automatic combat damage — this taps the creature and announces the attack in the game log.',
+    description:
+      'Declare an attack with an untapped creature you control. There is no automatic combat damage or ' +
+      "blocking — this taps the creature and announces the attack in the game log. If you're confident the " +
+      "attack goes through unblocked, also call adjust_life on the defending player for the creature's power.",
     parameters: {
       type: 'object',
       properties: { instanceId: { type: 'string', description: 'The battlefield instanceId of the attacking creature.' } },
@@ -70,7 +80,10 @@ export const AI_ACTIONS: AIActionSpec[] = [
   },
   {
     name: 'adjust_life',
-    description: "Change a player's life total (e.g. to resolve a burn spell or lifegain effect).",
+    description:
+      "Change a player's life total. Call this yourself whenever a card's rules text says so — shock/painlands " +
+      "(you lose life), burn spells and combat damage (target loses life), lifegain effects (you gain life) — " +
+      'the platform never applies these automatically.',
     parameters: {
       type: 'object',
       properties: {
@@ -82,7 +95,9 @@ export const AI_ACTIONS: AIActionSpec[] = [
   },
   {
     name: 'draw_card',
-    description: 'Draw the top card of your library into your hand.',
+    description:
+      'Draw the top card of your library into your hand. You already automatically drew your card for the turn, ' +
+      'so only call this for an extra draw a card explicitly grants you.',
     parameters: { type: 'object', properties: {} },
   },
   {

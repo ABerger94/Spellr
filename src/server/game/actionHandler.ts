@@ -1,5 +1,4 @@
 import { prisma } from '@/lib/prisma';
-import { waitUntil } from '@vercel/functions';
 import type { GameEvent } from '@prisma/client';
 import type { ZoneState } from '@/types/game';
 import {
@@ -20,7 +19,6 @@ import {
 import { logEvent } from './gameEvents';
 import { broadcastGameState } from '@/server/realtime/pusherServer';
 import type { Action } from './actionTypes';
-import { maybeTakeAITurn } from '@/server/ai/aiController';
 import { endGame, resetPlayerBoard, restartGame, startingLifeFor } from './gameService';
 
 export interface ActionActor {
@@ -49,6 +47,26 @@ async function getPlayer(gameId: string, seat: number) {
 
 async function updateZones(gamePlayerId: string, zones: ZoneState) {
   await prisma.gamePlayer.update({ where: { id: gamePlayerId }, data: { zones: zones as unknown as object } });
+}
+
+const CONDITIONAL_TAPPED_MARKERS = ['unless', 'you may', "don't"];
+
+/** Whether a permanent unconditionally enters the battlefield tapped (Guildgates,
+ * bounce lands, etc.) — deliberately conservative, so it skips cards that
+ * make tapped-vs-untapped a real choice (shock lands' "pay 2 life", check
+ * lands' "unless you control", fast/slow lands' land-count conditions) rather
+ * than risk forcing a choice the player didn't get to make. */
+function entersTappedUnconditionally(oracleText: string | null): boolean {
+  if (!oracleText) return false;
+  const text = oracleText.toLowerCase();
+  if (!text.includes('enters the battlefield tapped') && !text.includes('enters tapped')) return false;
+  return !CONDITIONAL_TAPPED_MARKERS.some((marker) => text.includes(marker));
+}
+
+async function resolveEnterTapped(scryfallId: string | undefined): Promise<boolean> {
+  if (!scryfallId) return false;
+  const card = await prisma.cardCache.findUnique({ where: { scryfallId }, select: { oracleText: true } });
+  return entersTappedUnconditionally(card?.oracleText ?? null);
 }
 
 async function broadcastState(gameId: string) {
@@ -85,12 +103,14 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
     case 'PLAY_CARD': {
       const player = await getPlayer(gameId, actor.seat);
       const zones = player.zones as unknown as ZoneState;
+      const enterTapped = await resolveEnterTapped(action.scryfallId);
       const { zones: nextZones } = moveCard(zones, {
         fromZone: action.fromZone,
         toZone: 'battlefield',
         scryfallId: action.scryfallId,
         x: action.x,
         y: action.y,
+        enterTapped,
       });
       await updateZones(player.id, nextZones);
       event = await logEvent(gameId, 'PLAY_CARD', { scryfallId: action.scryfallId, fromZone: action.fromZone }, actor);
@@ -110,6 +130,7 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
     case 'MOVE_CARD': {
       const player = await getPlayer(gameId, actor.seat);
       const zones = player.zones as unknown as ZoneState;
+      const enterTapped = action.toZone === 'battlefield' ? await resolveEnterTapped(action.scryfallId) : false;
       const { zones: nextZones } = moveCard(zones, {
         fromZone: action.fromZone,
         toZone: action.toZone,
@@ -118,6 +139,7 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
         position: action.position,
         x: action.x,
         y: action.y,
+        enterTapped,
       });
       await updateZones(player.id, nextZones);
       event = await logEvent(
@@ -174,15 +196,24 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       });
       event = await logEvent(gameId, 'TURN_PASSED', { nextSeat }, actor);
 
+      // Every turn draws a card for the player whose turn it now is, same as
+      // real Magic — the only exception (the very first player's very first
+      // turn) is never reached via PASS_TURN, since that's the game's initial
+      // state right after it starts, before anyone has passed a turn yet.
       const nextPlayer = players.find((p) => p.seat === nextSeat);
-      if (nextPlayer?.isAI) {
-        // Fire-and-forget from the human's perspective (don't make them wait
-        // for the AI's whole turn), but keep the serverless function alive
-        // until it finishes — an unawaited promise can otherwise get frozen
-        // the instant this request's response is sent, silently dropping the
-        // AI's turn (including its no-key/error fallbacks) entirely.
-        waitUntil(maybeTakeAITurn(gameId, nextSeat));
+      if (nextPlayer) {
+        const nextZones = nextPlayer.zones as unknown as ZoneState;
+        const { zones: drawnZones, drawnScryfallIds } = drawCards(nextZones, 1);
+        if (drawnScryfallIds.length > 0) {
+          await updateZones(nextPlayer.id, drawnZones);
+          await logEvent(gameId, 'DRAW_CARD', { count: 1 }, { userId: nextPlayer.userId, seat: nextSeat });
+        }
       }
+      // If the next seat is AI, a connected client's useGameState hook
+      // notices via the returned state and calls POST /api/games/[gameId]/ai-turn
+      // itself — a real, fully-awaited request, not backgrounded off of this
+      // one (backgrounded work only stays alive up to this request's own
+      // duration limit, which isn't enough for a multi-step AI turn).
       break;
     }
 

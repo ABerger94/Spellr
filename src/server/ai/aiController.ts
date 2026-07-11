@@ -17,10 +17,28 @@ function createDriver(provider: ProviderName): AITurnDriver {
   return provider === 'gemini' ? createGeminiDriver() : createGroqDriver();
 }
 
+// Guards against two concurrent requests (e.g. two connected players' clients
+// both noticing it's the AI's turn at once) triggering the same seat's turn
+// twice — a second call for a key already in flight just piggybacks on the
+// first's promise instead of starting a redundant one.
+const aiTurnLocks = new Map<string, Promise<void>>();
+
+export function runAITurnOnce(gameId: string, seat: number): Promise<void> {
+  const key = `${gameId}:${seat}`;
+  const existing = aiTurnLocks.get(key);
+  if (existing) return existing;
+
+  const run = maybeTakeAITurn(gameId, seat).finally(() => {
+    aiTurnLocks.delete(key);
+  });
+  aiTurnLocks.set(key, run);
+  return run;
+}
+
 // Gemini is tried first when both are configured — Groq is the fallback for
 // when Gemini is down, rate-limited, or misconfigured, not a load-balanced
 // peer, since its open models are less reliable at multi-step tool calling.
-export async function maybeTakeAITurn(gameId: string, seat: number): Promise<void> {
+async function maybeTakeAITurn(gameId: string, seat: number): Promise<void> {
   const providers: ProviderName[] = [];
   if (env.geminiApiKey) providers.push('gemini');
   if (env.groqApiKey) providers.push('groq');
@@ -59,6 +77,22 @@ async function forcePass(gameId: string, seat: number) {
   }
 }
 
+/** Oracle text is included for the AI's own cards (it needs the real rules
+ * text to know when a land enters tapped is its own business vs. already
+ * handled automatically, when a spell gains/loses life, etc.) but omitted
+ * for opponents' permanents to keep the prompt from ballooning — the AI
+ * only ever acts on its own cards anyway. */
+function cardLabel(state: GameStateView, id: string, includeText: boolean): string {
+  const facts = state.cards[id];
+  if (!facts) return id;
+  const bits = [facts.typeLine ?? 'unknown type'];
+  if (facts.manaCost) bits.push(facts.manaCost);
+  if (facts.power !== null && facts.toughness !== null) bits.push(`${facts.power}/${facts.toughness}`);
+  let label = `${facts.name} [${bits.join(', ')}]`;
+  if (includeText && facts.oracleText) label += ` {${facts.oracleText.replace(/\n/g, ' ')}}`;
+  return label;
+}
+
 function buildPrompt(state: GameStateView, seat: number): string {
   const me = state.players.find((p) => p.seat === seat);
   const lines: string[] = [];
@@ -66,20 +100,18 @@ function buildPrompt(state: GameStateView, seat: number): string {
   lines.push('');
 
   for (const p of state.players) {
+    const isMe = p.seat === seat;
     lines.push(
-      `Seat ${p.seat} (${p.displayName})${p.seat === seat ? ' [you]' : ''}: life ${p.life}, library ${p.libraryCount}, hand ${p.handCount} card(s).`,
+      `Seat ${p.seat} (${p.displayName})${isMe ? ' [you]' : ''}: life ${p.life}, library ${p.libraryCount}, hand ${p.handCount} card(s).`,
     );
     if (p.commandZone.length > 0) {
-      lines.push(`  Command zone: ${p.commandZone.map((id) => state.cards[id]?.name ?? id).join(', ')}`);
+      lines.push(`  Command zone: ${p.commandZone.map((id) => cardLabel(state, id, isMe)).join('; ')}`);
     }
     if (p.battlefield.length > 0) {
       lines.push(
         '  Battlefield: ' +
           p.battlefield
-            .map(
-              (c) =>
-                `${state.cards[c.scryfallId]?.name ?? c.scryfallId} (instanceId=${c.instanceId}${c.tapped ? ', tapped' : ''})`,
-            )
+            .map((c) => `${cardLabel(state, c.scryfallId, isMe)} (instanceId=${c.instanceId}${c.tapped ? ', tapped' : ''})`)
             .join('; '),
       );
     }
@@ -92,12 +124,7 @@ function buildPrompt(state: GameStateView, seat: number): string {
   if (me?.hand && me.hand.length > 0) {
     lines.push(
       'Your hand: ' +
-        me.hand
-          .map((id) => {
-            const facts = state.cards[id];
-            return `${facts?.name ?? id} [${facts?.typeLine ?? 'unknown type'}${facts?.manaCost ? `, ${facts.manaCost}` : ''}] (scryfallId=${id})`;
-          })
-          .join('; '),
+        me.hand.map((id) => `${cardLabel(state, id, true)} (scryfallId=${id})`).join('; '),
     );
   } else {
     lines.push('Your hand is empty.');

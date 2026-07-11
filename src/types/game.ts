@@ -44,6 +44,9 @@ export interface CardFacts {
   imageNormal: string | null;
   typeLine: string | null;
   manaCost: string | null;
+  oracleText: string | null;
+  power: string | null;
+  toughness: string | null;
 }
 
 export interface PlayerStateView {
