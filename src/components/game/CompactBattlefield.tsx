@@ -27,19 +27,19 @@ export function CompactBattlefield({
     <div
       data-dropzone={interactive ? 'true' : undefined}
       data-zone="battlefield"
-      className={`flex h-full flex-wrap content-start gap-1 overflow-hidden rounded p-1 ${
+      className={`flex h-full flex-wrap content-start gap-1 overflow-y-auto overflow-x-hidden rounded p-1 ${
         isHover ? 'bg-accent/10 ring-2 ring-inset ring-accent' : ''
       }`}
     >
       {battlefield.length === 0 && (
-        <div className="flex w-full items-center justify-center text-[10px] text-slate-600">
+        <div className="flex h-full w-full items-center justify-center text-[10px] text-slate-600">
           {interactive ? 'Drag cards here' : 'Empty'}
         </div>
       )}
       {battlefield.map((c) => {
         const facts = cards[c.scryfallId];
         return (
-          <div key={c.instanceId} className="w-11 flex-shrink-0">
+          <div key={c.instanceId} className="w-16 flex-shrink-0">
             <DraggableCard
               source={interactive ? { zone: 'battlefield', instanceId: c.instanceId } : null}
               name={facts?.name ?? c.scryfallId}

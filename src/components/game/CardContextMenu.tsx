@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 export interface ContextMenuOption {
   label: string;
@@ -19,6 +19,21 @@ export function CardContextMenu({
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ left: x, top: y });
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const margin = 8;
+    const rect = el.getBoundingClientRect();
+    let left = x;
+    let top = y;
+    if (left + rect.width > window.innerWidth - margin) left = window.innerWidth - rect.width - margin;
+    if (left < margin) left = margin;
+    if (top + rect.height > window.innerHeight - margin) top = window.innerHeight - rect.height - margin;
+    if (top < margin) top = margin;
+    setPos({ left, top });
+  }, [x, y]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -36,7 +51,7 @@ export function CardContextMenu({
   return (
     <div
       ref={ref}
-      style={{ position: 'fixed', left: x, top: y }}
+      style={{ position: 'fixed', left: pos.left, top: pos.top }}
       className="z-50 min-w-[160px] rounded border border-white/10 bg-panel py-1 shadow-xl"
     >
       {options.map((opt) => (
