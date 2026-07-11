@@ -4,6 +4,7 @@ import { shuffle, drawCards } from './zones';
 import { EMPTY_ZONES, type ZoneState } from '@/types/game';
 import { broadcastGameCancelled, broadcastGameState } from '@/server/realtime/pusherServer';
 import { logEvent } from './gameEvents';
+import { pickAIPreconDeckIds } from '@/server/ai/aiPreconDecks';
 
 const AI_PERSONAS = ['Nissa (AI)', 'Jace (AI)', 'Chandra (AI)', 'Liliana (AI)'];
 
@@ -74,16 +75,20 @@ export async function createGame(
 ) {
   const maxSeats = format === 'COMMANDER' ? Math.min(Math.max(opts.seatCount ?? 4, 2), 4) : 2;
 
-  const extraSeats = opts.fillAI
-    ? Array.from({ length: maxSeats - 1 }, (_, i) => ({
-        seat: i + 1,
-        isAI: true,
-        aiPersona: AI_PERSONAS[i % AI_PERSONAS.length],
-        // v1 shortcut: AI seats borrow the host's deck rather than having their
-        // own curated decks — there's no deck-authoring flow for AI accounts yet.
-        deckId,
-      }))
-    : [];
+  let extraSeats: { seat: number; isAI: boolean; aiPersona: string; deckId: string }[] = [];
+  if (opts.fillAI) {
+    const aiSeatCount = maxSeats - 1;
+    // Each AI seat gets its own precon, cycled randomly, instead of a copy
+    // of the host's deck — deckId falls back to the host's deck only if
+    // precon seeding itself failed (e.g. Scryfall unreachable).
+    const aiDeckIds = await pickAIPreconDeckIds(deckFormatFor(format), aiSeatCount);
+    extraSeats = Array.from({ length: aiSeatCount }, (_, i) => ({
+      seat: i + 1,
+      isAI: true,
+      aiPersona: AI_PERSONAS[i % AI_PERSONAS.length],
+      deckId: aiDeckIds[i % aiDeckIds.length] ?? deckId,
+    }));
+  }
 
   return prisma.game.create({
     data: {
@@ -167,13 +172,14 @@ export async function startGame(gameId: string, requestingUserId: string) {
     }
   }
   if (newAiSeats.length > 0) {
+    const aiDeckIds = await pickAIPreconDeckIds(deckFormatFor(game.format), newAiSeats.length);
     await prisma.gamePlayer.createMany({
       data: newAiSeats.map((seat, i) => ({
         gameId,
         seat,
         isAI: true,
         aiPersona: AI_PERSONAS[i % AI_PERSONAS.length],
-        deckId: hostDeckId,
+        deckId: aiDeckIds[i % aiDeckIds.length] ?? hostDeckId,
       })),
     });
   }
