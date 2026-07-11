@@ -1,5 +1,7 @@
 'use client';
 
+import { useCardPreview } from '@/components/game/CardPreviewContext';
+
 interface CardImageProps {
   name: string;
   imageUrl?: string | null;
@@ -15,6 +17,14 @@ interface CardImageProps {
    * touch devices, so this renders a visible "more options" button instead
    * of relying on long-press. Called with the same handler shape. */
   onMore?: (e: React.MouseEvent) => void;
+  /** Extra facts (beyond name/image) shown in the hover/tap enlarge preview. */
+  manaCost?: string | null;
+  typeLine?: string | null;
+  oracleText?: string | null;
+  power?: string | null;
+  toughness?: string | null;
+  /** Set false to suppress the enlarge-preview trigger (e.g. a card-back). */
+  previewable?: boolean;
 }
 
 function counterLabel(type: string, count: number): string {
@@ -40,13 +50,26 @@ export function CardImage({
   onClick,
   onContextMenu,
   onMore,
+  manaCost,
+  typeLine,
+  oracleText,
+  power,
+  toughness,
+  previewable = true,
 }: CardImageProps) {
   const counterEntries = Object.entries(counters ?? {}).filter(([, count]) => count > 0);
+  const { showPreviewNow, showPreviewOnHover, hidePreview } = useCardPreview();
+
+  function previewPayload() {
+    return { name, imageUrl, manaCost, typeLine, oracleText, power, toughness };
+  }
 
   return (
     <div
       onClick={onClick}
       onContextMenu={onContextMenu}
+      onMouseEnter={previewable ? () => showPreviewOnHover(previewPayload()) : undefined}
+      onMouseLeave={previewable ? () => hidePreview() : undefined}
       title={title ?? name}
       className={`card-image relative inline-block w-full select-none overflow-hidden bg-panelLight shadow-md transition-transform duration-150 ${
         tapped ? 'rotate-90' : ''
@@ -60,6 +83,19 @@ export function CardImage({
         <div className="flex h-full w-full items-center justify-center p-2 text-center text-[10px] leading-tight text-slate-300">
           {name}
         </div>
+      )}
+      {previewable && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            showPreviewNow(previewPayload());
+          }}
+          title="Enlarge card"
+          className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/70 text-[10px] text-white hover:bg-black/90"
+        >
+          🔍
+        </button>
       )}
       {onMore && (
         <button

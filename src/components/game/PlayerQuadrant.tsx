@@ -6,9 +6,9 @@ import { ManaPool } from './ManaPool';
 import { LibraryStack } from './LibraryStack';
 import { PublicZoneStack } from './PublicZoneStack';
 import { CommandZone } from './CommandZone';
-import { CompactBattlefield } from './CompactBattlefield';
+import { FreeformBattlefield } from './FreeformBattlefield';
 
-/** One player's whole board — panel, zone stacks, mana pool, and a compact
+/** One player's whole board — panel, zone stacks, mana pool, and a freeform
  * battlefield — sized to sit in a fixed grid quadrant so every player's
  * board is visible at once without scrolling. */
 export function PlayerQuadrant({
@@ -95,7 +95,7 @@ export function PlayerQuadrant({
       </div>
 
       <div className="mt-1 min-h-0 flex-1">
-        <CompactBattlefield
+        <FreeformBattlefield
           battlefield={player.battlefield}
           cards={cards}
           interactive={interactive}

@@ -18,6 +18,11 @@ export function DraggableCard({
   onContextMenu,
   onMore,
   touchAction = 'none',
+  manaCost,
+  typeLine,
+  oracleText,
+  power,
+  toughness,
 }: {
   /** Pass null to disable dragging (e.g. opponents' cards, read-only views). */
   source: DragSource | null;
@@ -33,6 +38,12 @@ export function DraggableCard({
   /** 'pan-x' lets a horizontal swipe fall through to a scrollable ancestor
    * (e.g. the hand strip) instead of always being claimed for dragging. */
   touchAction?: 'none' | 'pan-x';
+  /** Extra facts (beyond name/image) shown in the hover/tap enlarge preview. */
+  manaCost?: string | null;
+  typeLine?: string | null;
+  oracleText?: string | null;
+  power?: string | null;
+  toughness?: string | null;
 }) {
   const { startDrag, updateDrag, endDrag, cancelDrag } = useDragDrop();
   const elRef = useRef<HTMLDivElement>(null);
@@ -97,6 +108,11 @@ export function DraggableCard({
         onClick={onClick}
         onContextMenu={onContextMenu}
         onMore={onMore}
+        manaCost={manaCost}
+        typeLine={typeLine}
+        oracleText={oracleText}
+        power={power}
+        toughness={toughness}
       />
     </div>
   );

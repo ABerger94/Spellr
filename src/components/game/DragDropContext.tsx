@@ -17,6 +17,10 @@ export interface DropTarget {
   /** Only set when zone === 'battlefield': drop position as a percentage of the container. */
   xPercent?: number;
   yPercent?: number;
+  /** Only set when zone === 'battlefield' and the drop landed on top of an
+   * existing battlefield card — signals "attach to this card" instead of
+   * "reposition to this spot". */
+  targetInstanceId?: string;
 }
 
 interface DragMeta {
@@ -116,10 +120,13 @@ export function DragDropProvider({
         const rect = zoneEl.getBoundingClientRect();
         const topLeftX = clientX - state.offsetX;
         const topLeftY = clientY - state.offsetY;
+        const cardEl = document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>('[data-battlefield-card]');
+        const targetInstanceId = cardEl?.dataset.battlefieldCard;
         target = {
           zone,
           xPercent: ((topLeftX - rect.left) / rect.width) * 100,
           yPercent: ((topLeftY - rect.top) / rect.height) * 100,
+          targetInstanceId: targetInstanceId && targetInstanceId !== state.source.instanceId ? targetInstanceId : undefined,
         };
       }
       onDrop(state.source, target);

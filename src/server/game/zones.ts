@@ -79,7 +79,11 @@ export function moveCard(zones: ZoneState, params: MoveCardParams): MoveCardResu
     const existing = next.battlefield[idx];
     const x = params.x !== undefined ? clampPercent(params.x) : existing.x;
     const y = params.y !== undefined ? clampPercent(params.y) : existing.y;
-    next.battlefield[idx] = { ...existing, x, y };
+    // A manual drag to an explicit spot picks the card up and sets it back
+    // down — if it was attached to something, that comes loose. (Dragging
+    // it onto another card to re-attach is handled separately, via ATTACH_CARD.)
+    const attachedTo = params.x !== undefined || params.y !== undefined ? undefined : existing.attachedTo;
+    next.battlefield[idx] = { ...existing, x, y, attachedTo };
     return { zones: next, movedScryfallId: existing.scryfallId };
   }
 
@@ -90,6 +94,11 @@ export function moveCard(zones: ZoneState, params: MoveCardParams): MoveCardResu
     if (idx === -1) throw new Error('Card not found on battlefield');
     movedScryfallId = next.battlefield[idx].scryfallId;
     next.battlefield.splice(idx, 1);
+    // Anything attached to a card that just left the battlefield comes loose
+    // rather than pointing at a card that no longer exists.
+    next.battlefield = next.battlefield.map((c) =>
+      c.attachedTo === params.instanceId ? { ...c, attachedTo: undefined } : c,
+    );
   } else {
     const arr = next[fromZone] as string[];
     const idx = params.scryfallId ? arr.indexOf(params.scryfallId) : 0;
@@ -166,6 +175,38 @@ export function adjustCounter(zones: ZoneState, instanceId: string, counterType:
   }
 
   next.battlefield[idx] = { ...card, counters };
+  return next;
+}
+
+/** Flips a two-sided (transform/MDFC) card on the battlefield to its other face. */
+export function flipCard(zones: ZoneState, instanceId: string): ZoneState {
+  const idx = zones.battlefield.findIndex((c) => c.instanceId === instanceId);
+  if (idx === -1) throw new Error('Card not found on battlefield');
+  const next = cloneZones(zones);
+  next.battlefield[idx] = { ...next.battlefield[idx], transformed: !next.battlefield[idx].transformed };
+  return next;
+}
+
+/** Attaches a card to another battlefield card (e.g. an aura/equipment onto a
+ * creature), or detaches it when targetInstanceId is null. Attachment is a
+ * single level deep — a card that's already a host, or already attached to
+ * something, can't be chosen as a new target — so stacks can't chain or loop. */
+export function attachCard(zones: ZoneState, instanceId: string, targetInstanceId: string | null): ZoneState {
+  const idx = zones.battlefield.findIndex((c) => c.instanceId === instanceId);
+  if (idx === -1) throw new Error('Card not found on battlefield');
+
+  if (targetInstanceId !== null) {
+    if (targetInstanceId === instanceId) throw new Error('A card cannot be attached to itself');
+    const target = zones.battlefield.find((c) => c.instanceId === targetInstanceId);
+    if (!target) throw new Error('Target card not found on battlefield');
+    if (target.attachedTo) throw new Error('Cannot attach to a card that is itself attached to something');
+    if (zones.battlefield.some((c) => c.attachedTo === instanceId)) {
+      throw new Error('Cannot attach a card that already has cards attached to it');
+    }
+  }
+
+  const next = cloneZones(zones);
+  next.battlefield[idx] = { ...next.battlefield[idx], attachedTo: targetInstanceId ?? undefined };
   return next;
 }
 

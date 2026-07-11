@@ -13,6 +13,8 @@ import {
   randomDiscard,
   mulligan,
   adjustCounter,
+  flipCard,
+  attachCard,
   adjustMana,
   emptyManaPool,
 } from './zones';
@@ -317,6 +319,29 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
         gameId,
         'ADJUST_COUNTER',
         { instanceId: action.instanceId, counterType: action.counterType, delta: action.delta },
+        actor,
+      );
+      break;
+    }
+
+    case 'FLIP_CARD': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const nextZones = flipCard(zones, action.instanceId);
+      await updateZones(player.id, nextZones);
+      event = await logEvent(gameId, 'FLIP_CARD', { instanceId: action.instanceId }, actor);
+      break;
+    }
+
+    case 'ATTACH_CARD': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const nextZones = attachCard(zones, action.instanceId, action.targetInstanceId);
+      await updateZones(player.id, nextZones);
+      event = await logEvent(
+        gameId,
+        'ATTACH_CARD',
+        { instanceId: action.instanceId, targetInstanceId: action.targetInstanceId },
         actor,
       );
       break;

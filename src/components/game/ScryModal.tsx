@@ -49,7 +49,15 @@ export function ScryModal({
                 className="flex items-center gap-4 rounded border border-white/10 bg-panelLight p-2"
               >
                 <div className="w-20 flex-shrink-0">
-                  <CardImage name={facts?.name ?? scryfallId} imageUrl={facts?.imageNormal} />
+                  <CardImage
+                    name={facts?.name ?? scryfallId}
+                    imageUrl={facts?.imageNormal}
+                    manaCost={facts?.manaCost}
+                    typeLine={facts?.typeLine}
+                    oracleText={facts?.oracleText}
+                    power={facts?.power}
+                    toughness={facts?.toughness}
+                  />
                 </div>
                 <div className="flex-1">
                   <p className="mb-2 text-sm font-medium text-white">{facts?.name ?? scryfallId}</p>

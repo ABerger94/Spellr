@@ -41,8 +41,16 @@ export function PublicZoneStack({
       >
         {scryfallIds.length > 0 ? (
           <div className="relative">
-            <CardImage name={topFacts?.name ?? topId} imageUrl={topFacts?.imageNormal} />
-            <span className="absolute right-1 top-1 rounded bg-black/70 px-1 text-[10px] font-semibold text-white">
+            <CardImage
+              name={topFacts?.name ?? topId}
+              imageUrl={topFacts?.imageNormal}
+              manaCost={topFacts?.manaCost}
+              typeLine={topFacts?.typeLine}
+              oracleText={topFacts?.oracleText}
+              power={topFacts?.power}
+              toughness={topFacts?.toughness}
+            />
+            <span className="absolute left-1 top-1 rounded bg-black/70 px-1 text-[10px] font-semibold text-white">
               {scryfallIds.length}
             </span>
           </div>
@@ -76,6 +84,11 @@ export function PublicZoneStack({
                   <CardImage
                     name={cards[id]?.name ?? id}
                     imageUrl={cards[id]?.imageNormal}
+                    manaCost={cards[id]?.manaCost}
+                    typeLine={cards[id]?.typeLine}
+                    oracleText={cards[id]?.oracleText}
+                    power={cards[id]?.power}
+                    toughness={cards[id]?.toughness}
                     onContextMenu={
                       onCardAction
                         ? (e) => {

@@ -99,6 +99,10 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
       const count = Math.abs(delta);
       return `${who} ${verb} ${count} ${MANA_COLOR_NAMES[color] ?? color} mana.`;
     }
+    case 'FLIP_CARD':
+      return `${who} flipped a card to its other face.`;
+    case 'ATTACH_CARD':
+      return event.payload.targetInstanceId ? `${who} attached a card to another card.` : `${who} detached a card.`;
     case 'EMPTY_MANA_POOL':
       return `${who} emptied their mana pool.`;
     case 'GAME_ENDED':
