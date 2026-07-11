@@ -8,22 +8,45 @@ type VoiceSignal =
   | { type: 'voice-joined'; from: string; target?: string }
   | { type: 'voice-left'; from: string }
   | { type: 'offer'; from: string; target: string; sdp: RTCSessionDescriptionInit }
-  | { type: 'answer'; from: string; target: string; sdp: RTCSessionDescriptionInit }
-  | { type: 'ice-candidate'; from: string; target: string; candidate: RTCIceCandidateInit };
+  | { type: 'answer'; from: string; target: string; sdp: RTCSessionDescriptionInit };
 
 type OutgoingVoiceSignal = VoiceSignal extends infer T ? (T extends { from: string } ? Omit<T, 'from'> : never) : never;
 
 // STUN alone only works when NAT traversal is simple on both sides; a lot of
 // real-world networks (symmetric NAT, mobile carriers, corporate wifi) need
 // a TURN relay to actually get audio flowing. OpenRelay's public demo TURN
-// server has no signup and is widely used for exactly this purpose.
+// server has no signup and is widely used for exactly this purpose. Kept
+// short deliberately — each extra server means more gathered ICE candidates
+// packed into the one offer/answer signal below.
 const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:openrelay.metered.ca:80' },
   { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
   { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
 ];
+
+// Pusher's per-second message rate limit made trickle ICE (one signal per
+// candidate, sometimes 15-30 of them fired in a couple seconds) unreliable
+// in practice — bursts of candidates were getting throttled, surfacing as
+// signaling failures. Instead, wait for ICE gathering to finish and send the
+// complete SDP (with every candidate already embedded in it) as a single
+// signal. Costs a little connection setup latency, not reliability.
+function waitForIceGatheringComplete(pc: RTCPeerConnection, timeoutMs = 3000): Promise<void> {
+  if (pc.iceGatheringState === 'complete') return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pc.removeEventListener('icegatheringstatechange', onChange);
+      resolve();
+    }, timeoutMs);
+    function onChange() {
+      if (pc.iceGatheringState === 'complete') {
+        clearTimeout(timer);
+        pc.removeEventListener('icegatheringstatechange', onChange);
+        resolve();
+      }
+    }
+    pc.addEventListener('icegatheringstatechange', onChange);
+  });
+}
 
 function log(...args: unknown[]) {
   // eslint-disable-next-line no-console
@@ -43,7 +66,6 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
   const localStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const audioElsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
-  const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const joinedRef = useRef(false);
 
   const recomputeConnectedCount = useCallback(() => {
@@ -100,7 +122,6 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
         audioEl.remove();
         audioElsRef.current.delete(remoteUserId);
       }
-      pendingCandidatesRef.current.delete(remoteUserId);
       recomputeConnectedCount();
     },
     [recomputeConnectedCount],
@@ -115,11 +136,6 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
       localStreamRef.current?.getTracks().forEach((track) => {
         pc.addTrack(track, localStreamRef.current!);
       });
-      pc.onicecandidate = (e) => {
-        if (e.candidate) {
-          sendSignal({ type: 'ice-candidate', target: remoteUserId, candidate: e.candidate.toJSON() });
-        }
-      };
       pc.ontrack = (e) => {
         let audioEl = audioElsRef.current.get(remoteUserId);
         if (!audioEl) {
@@ -151,16 +167,11 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
       pc.oniceconnectionstatechange = () => {
         log('iceConnectionState', remoteUserId, pc.iceConnectionState);
         recomputeConnectedCount();
-        if (pc.iceConnectionState === 'failed') {
-          // A lone STUN/TURN hiccup shouldn't kill the call — ask the browser
-          // to renegotiate ICE before giving up on the connection entirely.
-          pc.restartIce();
-        }
       };
       peersRef.current.set(remoteUserId, pc);
       return pc;
     },
-    [sendSignal, closePeer, recomputeConnectedCount],
+    [closePeer, recomputeConnectedCount],
   );
 
   const handleSignal = useCallback(
@@ -187,7 +198,10 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
           const pc = getOrCreatePeer(signal.from);
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
-          sendSignal({ type: 'offer', target: signal.from, sdp: offer });
+          await waitForIceGatheringComplete(pc);
+          // pc.localDescription (not the original `offer`) has every
+          // gathered ICE candidate folded into its SDP by now.
+          sendSignal({ type: 'offer', target: signal.from, sdp: pc.localDescription! });
         } else {
           getOrCreatePeer(signal.from);
         }
@@ -200,28 +214,16 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
       if (signal.type === 'offer') {
         const pc = getOrCreatePeer(signal.from);
         await pc.setRemoteDescription(signal.sdp);
-        const queued = pendingCandidatesRef.current.get(signal.from) ?? [];
-        for (const candidate of queued) await pc.addIceCandidate(candidate).catch(() => {});
-        pendingCandidatesRef.current.delete(signal.from);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
-        sendSignal({ type: 'answer', target: signal.from, sdp: answer });
+        await waitForIceGatheringComplete(pc);
+        sendSignal({ type: 'answer', target: signal.from, sdp: pc.localDescription! });
         return;
       }
       if (signal.type === 'answer') {
         const pc = peersRef.current.get(signal.from);
         if (pc) await pc.setRemoteDescription(signal.sdp);
         return;
-      }
-      if (signal.type === 'ice-candidate') {
-        const pc = peersRef.current.get(signal.from);
-        if (pc?.remoteDescription) {
-          await pc.addIceCandidate(signal.candidate).catch(() => {});
-        } else {
-          const arr = pendingCandidatesRef.current.get(signal.from) ?? [];
-          arr.push(signal.candidate);
-          pendingCandidatesRef.current.set(signal.from, arr);
-        }
       }
     },
     [viewerUserId, sendSignal, getOrCreatePeer, closePeer],
