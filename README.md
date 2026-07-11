@@ -1,8 +1,8 @@
-# Spellr
+# ManaVerse
 
 A web platform for playing Magic: The Gathering online — with friends, with strangers, and against (or alongside) an AI player, including as a seat in a Commander pod. Card data and images come from the [Scryfall API](https://scryfall.com/docs/api).
 
-Spellr is a **virtual tabletop**, not a rules engine: it gives every player real zones (library, hand, battlefield, graveyard, exile, command zone), real card images, life totals, and a shared game log — but it does not enforce Magic's rules (no stack, no priority, no mana pool, no automatic triggers or combat damage). Players move cards and adjust life manually, the same way you would with paper cards, just online and with an AI seat available if you want one.
+ManaVerse is a **virtual tabletop**, not a rules engine: it gives every player real zones (library, hand, battlefield, graveyard, exile, command zone), real card images, life totals, and a shared game log — but it does not enforce Magic's rules (no stack, no priority, no mana pool, no automatic triggers or combat damage). Players move cards and adjust life manually, the same way you would with paper cards, just online and with an AI seat available if you want one.
 
 ## Stack
 

@@ -8,7 +8,7 @@ import { createDeck, importDecklist, setCommander } from '@/server/deck/deckServ
 // opponent played an exact copy of whatever the human brought. These are a
 // small fixed library of real, Scryfall-backed decks owned by a dedicated
 // system account instead, so AI seats get their own decklists.
-const AI_PRECON_LIBRARY_EMAIL = 'ai-precon-library@spellr.internal';
+const AI_PRECON_LIBRARY_EMAIL = 'ai-precon-library@manaverse.internal';
 
 interface PreconDefinition {
   name: string;
@@ -344,7 +344,7 @@ async function getOrCreateLibraryUserId(): Promise<string> {
   // required column with something nobody could guess.
   const passwordHash = await bcrypt.hash(randomUUID(), 10);
   const user = await prisma.user.create({
-    data: { email: AI_PRECON_LIBRARY_EMAIL, passwordHash, displayName: 'Spellr AI Precon Library' },
+    data: { email: AI_PRECON_LIBRARY_EMAIL, passwordHash, displayName: 'ManaVerse AI Precon Library' },
   });
   return user.id;
 }

@@ -3,7 +3,7 @@ import './globals.css';
 import { Providers } from '@/components/layout/Providers';
 
 export const metadata: Metadata = {
-  title: 'Spellr',
+  title: 'ManaVerse',
   description: 'Play Magic: The Gathering online with friends, strangers, and AI.',
 };
 
