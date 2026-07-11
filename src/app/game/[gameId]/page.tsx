@@ -477,6 +477,12 @@ export default function GameTablePage() {
         </div>
       )}
 
+      {voiceChat.signalingError && (
+        <div className="flex items-center justify-between border-b border-red-500/30 bg-red-500/10 px-4 py-1.5 text-sm text-red-400">
+          <span>{voiceChat.signalingError}</span>
+        </div>
+      )}
+
       {me && (
         <GameActionsBar
           isMyTurn={!!isMyTurn}
@@ -504,7 +510,6 @@ export default function GameTablePage() {
           voiceConnectedPeerCount={voiceChat.connectedPeerCount}
           voiceConnectingPeerCount={voiceChat.connectingPeerCount}
           voiceMicError={voiceChat.micError}
-          voiceSignalingError={voiceChat.signalingError}
           voiceAudioBlocked={voiceChat.audioBlocked}
           onVoiceJoin={voiceChat.join}
           onVoiceToggleMute={voiceChat.toggleMute}

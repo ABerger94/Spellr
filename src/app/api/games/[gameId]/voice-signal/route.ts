@@ -40,7 +40,20 @@ export async function POST(req: Request, { params }: { params: { gameId: string 
     // at least tell the player their voice connection attempt failed rather
     // than silently never connecting.
     console.error('[broadcastVoiceSignal]', err);
-    return NextResponse.json({ error: 'Failed to relay voice signal' }, { status: 502 });
+    // Pusher's SDK throws a RequestError carrying the *actual* rejection
+    // reason (rate limit, payload-too-large, auth, ...) in message/status/
+    // body — surface that instead of a generic label, since a blanket 502
+    // told us nothing about which of those it actually was.
+    const pusherErr = err as { message?: string; status?: number; body?: string } | undefined;
+    return NextResponse.json(
+      {
+        error: 'Failed to relay voice signal',
+        detail: pusherErr?.message ?? String(err),
+        pusherStatus: pusherErr?.status ?? null,
+        pusherBody: pusherErr?.body ?? null,
+      },
+      { status: 502 },
+    );
   }
   return NextResponse.json({ ok: true });
 }
