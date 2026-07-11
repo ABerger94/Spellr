@@ -124,7 +124,6 @@ export type ContentZone = 'library' | 'hand' | 'battlefield' | 'graveyard' | 'ex
 
 export type GameActionPayload =
   | { type: 'DRAW_CARD'; count?: number }
-  | { type: 'MULLIGAN'; bottomCardScryfallIds?: string[] }
   | { type: 'PLAY_CARD'; scryfallId: string; fromZone: 'hand' | 'commandZone'; x?: number; y?: number }
   | { type: 'TAP_CARD'; instanceId: string }
   | { type: 'UNTAP_CARD'; instanceId: string }
