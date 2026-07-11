@@ -7,7 +7,15 @@ import { getPusherClient } from '@/lib/pusherClient';
 
 const ONLINE_PRESENCE_CHANNEL = 'presence-online';
 
-const OnlineCountContext = createContext<number | null>(null);
+export interface OnlineCountState {
+  count: number | null;
+  /** True once we know the channel will never connect (bad Pusher config, a
+   * rejected auth request, etc.) — lets the UI stop saying "Connecting…"
+   * forever and show something more honest instead. */
+  errored: boolean;
+}
+
+const OnlineCountContext = createContext<OnlineCountState>({ count: null, errored: false });
 
 /** Tracks how many authenticated users are connected anywhere in the app via
  * one shared presence channel subscribed here at the provider level (mounted
@@ -16,36 +24,46 @@ const OnlineCountContext = createContext<number | null>(null);
  * instead of each mounting its own. */
 export function OnlineCountProvider({ children }: { children: ReactNode }) {
   const { status } = useSession();
-  const [count, setCount] = useState<number | null>(null);
+  const [state, setState] = useState<OnlineCountState>({ count: null, errored: false });
 
   useEffect(() => {
     if (status !== 'authenticated') {
-      setCount(null);
+      setState({ count: null, errored: false });
       return;
     }
 
     let pusher: ReturnType<typeof getPusherClient>;
     try {
       pusher = getPusherClient();
-    } catch {
+    } catch (err) {
+      // Previously swallowed silently, which left the lobby badge stuck on
+      // "Connecting…" forever with zero indication of why (usually
+      // NEXT_PUBLIC_PUSHER_KEY/CLUSTER missing or stale from before a
+      // redeploy) — log it so it's actually diagnosable from devtools.
+      console.error('[OnlineCountProvider] Pusher client unavailable', err);
+      setState({ count: null, errored: true });
       return;
     }
 
     const channel = pusher.subscribe(ONLINE_PRESENCE_CHANNEL) as PresenceChannel;
-    const updateCount = () => setCount(channel.members.count);
+    const updateCount = () => setState({ count: channel.members.count, errored: false });
     channel.bind('pusher:subscription_succeeded', updateCount);
     channel.bind('pusher:member_added', updateCount);
     channel.bind('pusher:member_removed', updateCount);
+    channel.bind('pusher:subscription_error', (err: unknown) => {
+      console.error('[OnlineCountProvider] presence-online subscription failed', err);
+      setState({ count: null, errored: true });
+    });
 
     return () => {
       pusher.unsubscribe(ONLINE_PRESENCE_CHANNEL);
     };
   }, [status]);
 
-  return <OnlineCountContext.Provider value={count}>{children}</OnlineCountContext.Provider>;
+  return <OnlineCountContext.Provider value={state}>{children}</OnlineCountContext.Provider>;
 }
 
-/** Null while not yet known (still connecting, or not signed in). */
-export function useOnlineCount(): number | null {
+/** { count: null, errored: false } while still connecting or not signed in. */
+export function useOnlineCount(): OnlineCountState {
   return useContext(OnlineCountContext);
 }
