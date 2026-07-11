@@ -6,8 +6,12 @@ import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useGameState } from '@/hooks/useGameState';
 import { NavBar } from '@/components/layout/NavBar';
-import { PlayerQuadrant } from '@/components/game/PlayerQuadrant';
+import { PlayerPanel } from '@/components/game/PlayerPanel';
+import { FreeformBattlefield } from '@/components/game/FreeformBattlefield';
 import { HandZone } from '@/components/game/HandZone';
+import { LibraryStack } from '@/components/game/LibraryStack';
+import { PublicZoneStack } from '@/components/game/PublicZoneStack';
+import { CommandZone } from '@/components/game/CommandZone';
 import { GameLog } from '@/components/game/GameLog';
 import { GameLobbyWait } from '@/components/game/GameLobbyWait';
 import { ScryModal } from '@/components/game/ScryModal';
@@ -17,17 +21,12 @@ import { CardContextMenu, type ContextMenuOption } from '@/components/game/CardC
 import { CounterEditor } from '@/components/game/CounterEditor';
 import { AttachPicker } from '@/components/game/AttachPicker';
 import { CardPreviewProvider } from '@/components/game/CardPreviewContext';
+import { ManaPool } from '@/components/game/ManaPool';
 import { DragDropProvider, type DragSource, type DropTarget } from '@/components/game/DragDropContext';
 import type { BattlefieldCard, ManaColor } from '@/types/game';
 
-// Fills the viewport with a fixed grid of player quadrants (2x1 for two
-// players, 2x2 for three-to-four) so a whole board is visible without
-// scrolling, instead of a single scrolling column.
-function quadrantGridClass(playerCount: number): string {
-  if (playerCount <= 1) return 'grid-cols-1 grid-rows-1';
-  if (playerCount === 2) return 'grid-cols-2 grid-rows-1';
-  return 'grid-cols-2 grid-rows-2';
-}
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 1.5;
 
 export default function GameTablePage() {
   const params = useParams<{ gameId: string }>();
@@ -36,6 +35,7 @@ export default function GameTablePage() {
   const { state, gameInfo, log, joinError, actionError, sendAction, onlineUserIds, refreshState } = useGameState(params.gameId);
   const [menu, setMenu] = useState<{ x: number; y: number; options: ContextMenuOption[] } | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const [showLog, setShowLog] = useState(true);
   const [counterEditor, setCounterEditor] = useState<{ instanceId: string; name: string } | null>(null);
   const [attachPicker, setAttachPicker] = useState<{ instanceId: string; name: string } | null>(null);
@@ -121,13 +121,7 @@ export default function GameTablePage() {
   }
 
   const me = state.players.find((p) => p.seat === state.viewerSeat);
-  // Viewer's own quadrant always comes first (top-left), everyone else in
-  // seat order after — a stable arrangement regardless of turn order.
-  const orderedPlayers = [...state.players].sort((a, b) => {
-    if (a.seat === state.viewerSeat) return -1;
-    if (b.seat === state.viewerSeat) return 1;
-    return a.seat - b.seat;
-  });
+  const opponents = state.players.filter((p) => p.seat !== state.viewerSeat);
 
   const displayName = (seat: number | null) =>
     seat === null ? 'System' : state.players.find((p) => p.seat === seat)?.displayName ?? `Seat ${seat}`;
@@ -320,13 +314,13 @@ export default function GameTablePage() {
   return (
     <CardPreviewProvider>
     <DragDropProvider onDrop={handleDrop}>
-    <div className="flex min-h-[100dvh] flex-col">
+    <div className="flex h-screen flex-col">
       <NavBar />
 
       <div className="flex items-center justify-between border-b border-white/10 bg-panel px-4 py-1.5 text-xs text-slate-400">
         <span className="hidden truncate sm:inline">
-          Turn {state.turnNumber} · {displayName(state.currentTurnSeat)}&apos;s turn · tap or drag a card to play/move it
-          · tap ⋯ for more options ·
+          Tap or drag a card to play/move it · tap ⋯ on a card for more options · use the Game actions bar for
+          draw/scry/surveil/mill/pass/etc ·
           keyboard: <kbd className="rounded bg-panelLight px-1">D</kbd> draw, <kbd className="rounded bg-panelLight px-1">Space</kbd> pass turn
         </span>
         {isHost && (
@@ -364,19 +358,34 @@ export default function GameTablePage() {
       </div>
 
       {showHelp && (
-        <div className="max-h-[40vh] overflow-y-auto border-b border-white/10 bg-panel px-4 py-3 text-sm text-slate-300">
+        <div className="border-b border-white/10 bg-panel px-4 py-3 text-sm text-slate-300">
           <p className="mb-1">
             <strong>Draw:</strong> tap your library (the card-back stack) for one card instantly, or press{' '}
             <kbd className="rounded bg-panelLight px-1">D</kbd> on a keyboard. The Draw button at the bottom of the
             screen lets you pick a number first — e.g. draw 7 for your opening hand.
           </p>
           <p className="mb-1">
-            <strong>Play a card:</strong> tap it in your hand to send it straight to the battlefield, or drag it onto
-            your quadrant; the platform doesn&apos;t know mana costs or the stack, so anything playable just resolves
-            immediately.
+            <strong>Play a card:</strong> tap it in your hand to send it straight to the battlefield, or drag it there
+            to drop it exactly where you want; the platform doesn&apos;t know mana costs or the stack, so anything
+            playable just resolves immediately.
           </p>
           <p className="mb-1">
             <strong>Tap/untap:</strong> tap a permanent on your battlefield.
+          </p>
+          <p className="mb-1">
+            <strong>Rearrange the battlefield:</strong> drag a permanent to any spot — positions are freeform, not a grid.
+          </p>
+          <p className="mb-1">
+            <strong>Attach equipment/auras:</strong> drag a permanent onto another one on your battlefield to attach
+            it — it renders stacked underneath, peeking out. Tap ⋯ → &quot;Detach&quot; to unattach, or use ⋯ →
+            &quot;Attach to…&quot; instead of dragging.
+          </p>
+          <p className="mb-1">
+            <strong>Two-sided cards:</strong> transform/modal-DFC permanents get a &quot;Flip card&quot; option in
+            their ⋯ menu once they&apos;re on the battlefield, to show the other face.
+          </p>
+          <p className="mb-1">
+            <strong>See a card bigger:</strong> hover your mouse over any card to see it enlarged with its full text.
           </p>
           <p className="mb-1">
             <strong>Discard, exile, sacrifice, bounce, top/bottom of library:</strong> drag a card from your hand or
@@ -390,7 +399,8 @@ export default function GameTablePage() {
           <p className="mb-1">
             <strong>Game actions bar:</strong> at the top — Untap All, Draw, Pass are one tap; the Actions ▾ menu adds
             Draw X, Scry, Surveil, Mill, Exile Top, Look at Top, Random Discard, Reveal Hand, Shuffle, Mulligan, and
-            Reset Deck (cards back to library, reshuffled, life reset).
+            Reset Deck (cards back to library, reshuffled, life reset). The +/− on the right zooms the whole table
+            in and out — handy for fitting more on screen or seeing a crowded board at a glance.
           </p>
           <p className="mb-1">
             <strong>Opening hand:</strong> everyone is dealt a fresh 7-card hand automatically when the game starts.
@@ -399,25 +409,9 @@ export default function GameTablePage() {
             your library once you keep (drag them onto the library, or tap ⋯ → bottom of library on each one).
           </p>
           <p className="mb-1">
-            <strong>Every board on one screen:</strong> each player's zones and battlefield sit in their own quadrant,
-            sized to fit without scrolling — yours is always top-left. Your hand is the strip along the bottom.
-          </p>
-          <p className="mb-1">
-            <strong>Arrange your battlefield:</strong> drag any permanent to wherever you want it within your
-            quadrant — it stays put until you move it again.
-          </p>
-          <p className="mb-1">
-            <strong>Attach equipment/auras:</strong> drag a permanent onto another one on your battlefield to attach
-            it — it renders stacked underneath, peeking out. Tap ⋯ → &quot;Detach&quot; to unattach, or use ⋯ →
-            &quot;Attach to…&quot; instead of dragging.
-          </p>
-          <p className="mb-1">
-            <strong>Two-sided cards:</strong> transform/modal-DFC permanents get a &quot;Flip card&quot; option in
-            their ⋯ menu once they&apos;re on the battlefield, to show the other face.
-          </p>
-          <p className="mb-1">
-            <strong>See a card bigger:</strong> hover your mouse over any card (or tap the 🔍 on it) to see it
-            enlarged with its full text — tap/click anywhere to dismiss.
+            <strong>More room:</strong> each battlefield is a scrollable canvas, not just the visible box — scroll
+            (or drag) to reach cards placed further out. Your hand strip scrolls too; use the ‹ › arrows if it&apos;s
+            hard to swipe, especially with lots of cards.
           </p>
           <p className="mb-1">
             <strong>Dice &amp; coins:</strong> below the game log — pick a die size and tap Roll, or tap Flip for a
@@ -475,6 +469,9 @@ export default function GameTablePage() {
         <GameActionsBar
           isMyTurn={!!isMyTurn}
           lookInProgress={me.pendingLook.length > 0}
+          zoom={zoom}
+          onZoomIn={() => setZoom((z) => Math.min(MAX_ZOOM, +(z + 0.1).toFixed(2)))}
+          onZoomOut={() => setZoom((z) => Math.max(MIN_ZOOM, +(z - 0.1).toFixed(2)))}
           onUntapAll={() => sendAction({ type: 'UNTAP_ALL' })}
           onDraw={() => sendAction({ type: 'DRAW_CARD' })}
           onPassTurn={() => sendAction({ type: 'PASS_TURN' })}
@@ -493,46 +490,145 @@ export default function GameTablePage() {
         />
       )}
 
-      <div className="flex flex-1 flex-col gap-2 p-2 lg:flex-row lg:gap-3 lg:p-3">
-        <div
-          className={`grid min-h-[320px] flex-1 gap-2 ${quadrantGridClass(orderedPlayers.length)}`}
-        >
-          {orderedPlayers.map((p) => {
-            const isViewer = p.seat === state.viewerSeat;
-            return (
-              <PlayerQuadrant
-                key={p.seat}
-                player={p}
-                cards={state.cards}
-                format={state.format}
-                isViewer={isViewer}
-                isActiveTurn={state.currentTurnSeat === p.seat}
-                isOnline={isViewer || p.isAI || (p.userId !== null && onlineUserIds.has(p.userId))}
-                aiKeyMissing={!state.aiEnabled}
-                onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: p.seat, delta })}
-                interactive={isViewer}
-                onDraw={isViewer ? () => sendAction({ type: 'DRAW_CARD' }) : undefined}
-                onShuffle={isViewer ? () => sendAction({ type: 'SHUFFLE_LIBRARY' }) : undefined}
-                onManaAdjust={isViewer ? (color, delta) => sendAction({ type: 'ADJUST_MANA', color: color as ManaColor, delta }) : undefined}
-                onManaEmpty={isViewer ? () => sendAction({ type: 'EMPTY_MANA_POOL' }) : undefined}
-                onPlayCommander={
-                  isViewer ? (scryfallId) => sendAction({ type: 'PLAY_CARD', scryfallId, fromZone: 'commandZone' }) : undefined
-                }
-                onTapToggle={
-                  isViewer
-                    ? (instanceId, tapped) =>
-                        sendAction(tapped ? { type: 'UNTAP_CARD', instanceId } : { type: 'TAP_CARD', instanceId })
-                    : undefined
-                }
-                onContextMenu={isViewer ? openBattlefieldCardMenu : undefined}
-                onPileCardAction={isViewer ? (e, zone, scryfallId) => openPileMenu(e, zone, scryfallId) : undefined}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4 lg:flex-row">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+          <div className="flex flex-col gap-4" style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
+          {/* Opponents */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {opponents.map((p) => (
+              <div key={p.seat} className="rounded-lg border border-white/10 bg-panel p-3">
+                <PlayerPanel
+                  player={p}
+                  isViewer={false}
+                  isActiveTurn={state.currentTurnSeat === p.seat}
+                  isOnline={p.isAI || (p.userId !== null && onlineUserIds.has(p.userId))}
+                  aiKeyMissing={!state.aiEnabled}
+                  onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: p.seat, delta })}
+                />
+                <ManaPool pool={p.manaPool} interactive={false} />
+                <div className="mt-2 flex items-center gap-2">
+                  <LibraryStack count={p.libraryCount} />
+                  <PublicZoneStack label="Graveyard" zone="graveyard" scryfallIds={p.graveyard} cards={state.cards} />
+                  <PublicZoneStack label="Exile" zone="exile" scryfallIds={p.exile} cards={state.cards} />
+                  {state.format === 'COMMANDER' && <CommandZone scryfallIds={p.commandZone} cards={state.cards} />}
+                  <span className="text-xs text-slate-500">Hand: {p.handCount}</span>
+                </div>
+                <div className="mt-2">
+                  <FreeformBattlefield battlefield={p.battlefield} cards={state.cards} interactive={false} />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Turn indicator */}
+          <div className="text-center text-xs text-slate-500">
+            Turn {state.turnNumber} · {displayName(state.currentTurnSeat)}&apos;s turn
+          </div>
+
+          {/* My side */}
+          {me && (
+            <div className="rounded-lg border border-accent/30 bg-panel p-3">
+              <PlayerPanel
+                player={me}
+                isViewer
+                isActiveTurn={state.currentTurnSeat === me.seat}
+                isOnline
+                onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: me.seat, delta })}
               />
-            );
-          })}
+              <div className="mt-2">
+                <ManaPool
+                  pool={me.manaPool}
+                  interactive
+                  onAdjust={(color, delta) => sendAction({ type: 'ADJUST_MANA', color: color as ManaColor, delta })}
+                  onEmpty={() => sendAction({ type: 'EMPTY_MANA_POOL' })}
+                />
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <LibraryStack
+                  count={me.libraryCount}
+                  onDraw={() => sendAction({ type: 'DRAW_CARD' })}
+                  onShuffle={() => sendAction({ type: 'SHUFFLE_LIBRARY' })}
+                  draggable
+                />
+                <PublicZoneStack
+                  label="Graveyard"
+                  zone="graveyard"
+                  scryfallIds={me.graveyard}
+                  cards={state.cards}
+                  draggable
+                  onCardAction={(e, scryfallId) => openPileMenu(e, 'graveyard', scryfallId)}
+                />
+                <PublicZoneStack
+                  label="Exile"
+                  zone="exile"
+                  scryfallIds={me.exile}
+                  cards={state.cards}
+                  draggable
+                  onCardAction={(e, scryfallId) => openPileMenu(e, 'exile', scryfallId)}
+                />
+                {state.format === 'COMMANDER' && (
+                  <CommandZone
+                    scryfallIds={me.commandZone}
+                    cards={state.cards}
+                    onPlay={(scryfallId) => sendAction({ type: 'PLAY_CARD', scryfallId, fromZone: 'commandZone' })}
+                    draggable
+                  />
+                )}
+                {state.currentTurnSeat === me.seat && (
+                  <span className="ml-auto rounded bg-accent/20 px-2 py-1 text-xs font-medium text-accent">Your turn</span>
+                )}
+              </div>
+              <div className="mt-2">
+                <FreeformBattlefield
+                  battlefield={me.battlefield}
+                  cards={state.cards}
+                  interactive
+                  onTapToggle={(instanceId, tapped) =>
+                    sendAction(tapped ? { type: 'UNTAP_CARD', instanceId } : { type: 'TAP_CARD', instanceId })
+                  }
+                  onContextMenu={openBattlefieldCardMenu}
+                />
+              </div>
+              <div className="mt-3 border-t border-white/10 pt-2">
+                <HandZone
+                  hand={me.hand ?? []}
+                  cards={state.cards}
+                  onPlay={(scryfallId) => sendAction({ type: 'PLAY_CARD', scryfallId, fromZone: 'hand' })}
+                  onContextMenu={(e, scryfallId) =>
+                    setMenu({
+                      x: e.clientX,
+                      y: e.clientY,
+                      options: [
+                        {
+                          label: 'Discard',
+                          onClick: () => sendAction({ type: 'MOVE_CARD', fromZone: 'hand', toZone: 'graveyard', scryfallId }),
+                        },
+                        {
+                          label: 'Exile from hand',
+                          onClick: () => sendAction({ type: 'MOVE_CARD', fromZone: 'hand', toZone: 'exile', scryfallId }),
+                        },
+                        {
+                          label: 'Put on top of library',
+                          onClick: () =>
+                            sendAction({ type: 'MOVE_CARD', fromZone: 'hand', toZone: 'library', scryfallId, position: 'top' }),
+                        },
+                        {
+                          label: 'Put on bottom of library',
+                          onClick: () =>
+                            sendAction({ type: 'MOVE_CARD', fromZone: 'hand', toZone: 'library', scryfallId, position: 'bottom' }),
+                        },
+                      ],
+                    })
+                  }
+                />
+              </div>
+            </div>
+          )}
+          </div>
         </div>
 
         {showLog && (
-          <div className="flex h-40 flex-shrink-0 flex-col lg:h-full lg:w-72">
+          <div className="flex h-40 flex-shrink-0 flex-col lg:h-auto lg:w-72">
             <div className="min-h-0 flex-1">
               <GameLog
                 events={log}
@@ -548,42 +644,6 @@ export default function GameTablePage() {
           </div>
         )}
       </div>
-
-      {me && (
-        <div className="flex-shrink-0 border-t border-white/10 bg-panel px-3 py-2">
-          <HandZone
-            hand={me.hand ?? []}
-            cards={state.cards}
-            onPlay={(scryfallId) => sendAction({ type: 'PLAY_CARD', scryfallId, fromZone: 'hand' })}
-            onContextMenu={(e, scryfallId) =>
-              setMenu({
-                x: e.clientX,
-                y: e.clientY,
-                options: [
-                  {
-                    label: 'Discard',
-                    onClick: () => sendAction({ type: 'MOVE_CARD', fromZone: 'hand', toZone: 'graveyard', scryfallId }),
-                  },
-                  {
-                    label: 'Exile from hand',
-                    onClick: () => sendAction({ type: 'MOVE_CARD', fromZone: 'hand', toZone: 'exile', scryfallId }),
-                  },
-                  {
-                    label: 'Put on top of library',
-                    onClick: () =>
-                      sendAction({ type: 'MOVE_CARD', fromZone: 'hand', toZone: 'library', scryfallId, position: 'top' }),
-                  },
-                  {
-                    label: 'Put on bottom of library',
-                    onClick: () =>
-                      sendAction({ type: 'MOVE_CARD', fromZone: 'hand', toZone: 'library', scryfallId, position: 'bottom' }),
-                  },
-                ],
-              })
-            }
-          />
-        </div>
-      )}
 
       {menu && <CardContextMenu x={menu.x} y={menu.y} options={menu.options} onClose={() => setMenu(null)} />}
 
