@@ -64,6 +64,25 @@ const PRECON_DEFINITIONS: PreconDefinition[] = [
       1 Rishkar, Peema Renegade
       1 Wolfir Silverheart
       1 Song of the Dryads
+      1 Elvish Visionary
+      1 Fyndhorn Elves
+      1 Wall of Blossoms
+      1 Skyshroud Claim
+      1 Harrow
+      1 Traverse the Outlands
+      1 Return of the Wildspeaker
+      1 Elemental Bond
+      1 Guardian Project
+      1 Soul of the Harvest
+      1 Rampaging Baloths
+      1 Verdant Force
+      1 Genesis Wave
+      1 Rishkar's Expertise
+      1 Kamahl, Fist of Krosa
+      1 Yeva, Nature's Herald
+      1 Woodland Bellower
+      1 Ulvenwald Hydra
+      1 Rampaging Brontodon
       1 Sol Ring
       1 Arcane Signet
       1 Fellwar Stone
@@ -113,6 +132,28 @@ const PRECON_DEFINITIONS: PreconDefinition[] = [
       1 Deceiver Exarch
       1 Trinket Mage
       1 Trophy Mage
+      1 Man-o'-War
+      1 Snapcaster Mage
+      1 Torrential Gearhulk
+      1 Archaeomancer
+      1 Mulldrifter
+      1 Sea Gate Oracle
+      1 Merfolk Looter
+      1 Thing in the Ice
+      1 Vendilion Clique
+      1 Time Warp
+      1 Temporal Manipulation
+      1 Windfall
+      1 Sower of Temptation
+      1 Dismiss
+      1 Negate
+      1 Turnabout
+      1 Braingeyser
+      1 Stroke of Genius
+      1 Whelming Wave
+      1 Diluvian Primordial
+      1 Frost Breath
+      1 Compulsive Research
       1 Sol Ring
       1 Arcane Signet
       1 Fellwar Stone
@@ -161,6 +202,29 @@ const PRECON_DEFINITIONS: PreconDefinition[] = [
       1 Young Pyromancer
       1 Guttersnipe
       1 Chain Lightning
+      1 Goblin King
+      1 Mogg Fanatic
+      1 Reckless Fireweaver
+      1 Impact Tremors
+      1 Zo-Zu the Punisher
+      1 Dragon Mage
+      1 Skirk Prospector
+      1 Mogg War Marshal
+      1 Squee, Goblin Nabob
+      1 Warren Instigator
+      1 Goblin Sharpshooter
+      1 Krenko's Command
+      1 Pyrokinesis
+      1 Fireblast
+      1 Price of Progress
+      1 Sulfuric Vortex
+      1 Browbeat
+      1 Chandra's Ignition
+      1 Underworld Breach
+      1 Dictate of the Twin Gods
+      1 Blood Moon
+      1 Act of Treason
+      1 Mizzium Mortars
       1 Sol Ring
       1 Arcane Signet
       1 Fellwar Stone
@@ -210,6 +274,28 @@ const PRECON_DEFINITIONS: PreconDefinition[] = [
       1 Butcher of Malakir
       1 Grim Haruspex
       1 Viscera Seer
+      1 Bloodchief Ascension
+      1 Corpse Augur
+      1 Gravecrawler
+      1 Falkenrath Noble
+      1 Bloodline Keeper
+      1 Vampire Nocturnus
+      1 Indulgent Aristocrat
+      1 Duress
+      1 Thoughtseize
+      1 Inquisition of Kozilek
+      1 Dark Ritual
+      1 Diabolic Tutor
+      1 Demonic Tutor
+      1 Vampiric Tutor
+      1 Bone Shards
+      1 Victimize
+      1 Attrition
+      1 Living Death
+      1 Exsanguinate
+      1 Debt to the Deathless
+      1 Crypt Ghast
+      1 Nirkana Revenant
       1 Sol Ring
       1 Arcane Signet
       1 Fellwar Stone
