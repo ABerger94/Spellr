@@ -9,7 +9,7 @@ const manaColor = z.enum(['W', 'U', 'B', 'R', 'G', 'C']);
 
 export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('DRAW_CARD'), count: z.number().int().min(1).max(40).optional() }),
-  z.object({ type: z.literal('MULLIGAN'), bottomCardScryfallIds: z.array(z.string()).optional() }),
+  z.object({ type: z.literal('MULLIGAN') }),
   z.object({
     type: z.literal('PLAY_CARD'),
     scryfallId: z.string(),

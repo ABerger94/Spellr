@@ -10,7 +10,7 @@ import {
   flipCard,
   millCards,
   moveCard,
-  mulliganWithBottomCards,
+  mulligan,
   randomDiscard,
   resolveLook,
   shuffleLibrary,
@@ -99,31 +99,6 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       if (drawnScryfallIds.length === 0) throw new Error('Library is empty');
       await updateZones(player.id, nextZones);
       event = await logEvent(gameId, 'DRAW_CARD', { count: drawnScryfallIds.length }, actor);
-      break;
-    }
-
-    case 'MULLIGAN': {
-      const player = await getPlayer(gameId, actor.seat);
-      const zones = player.zones as unknown as ZoneState;
-      const counters = (player.counters as Record<string, number> | null) ?? {};
-      const mulliganCount = counters.mulliganCount ?? 0;
-      const requiredBottomCards = Math.max(0, mulliganCount);
-
-      if (requiredBottomCards > 0) {
-        const selectedCards = action.bottomCardScryfallIds ?? [];
-        if (selectedCards.length !== requiredBottomCards) {
-          throw new Error(`Choose ${requiredBottomCards} card${requiredBottomCards === 1 ? '' : 's'} to put on the bottom of your library`);
-        }
-      }
-
-      const { zones: nextZones } = mulliganWithBottomCards(zones, requiredBottomCards, action.bottomCardScryfallIds);
-      const nextCounters = { ...counters, mulliganCount: mulliganCount + 1 };
-
-      await prisma.gamePlayer.update({
-        where: { id: player.id },
-        data: { zones: nextZones as unknown as object, counters: nextCounters as unknown as object },
-      });
-      await logEvent(gameId, 'MULLIGAN', { mulliganCount: mulliganCount + 1, bottomCardScryfallIds: action.bottomCardScryfallIds ?? [] }, actor);
       break;
     }
 
@@ -317,21 +292,9 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       }
       const player = await getPlayer(gameId, actor.seat);
       const zones = player.zones as unknown as ZoneState;
-      const requiredBottomCards = zones.mulliganCount ?? 0;
-      if (requiredBottomCards > 0) {
-        const selectedCards = action.bottomCardScryfallIds ?? [];
-        if (selectedCards.length !== requiredBottomCards) {
-          throw new Error(`Choose ${requiredBottomCards} card${requiredBottomCards === 1 ? '' : 's'} to put on the bottom of your library`);
-        }
-      }
-      const { zones: nextZones } = mulliganWithBottomCards(zones, requiredBottomCards, action.bottomCardScryfallIds);
+      const nextZones = mulligan(zones);
       await updateZones(player.id, nextZones);
-      event = await logEvent(
-        gameId,
-        'MULLIGAN',
-        { mulliganCount: nextZones.mulliganCount, bottomCardScryfallIds: action.bottomCardScryfallIds ?? [] },
-        actor,
-      );
+      event = await logEvent(gameId, 'MULLIGAN', { mulliganCount: nextZones.mulliganCount }, actor);
       break;
     }
 
