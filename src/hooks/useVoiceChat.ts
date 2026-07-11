@@ -25,11 +25,18 @@ const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
 ];
 
+function log(...args: unknown[]) {
+  // eslint-disable-next-line no-console
+  console.log('[voice]', ...args);
+}
+
 export function useVoiceChat(gameId: string, viewerUserId: string | null) {
   const [joined, setJoined] = useState(false);
   const [muted, setMuted] = useState(false);
   const [connectedPeerCount, setConnectedPeerCount] = useState(0);
+  const [connectingPeerCount, setConnectingPeerCount] = useState(0);
   const [micError, setMicError] = useState<string | null>(null);
+  const [signalingError, setSignalingError] = useState<string | null>(null);
 
   const [audioBlocked, setAudioBlocked] = useState(false);
 
@@ -40,24 +47,44 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
   const joinedRef = useRef(false);
 
   const recomputeConnectedCount = useCallback(() => {
-    let n = 0;
+    let connected = 0;
+    let connecting = 0;
     peersRef.current.forEach((p) => {
       // iceConnectionState has much more consistent cross-browser support
       // (notably Safari) than the newer connectionState, so treat either as
       // evidence the peer is actually connected.
-      if (p.connectionState === 'connected' || ['connected', 'completed'].includes(p.iceConnectionState)) n += 1;
+      if (p.connectionState === 'connected' || ['connected', 'completed'].includes(p.iceConnectionState)) {
+        connected += 1;
+      } else {
+        connecting += 1;
+      }
     });
-    setConnectedPeerCount(n);
+    setConnectedPeerCount(connected);
+    setConnectingPeerCount(connecting);
   }, []);
 
   const sendSignal = useCallback(
     (signal: OutgoingVoiceSignal) => {
       if (!viewerUserId) return;
+      log('sending', signal.type, signal);
       fetch(`/api/games/${gameId}/voice-signal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(signal),
-      }).catch(() => {});
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            const body = await res.text().catch(() => '');
+            log('signal rejected', res.status, body);
+            setSignalingError(`Voice signaling failed (${res.status}) — the other player may not be receiving your connection request.`);
+          } else {
+            setSignalingError(null);
+          }
+        })
+        .catch((err) => {
+          log('signal send failed', err);
+          setSignalingError('Could not reach the server to set up voice chat — check your connection.');
+        });
     },
     [gameId, viewerUserId],
   );
@@ -115,12 +142,14 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
         });
       };
       pc.onconnectionstatechange = () => {
+        log('connectionState', remoteUserId, pc.connectionState);
         recomputeConnectedCount();
         if (['failed', 'closed'].includes(pc.connectionState)) {
           closePeer(remoteUserId);
         }
       };
       pc.oniceconnectionstatechange = () => {
+        log('iceConnectionState', remoteUserId, pc.iceConnectionState);
         recomputeConnectedCount();
         if (pc.iceConnectionState === 'failed') {
           // A lone STUN/TURN hiccup shouldn't kill the call — ask the browser
@@ -138,6 +167,7 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
     async (signal: VoiceSignal) => {
       if (!viewerUserId || signal.from === viewerUserId) return;
       if ('target' in signal && signal.target && signal.target !== viewerUserId) return;
+      log('received', signal.type, signal);
 
       if (signal.type === 'voice-joined') {
         if (!joinedRef.current) return;
@@ -202,12 +232,14 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
     let pusher: ReturnType<typeof getPusherClient>;
     try {
       pusher = getPusherClient();
-    } catch {
+    } catch (err) {
+      log('pusher client unavailable', err);
       return;
     }
     const channel = pusher.subscribe(`presence-game-${gameId}`) as PresenceChannel;
+    log('subscribed to presence channel, listening for voice:signal as', viewerUserId);
     const handler = (data: VoiceSignal) => {
-      handleSignal(data).catch(() => {});
+      handleSignal(data).catch((err) => log('handleSignal threw', err));
     };
     channel.bind('voice:signal', handler);
     return () => {
@@ -224,11 +256,13 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
       joinedRef.current = true;
       setJoined(true);
       setMuted(false);
+      log('joined, mic acquired, broadcasting voice-joined as', viewerUserId);
       sendSignal({ type: 'voice-joined' });
     } catch (err) {
+      log('getUserMedia failed', err);
       setMicError(err instanceof Error ? err.message : 'Microphone permission was denied');
     }
-  }, [sendSignal]);
+  }, [sendSignal, viewerUserId]);
 
   const leave = useCallback(() => {
     if (!joinedRef.current) return;
@@ -240,6 +274,7 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
     setConnectedPeerCount(0);
+    setConnectingPeerCount(0);
     setAudioBlocked(false);
   }, [sendSignal, closePeer]);
 
@@ -284,5 +319,17 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { joined, muted, connectedPeerCount, micError, audioBlocked, join, leave, toggleMute, enableAudio };
+  return {
+    joined,
+    muted,
+    connectedPeerCount,
+    connectingPeerCount,
+    micError,
+    signalingError,
+    audioBlocked,
+    join,
+    leave,
+    toggleMute,
+    enableAudio,
+  };
 }
