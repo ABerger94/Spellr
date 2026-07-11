@@ -19,6 +19,12 @@ export const env = {
   get geminiModel(): string {
     return process.env.GEMINI_MODEL || 'gemini-2.0-flash';
   },
+  get groqApiKey(): string | undefined {
+    return process.env.GROQ_API_KEY || undefined;
+  },
+  get groqModel(): string {
+    return process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+  },
   get pusherAppId() {
     return required('PUSHER_APP_ID');
   },

@@ -32,7 +32,7 @@ export function PlayerPanel({
           {player.isAI && aiKeyMissing && (
             <span
               className="ml-1 whitespace-nowrap rounded bg-amber-500/20 px-1 text-[10px] text-amber-400"
-              title="GEMINI_API_KEY isn't configured on the server, so this seat will just pass its turn instead of playing."
+              title="No GEMINI_API_KEY or GROQ_API_KEY is configured on the server, so this seat will just pass its turn instead of playing."
             >
               no AI key
             </span>

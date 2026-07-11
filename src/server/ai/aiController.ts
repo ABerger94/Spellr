@@ -5,24 +5,50 @@ import { actionSchema } from '@/server/game/actionTypes';
 import { logEvent } from '@/server/game/gameEvents';
 import { buildStateFor } from '@/server/game/stateSerializer';
 import type { ZoneState, GameStateView } from '@/types/game';
-import { getModel } from './geminiClient';
+import { createGeminiDriver } from './geminiClient';
+import { createGroqDriver } from './groqClient';
+import type { AITurnDriver } from './aiDriver';
 
 const MAX_ACTIONS_PER_TURN = 12;
 
+type ProviderName = 'gemini' | 'groq';
+
+function createDriver(provider: ProviderName): AITurnDriver {
+  return provider === 'gemini' ? createGeminiDriver() : createGroqDriver();
+}
+
+// Gemini is tried first when both are configured — Groq is the fallback for
+// when Gemini is down, rate-limited, or misconfigured, not a load-balanced
+// peer, since its open models are less reliable at multi-step tool calling.
 export async function maybeTakeAITurn(gameId: string, seat: number): Promise<void> {
-  if (!env.geminiApiKey) {
+  const providers: ProviderName[] = [];
+  if (env.geminiApiKey) providers.push('gemini');
+  if (env.groqApiKey) providers.push('groq');
+
+  if (providers.length === 0) {
     await logEvent(gameId, 'AI_SKIPPED_NO_KEY', {}, { seat });
     await forcePass(gameId, seat);
     return;
   }
 
-  try {
-    await takeTurn(gameId, seat);
-  } catch (err) {
-    console.error('[aiController]', err);
-    await logEvent(gameId, 'AI_ERROR', { message: err instanceof Error ? err.message : 'Unknown error' }, { seat });
-    await forcePass(gameId, seat);
+  for (let i = 0; i < providers.length; i++) {
+    const provider = providers[i];
+    try {
+      await takeTurn(gameId, seat, createDriver(provider));
+      return;
+    } catch (err) {
+      console.error(`[aiController] ${provider} failed`, err);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      const nextProvider = providers[i + 1];
+      if (nextProvider) {
+        await logEvent(gameId, 'AI_PROVIDER_FAILED', { provider, message, nextProvider }, { seat });
+      } else {
+        await logEvent(gameId, 'AI_ERROR', { provider, message }, { seat });
+      }
+    }
   }
+
+  await forcePass(gameId, seat);
 }
 
 async function forcePass(gameId: string, seat: number) {
@@ -137,45 +163,42 @@ async function mapFunctionCallToAction(
   }
 }
 
-async function takeTurn(gameId: string, seat: number): Promise<void> {
-  const model = getModel();
-  const chat = model.startChat();
-
+// Provider-agnostic turn loop — driver hides whether it's talking to Gemini
+// or Groq, so a mid-turn failure and fallback to the next provider just
+// means a fresh driver picks up from whatever the live game state now is.
+async function takeTurn(gameId: string, seat: number, driver: AITurnDriver): Promise<void> {
   const state = await buildStateFor(gameId, seat);
-  let result = await chat.sendMessage(buildPrompt(state, seat));
+  let step = await driver.sendInitial(buildPrompt(state, seat));
   let actionsTaken = 0;
 
   while (actionsTaken < MAX_ACTIONS_PER_TURN) {
-    const response = result.response;
-    const text = response.text().trim();
-    if (text) {
-      await logEvent(gameId, 'AI_REASONING', { text }, { seat });
+    if (step.reasoningText) {
+      await logEvent(gameId, 'AI_REASONING', { text: step.reasoningText }, { seat });
     }
 
-    const calls = response.functionCalls();
-    if (!calls || calls.length === 0) {
+    if (!step.toolCall) {
       // The model stopped calling functions without explicitly passing — end its turn here.
       break;
     }
 
-    const call = calls[0];
-    if (call.name === 'pass_turn') {
+    const { id: toolCallId, name, args } = step.toolCall;
+    if (name === 'pass_turn') {
       await execute(gameId, { seat }, { type: 'PASS_TURN' });
       return;
     }
 
-    let functionResponsePayload: Record<string, unknown>;
+    let resultPayload: Record<string, unknown>;
     try {
-      const rawAction = await mapFunctionCallToAction(gameId, seat, call.name, call.args as Record<string, unknown>);
+      const rawAction = await mapFunctionCallToAction(gameId, seat, name, args);
       const action = actionSchema.parse(rawAction);
       await execute(gameId, { seat }, action);
       actionsTaken += 1;
-      functionResponsePayload = { ok: true };
+      resultPayload = { ok: true };
     } catch (err) {
-      functionResponsePayload = { ok: false, error: err instanceof Error ? err.message : 'Action failed' };
+      resultPayload = { ok: false, error: err instanceof Error ? err.message : 'Action failed' };
     }
 
-    result = await chat.sendMessage([{ functionResponse: { name: call.name, response: functionResponsePayload } }]);
+    step = await driver.sendToolResult(toolCallId, name, resultPayload);
   }
 
   if (actionsTaken >= MAX_ACTIONS_PER_TURN) {

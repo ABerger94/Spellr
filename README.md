@@ -11,13 +11,13 @@ Spellr is a **virtual tabletop**, not a rules engine: it gives every player real
 - **Pusher Channels** for realtime game state sync (private per-seat channels for redacted state, a presence channel per game for the log and online/offline status) — chosen specifically so the app runs on ordinary serverless hosting like Vercel, with no custom Node server required
 - **NextAuth.js** (Credentials provider — email + password)
 - **Scryfall REST API**, cached in Postgres (`CardCache`) with a rate-limited fetch queue, for card search/autocomplete and images
-- **Gemini API** (`@google/generative-ai`) for the AI player seat, via function-calling into the same action pipeline human players use
+- **Gemini API** (`@google/generative-ai`) for the AI player seat, via function-calling into the same action pipeline human players use, with **Groq** (`groq-sdk`) as an automatic fallback provider if Gemini errors
 
 ## Local development
 
 1. **Database**: either run `docker compose up -d postgres`, or point `DATABASE_URL` at any Postgres 16 instance you already have.
 2. **Realtime**: create a free app at [dashboard.pusher.com](https://dashboard.pusher.com) (the "Channels" product). You'll need its app id, key, secret, and cluster — realtime sync doesn't work without these, even locally, since there's no self-hosted socket server anymore.
-3. **Environment**: `cp .env.example .env` and fill in `NEXTAUTH_SECRET` (e.g. `openssl rand -base64 32`) and the four `PUSHER_*`/`NEXT_PUBLIC_PUSHER_*` values from step 2. `GEMINI_API_KEY` is optional — AI seats simply sit out (and say so in the game log) if it's unset.
+3. **Environment**: `cp .env.example .env` and fill in `NEXTAUTH_SECRET` (e.g. `openssl rand -base64 32`) and the four `PUSHER_*`/`NEXT_PUBLIC_PUSHER_*` values from step 2. `GEMINI_API_KEY` and `GROQ_API_KEY` are both optional — AI seats simply sit out (and say so in the game log) if neither is set; if both are set, Gemini is tried first and Groq is used as a fallback when a Gemini call errors.
 4. **Install & migrate**:
    ```
    npm install
@@ -35,7 +35,7 @@ Spellr is a **virtual tabletop**, not a rules engine: it gives every player real
 2. Provision a hosted Postgres (Vercel Postgres / Neon / Supabase all work) and set `DATABASE_URL` and `DIRECT_URL` in the Vercel project's environment variables. Prisma needs those two exact names — a pooled connection is required at runtime because Vercel's serverless functions open many short-lived connections that a small Postgres instance can't handle directly, while migrations need a direct (non-pooled) connection:
    - **Via Vercel's Supabase integration**: it auto-injects several `POSTGRES_*` variables. Copy `POSTGRES_PRISMA_URL`'s value into `DATABASE_URL`, and `POSTGRES_URL_NON_POOLING`'s value into `DIRECT_URL`.
    - **Manually (Supabase, Neon, etc.)**: in the provider's dashboard, find the pooled/"transaction mode" connection string (Supabase: port `6543`, `?pgbouncer=true`) for `DATABASE_URL`, and the direct/non-pooled one (port `5432`) for `DIRECT_URL`.
-3. Set `NEXTAUTH_SECRET`, `NEXTAUTH_URL` (your production URL, e.g. `https://your-app.vercel.app`), the four `PUSHER_*` vars from your Pusher app, and optionally `GEMINI_API_KEY`.
+3. Set `NEXTAUTH_SECRET`, `NEXTAUTH_URL` (your production URL, e.g. `https://your-app.vercel.app`), the four `PUSHER_*` vars from your Pusher app, and optionally `GEMINI_API_KEY` and/or `GROQ_API_KEY`.
 4. Deploy. The build runs `prisma migrate deploy` automatically before `next build`, so the database schema is created/updated on every deploy — no manual migration step needed. Every push auto-redeploys.
 
 Note: Pusher's free tier caps concurrent connections and daily messages — fine for casual play, but worth checking if you expect heavy usage.
@@ -47,7 +47,7 @@ Note: Pusher's free tier caps concurrent connections and daily messages — fine
 - Lobby: create a 1v1 or 2-4 player Commander game, invite-code join, optional AI-filled seats
 - Live multiplayer game table: battlefield/hand/library/graveyard/exile/command zone per seat, tap-to-tap, right-click "move to..." menu, life totals, turn tracker, realtime sync over Pusher, and hand privacy enforced server-side — each player has their own private channel carrying only their own redacted view, authorized per-request against who actually owns that seat, so opponents' hands are never sent to your browser (you only ever see their card count)
 - Game log and online/offline status delivered over a shared presence channel per game
-- An AI seat powered by Gemini function-calling, which acts through the exact same action handler as human players (no special-cased "AI rules"), capped at 12 actions per turn, and degrades gracefully (logs why, then passes) if no API key is configured or a call fails
+- An AI seat powered by Gemini function-calling (Groq as an automatic fallback provider if Gemini errors), which acts through the exact same action handler as human players (no special-cased "AI rules"), capped at 12 actions per turn, and degrades gracefully (logs why, then passes) if no provider key is configured or every configured provider fails
 
 ## Explicitly not in this first pass
 

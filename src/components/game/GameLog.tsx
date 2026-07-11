@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameLogEntry } from '@/hooks/useGameState';
 
-const AI_EVENT_TYPES = new Set(['AI_REASONING', 'AI_SKIPPED_NO_KEY', 'AI_ERROR', 'AI_TURN_CAPPED']);
+const AI_EVENT_TYPES = new Set(['AI_REASONING', 'AI_SKIPPED_NO_KEY', 'AI_ERROR', 'AI_TURN_CAPPED', 'AI_PROVIDER_FAILED']);
 
 const MANA_COLOR_NAMES: Record<string, string> = {
   W: 'White',
@@ -13,6 +13,12 @@ const MANA_COLOR_NAMES: Record<string, string> = {
   G: 'Green',
   C: 'Colorless',
 };
+
+const AI_PROVIDER_LABELS: Record<string, string> = { gemini: 'Gemini', groq: 'Groq' };
+
+function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
 
 function describeEvent(event: GameLogEntry, displayName: (seat: number | null) => string): string {
   const who = displayName(event.actorSeat);
@@ -101,8 +107,17 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
       return `${who} has no AI key configured and will not act.`;
     case 'AI_ERROR': {
       const rawMessage = event.payload.message as string | undefined;
-      const message = rawMessage && rawMessage.length > 300 ? `${rawMessage.slice(0, 300)}…` : rawMessage;
-      return message ? `${who} hit an error and passed the turn: ${message}` : `${who} hit an error and passed the turn.`;
+      const message = rawMessage ? truncate(rawMessage, 300) : undefined;
+      const provider = event.payload.provider as string | undefined;
+      const prefix = provider ? `${who}'s ${AI_PROVIDER_LABELS[provider] ?? provider} attempt` : who;
+      return message ? `${prefix} hit an error and passed the turn: ${message}` : `${prefix} hit an error and passed the turn.`;
+    }
+    case 'AI_PROVIDER_FAILED': {
+      const rawMessage = event.payload.message as string | undefined;
+      const message = rawMessage ? truncate(rawMessage, 300) : undefined;
+      const provider = AI_PROVIDER_LABELS[event.payload.provider as string] ?? event.payload.provider;
+      const nextProvider = AI_PROVIDER_LABELS[event.payload.nextProvider as string] ?? event.payload.nextProvider;
+      return `${who}'s ${provider} attempt failed, trying ${nextProvider} instead${message ? `: ${message}` : '.'}`;
     }
     case 'AI_TURN_CAPPED':
       return `${who} reached the action limit for this turn.`;
