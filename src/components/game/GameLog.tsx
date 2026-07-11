@@ -14,7 +14,7 @@ const MANA_COLOR_NAMES: Record<string, string> = {
   C: 'Colorless',
 };
 
-const AI_PROVIDER_LABELS: Record<string, string> = { gemini: 'Gemini', groq: 'Groq' };
+const AI_PROVIDER_LABELS: Record<string, string> = { gemini: 'Gemini', groq: 'Groq', cerebras: 'Cerebras', openrouter: 'OpenRouter' };
 
 function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max)}…` : text;

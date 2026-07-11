@@ -7,14 +7,23 @@ import { buildStateFor } from '@/server/game/stateSerializer';
 import type { ZoneState, GameStateView } from '@/types/game';
 import { createGeminiDriver } from './geminiClient';
 import { createGroqDriver } from './groqClient';
+import { createCerebrasDriver } from './cerebrasClient';
+import { createOpenRouterDriver } from './openRouterClient';
 import type { AITurnDriver } from './aiDriver';
 
 const MAX_ACTIONS_PER_TURN = 12;
 
-type ProviderName = 'gemini' | 'groq';
+type ProviderName = 'gemini' | 'groq' | 'cerebras' | 'openrouter';
+
+const DRIVER_FACTORIES: Record<ProviderName, () => AITurnDriver> = {
+  gemini: createGeminiDriver,
+  groq: createGroqDriver,
+  cerebras: createCerebrasDriver,
+  openrouter: createOpenRouterDriver,
+};
 
 function createDriver(provider: ProviderName): AITurnDriver {
-  return provider === 'gemini' ? createGeminiDriver() : createGroqDriver();
+  return DRIVER_FACTORIES[provider]();
 }
 
 // Guards against two concurrent requests (e.g. two connected players' clients
@@ -35,13 +44,16 @@ export function runAITurnOnce(gameId: string, seat: number): Promise<void> {
   return run;
 }
 
-// Gemini is tried first when both are configured — Groq is the fallback for
-// when Gemini is down, rate-limited, or misconfigured, not a load-balanced
-// peer, since its open models are less reliable at multi-step tool calling.
+// Tried in order of preference, falling through to the next only when the
+// current one is down, rate-limited, or misconfigured — not load-balanced
+// peers, since the open fallback models are less reliable at multi-step tool
+// calling than Gemini.
 async function maybeTakeAITurn(gameId: string, seat: number): Promise<void> {
   const providers: ProviderName[] = [];
   if (env.geminiApiKey) providers.push('gemini');
   if (env.groqApiKey) providers.push('groq');
+  if (env.cerebrasApiKey) providers.push('cerebras');
+  if (env.openRouterApiKey) providers.push('openrouter');
 
   if (providers.length === 0) {
     await logEvent(gameId, 'AI_SKIPPED_NO_KEY', {}, { seat });
