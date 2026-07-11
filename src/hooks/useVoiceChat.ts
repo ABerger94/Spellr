@@ -13,7 +13,17 @@ type VoiceSignal =
 
 type OutgoingVoiceSignal = VoiceSignal extends infer T ? (T extends { from: string } ? Omit<T, 'from'> : never) : never;
 
-const ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
+// STUN alone only works when NAT traversal is simple on both sides; a lot of
+// real-world networks (symmetric NAT, mobile carriers, corporate wifi) need
+// a TURN relay to actually get audio flowing. OpenRelay's public demo TURN
+// server has no signup and is widely used for exactly this purpose.
+const ICE_SERVERS: RTCIceServer[] = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:openrelay.metered.ca:80' },
+  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+];
 
 export function useVoiceChat(gameId: string, viewerUserId: string | null) {
   const [joined, setJoined] = useState(false);
@@ -21,11 +31,24 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
   const [connectedPeerCount, setConnectedPeerCount] = useState(0);
   const [micError, setMicError] = useState<string | null>(null);
 
+  const [audioBlocked, setAudioBlocked] = useState(false);
+
   const localStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const audioElsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const joinedRef = useRef(false);
+
+  const recomputeConnectedCount = useCallback(() => {
+    let n = 0;
+    peersRef.current.forEach((p) => {
+      // iceConnectionState has much more consistent cross-browser support
+      // (notably Safari) than the newer connectionState, so treat either as
+      // evidence the peer is actually connected.
+      if (p.connectionState === 'connected' || ['connected', 'completed'].includes(p.iceConnectionState)) n += 1;
+    });
+    setConnectedPeerCount(n);
+  }, []);
 
   const sendSignal = useCallback(
     (signal: OutgoingVoiceSignal) => {
@@ -39,26 +62,22 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
     [gameId, viewerUserId],
   );
 
-  const closePeer = useCallback((remoteUserId: string) => {
-    const pc = peersRef.current.get(remoteUserId);
-    pc?.close();
-    peersRef.current.delete(remoteUserId);
-    const audioEl = audioElsRef.current.get(remoteUserId);
-    if (audioEl) {
-      audioEl.srcObject = null;
-      audioElsRef.current.delete(remoteUserId);
-    }
-    pendingCandidatesRef.current.delete(remoteUserId);
-    setConnectedPeerCount(peersRef.current.size > 0 ? countConnected() : 0);
-
-    function countConnected() {
-      let n = 0;
-      peersRef.current.forEach((p) => {
-        if (p.connectionState === 'connected') n += 1;
-      });
-      return n;
-    }
-  }, []);
+  const closePeer = useCallback(
+    (remoteUserId: string) => {
+      const pc = peersRef.current.get(remoteUserId);
+      pc?.close();
+      peersRef.current.delete(remoteUserId);
+      const audioEl = audioElsRef.current.get(remoteUserId);
+      if (audioEl) {
+        audioEl.srcObject = null;
+        audioEl.remove();
+        audioElsRef.current.delete(remoteUserId);
+      }
+      pendingCandidatesRef.current.delete(remoteUserId);
+      recomputeConnectedCount();
+    },
+    [recomputeConnectedCount],
+  );
 
   const getOrCreatePeer = useCallback(
     (remoteUserId: string): RTCPeerConnection => {
@@ -79,25 +98,40 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
         if (!audioEl) {
           audioEl = new Audio();
           audioEl.autoplay = true;
+          // Some browsers are unreliable about playing audio from an element
+          // that's never attached to the document, so keep it in the DOM
+          // (hidden) rather than relying on the detached Audio() object.
+          audioEl.style.display = 'none';
+          document.body.appendChild(audioEl);
           audioElsRef.current.set(remoteUserId, audioEl);
         }
         audioEl.srcObject = e.streams[0];
-        audioEl.play().catch(() => {});
+        audioEl.play().catch(() => {
+          // Autoplay was blocked (common if the browser doesn't consider the
+          // original "Join Voice" click a fresh-enough gesture) — surface it
+          // so the UI can offer a button that retries play() from within a
+          // real click handler, instead of the user just hearing nothing.
+          setAudioBlocked(true);
+        });
       };
       pc.onconnectionstatechange = () => {
-        let n = 0;
-        peersRef.current.forEach((p) => {
-          if (p.connectionState === 'connected') n += 1;
-        });
-        setConnectedPeerCount(n);
+        recomputeConnectedCount();
         if (['failed', 'closed'].includes(pc.connectionState)) {
           closePeer(remoteUserId);
+        }
+      };
+      pc.oniceconnectionstatechange = () => {
+        recomputeConnectedCount();
+        if (pc.iceConnectionState === 'failed') {
+          // A lone STUN/TURN hiccup shouldn't kill the call — ask the browser
+          // to renegotiate ICE before giving up on the connection entirely.
+          pc.restartIce();
         }
       };
       peersRef.current.set(remoteUserId, pc);
       return pc;
     },
-    [sendSignal, closePeer],
+    [sendSignal, closePeer, recomputeConnectedCount],
   );
 
   const handleSignal = useCallback(
@@ -107,6 +141,14 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
 
       if (signal.type === 'voice-joined') {
         if (!joinedRef.current) return;
+        // A peer's "I'm here" can reach us twice — once as their initial
+        // broadcast, once as their reply to our own reply — since neither
+        // side knows in advance who else is already listening. Once a peer
+        // connection exists for them, negotiation has already started (or
+        // finished), so re-running the offer/answer decision here would
+        // race a second createOffer() against the first and break the
+        // handshake.
+        if (peersRef.current.has(signal.from)) return;
         // Reply directly to a broadcast announce so a peer who joined before
         // us also learns we're here, without a central "who's in the call"
         // registry.
@@ -198,7 +240,21 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
     setConnectedPeerCount(0);
+    setAudioBlocked(false);
   }, [sendSignal, closePeer]);
+
+  // Retries play() on every remote peer's audio element from within a real
+  // click handler, which satisfies browsers that blocked the original
+  // autoplay attempt (it didn't happen inside a direct user-gesture chain).
+  const enableAudio = useCallback(() => {
+    let stillBlocked = false;
+    audioElsRef.current.forEach((audioEl) => {
+      audioEl.play().catch(() => {
+        stillBlocked = true;
+      });
+    });
+    setAudioBlocked(stillBlocked);
+  }, []);
 
   const toggleMute = useCallback(() => {
     if (!localStreamRef.current) return;
@@ -219,10 +275,14 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
       joinedRef.current = false;
       sendSignal({ type: 'voice-left' });
       peersRef.current.forEach((pc) => pc.close());
+      audioElsRef.current.forEach((audioEl) => {
+        audioEl.srcObject = null;
+        audioEl.remove();
+      });
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { joined, muted, connectedPeerCount, micError, join, leave, toggleMute };
+  return { joined, muted, connectedPeerCount, micError, audioBlocked, join, leave, toggleMute, enableAudio };
 }

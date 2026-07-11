@@ -28,9 +28,11 @@ export function GameActionsBar({
   voiceMuted,
   voiceConnectedPeerCount,
   voiceMicError,
+  voiceAudioBlocked,
   onVoiceJoin,
   onVoiceToggleMute,
   onVoiceLeave,
+  onVoiceEnableAudio,
 }: {
   isMyTurn: boolean;
   lookInProgress: boolean;
@@ -56,9 +58,11 @@ export function GameActionsBar({
   voiceMuted: boolean;
   voiceConnectedPeerCount: number;
   voiceMicError: string | null;
+  voiceAudioBlocked: boolean;
   onVoiceJoin: () => void;
   onVoiceToggleMute: () => void;
   onVoiceLeave: () => void;
+  onVoiceEnableAudio: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
@@ -134,6 +138,15 @@ export function GameActionsBar({
         {voiceJoined ? (voiceMuted ? '🔇 Unmute' : `🎤 Mute${voiceConnectedPeerCount > 0 ? ` (${voiceConnectedPeerCount})` : ''}`) : '🎙️ Join Voice'}
       </button>
       {voiceMicError && <span className="hidden flex-shrink-0 max-w-[14rem] truncate text-xs text-red-400 sm:inline">{voiceMicError}</span>}
+      {voiceJoined && voiceAudioBlocked && (
+        <button
+          onClick={onVoiceEnableAudio}
+          title="Your browser blocked autoplay for the other player's audio — tap to allow it"
+          className="flex-shrink-0 rounded bg-yellow-500/20 px-3 py-1.5 text-sm font-medium text-yellow-400 hover:bg-yellow-500/30"
+        >
+          🔊 Tap to enable audio
+        </button>
+      )}
       <div className="ml-auto flex flex-shrink-0 items-center gap-1">
         <button
           onClick={onZoomOut}

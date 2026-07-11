@@ -503,9 +503,11 @@ export default function GameTablePage() {
           voiceMuted={voiceChat.muted}
           voiceConnectedPeerCount={voiceChat.connectedPeerCount}
           voiceMicError={voiceChat.micError}
+          voiceAudioBlocked={voiceChat.audioBlocked}
           onVoiceJoin={voiceChat.join}
           onVoiceToggleMute={voiceChat.toggleMute}
           onVoiceLeave={voiceChat.leave}
+          onVoiceEnableAudio={voiceChat.enableAudio}
         />
       )}
 
