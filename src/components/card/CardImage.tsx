@@ -1,6 +1,10 @@
 'use client';
 
+import { useRef } from 'react';
 import { useCardPreview } from '@/components/game/CardPreviewContext';
+
+const LONG_PRESS_MS = 500;
+const LONG_PRESS_MOVE_TOLERANCE_PX = 10;
 
 interface CardImageProps {
   name: string;
@@ -58,18 +62,64 @@ export function CardImage({
   previewable = true,
 }: CardImageProps) {
   const counterEntries = Object.entries(counters ?? {}).filter(([, count]) => count > 0);
-  const { showPreviewOnHover, hidePreview } = useCardPreview();
+  const { showPreviewNow, showPreviewOnHover, hidePreview } = useCardPreview();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressStartRef = useRef<{ x: number; y: number } | null>(null);
 
   function previewPayload() {
     return { name, imageUrl, manaCost, typeLine, oracleText, power, toughness };
   }
 
+  function clearLongPressTimer() {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressStartRef.current = null;
+  }
+
+  // Touch has no hover, so the preview opens on a press-and-hold instead —
+  // a plain tap (used to play/tap a card, or hit the ⋯ button) must not
+  // trigger it. Real mouse pointers skip this path entirely and keep using
+  // hover below.
+  function handlePointerDown(e: React.PointerEvent) {
+    if (e.pointerType !== 'touch') return;
+    longPressStartRef.current = { x: e.clientX, y: e.clientY };
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTimerRef.current = null;
+      showPreviewNow(previewPayload());
+      // Swallow the click that follows this touch's release so the long
+      // press doesn't also play/tap the card underneath the preview it just opened.
+      const el = rootRef.current;
+      if (el) {
+        const suppressClick = (ev: MouseEvent) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+        };
+        el.addEventListener('click', suppressClick, { capture: true, once: true });
+      }
+    }, LONG_PRESS_MS);
+  }
+
+  function handlePointerMove(e: React.PointerEvent) {
+    if (!longPressStartRef.current) return;
+    const dx = e.clientX - longPressStartRef.current.x;
+    const dy = e.clientY - longPressStartRef.current.y;
+    if (Math.hypot(dx, dy) > LONG_PRESS_MOVE_TOLERANCE_PX) clearLongPressTimer();
+  }
+
   return (
     <div
+      ref={rootRef}
       onClick={onClick}
       onContextMenu={onContextMenu}
-      onMouseEnter={previewable ? () => showPreviewOnHover(previewPayload()) : undefined}
-      onMouseLeave={previewable ? () => hidePreview() : undefined}
+      onPointerEnter={previewable ? (e) => { if (e.pointerType === 'mouse') showPreviewOnHover(previewPayload()); } : undefined}
+      onPointerLeave={previewable ? (e) => { if (e.pointerType === 'mouse') hidePreview(); } : undefined}
+      onPointerDown={previewable ? handlePointerDown : undefined}
+      onPointerMove={previewable ? handlePointerMove : undefined}
+      onPointerUp={previewable ? clearLongPressTimer : undefined}
+      onPointerCancel={previewable ? clearLongPressTimer : undefined}
       title={title ?? name}
       className={`card-image relative inline-block w-full select-none overflow-hidden bg-panelLight shadow-md transition-transform duration-150 ${
         tapped ? 'rotate-90' : ''
