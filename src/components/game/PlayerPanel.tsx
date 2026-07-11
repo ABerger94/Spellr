@@ -7,12 +7,15 @@ export function PlayerPanel({
   isViewer,
   isActiveTurn,
   isOnline,
+  aiKeyMissing,
   onLifeChange,
 }: {
   player: PlayerStateView;
   isViewer: boolean;
   isActiveTurn: boolean;
   isOnline: boolean;
+  /** True when this is an AI seat but the server has no GEMINI_API_KEY configured. */
+  aiKeyMissing?: boolean;
   onLifeChange?: (delta: number) => void;
 }) {
   return (
@@ -26,6 +29,14 @@ export function PlayerPanel({
           {player.displayName}
           {isViewer && <span className="ml-1 text-xs text-accent2">(you)</span>}
           {player.isAI && <span className="ml-1 rounded bg-panelLight px-1 text-[10px] text-slate-400">AI</span>}
+          {player.isAI && aiKeyMissing && (
+            <span
+              className="ml-1 whitespace-nowrap rounded bg-amber-500/20 px-1 text-[10px] text-amber-400"
+              title="No GEMINI_API_KEY or GROQ_API_KEY is configured on the server, so this seat will just pass its turn instead of playing."
+            >
+              no AI key
+            </span>
+          )}
         </p>
         <p className="text-xs text-slate-500">
           Seat {player.seat} · {isOnline ? 'connected' : 'offline'}

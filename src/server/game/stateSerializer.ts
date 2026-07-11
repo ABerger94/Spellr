@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { env } from '@/lib/env';
 import type { GameStateView, PlayerStateView, ZoneState, CardFacts } from '@/types/game';
 
 export async function buildStateFor(gameId: string, viewerSeat: number | null): Promise<GameStateView> {
@@ -71,5 +72,6 @@ export async function buildStateFor(gameId: string, viewerSeat: number | null): 
     viewerSeat,
     players,
     cards,
+    aiEnabled: !!(env.geminiApiKey || env.groqApiKey),
   };
 }

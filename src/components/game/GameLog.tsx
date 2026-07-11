@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { GameLogEntry } from '@/hooks/useGameState';
 
-const AI_EVENT_TYPES = new Set(['AI_REASONING', 'AI_SKIPPED_NO_KEY', 'AI_ERROR', 'AI_TURN_CAPPED']);
+const AI_EVENT_TYPES = new Set(['AI_REASONING', 'AI_SKIPPED_NO_KEY', 'AI_ERROR', 'AI_TURN_CAPPED', 'AI_PROVIDER_FAILED']);
 
 const MANA_COLOR_NAMES: Record<string, string> = {
   W: 'White',
@@ -13,6 +13,12 @@ const MANA_COLOR_NAMES: Record<string, string> = {
   G: 'Green',
   C: 'Colorless',
 };
+
+const AI_PROVIDER_LABELS: Record<string, string> = { gemini: 'Gemini', groq: 'Groq' };
+
+function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
 
 function describeEvent(event: GameLogEntry, displayName: (seat: number | null) => string): string {
   const who = displayName(event.actorSeat);
@@ -99,8 +105,20 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
       return `${who} (thinking): ${event.payload.text ?? ''}`;
     case 'AI_SKIPPED_NO_KEY':
       return `${who} has no AI key configured and will not act.`;
-    case 'AI_ERROR':
-      return `${who} hit an error and passed the turn.`;
+    case 'AI_ERROR': {
+      const rawMessage = event.payload.message as string | undefined;
+      const message = rawMessage ? truncate(rawMessage, 300) : undefined;
+      const provider = event.payload.provider as string | undefined;
+      const prefix = provider ? `${who}'s ${AI_PROVIDER_LABELS[provider] ?? provider} attempt` : who;
+      return message ? `${prefix} hit an error and passed the turn: ${message}` : `${prefix} hit an error and passed the turn.`;
+    }
+    case 'AI_PROVIDER_FAILED': {
+      const rawMessage = event.payload.message as string | undefined;
+      const message = rawMessage ? truncate(rawMessage, 300) : undefined;
+      const provider = AI_PROVIDER_LABELS[event.payload.provider as string] ?? event.payload.provider;
+      const nextProvider = AI_PROVIDER_LABELS[event.payload.nextProvider as string] ?? event.payload.nextProvider;
+      return `${who}'s ${provider} attempt failed, trying ${nextProvider} instead${message ? `: ${message}` : '.'}`;
+    }
     case 'AI_TURN_CAPPED':
       return `${who} reached the action limit for this turn.`;
     default:
@@ -112,17 +130,28 @@ export function GameLog({
   events,
   displayName,
   onClose,
+  onSendChat,
 }: {
   events: GameLogEntry[];
   displayName: (seat: number | null) => string;
   /** Renders a "✕" header button to collapse/hide the log, when provided. */
   onClose?: () => void;
+  /** Renders a chat input pinned under the log, when provided. */
+  onSendChat?: (text: string) => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [chatText, setChatText] = useState('');
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [events.length]);
+
+  function handleSend() {
+    const text = chatText.trim();
+    if (!text || !onSendChat) return;
+    onSendChat(text);
+    setChatText('');
+  }
 
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-lg border border-white/10 bg-panel text-sm">
@@ -136,16 +165,44 @@ export function GameLog({
       </div>
       <div className="flex-1 overflow-y-auto p-3">
         {events.length === 0 && <p className="text-slate-500">No events yet.</p>}
-        {events.map((event) => (
-          <p
-            key={event.id}
-            className={AI_EVENT_TYPES.has(event.type) ? 'italic text-accent2' : 'text-slate-300'}
-          >
-            {describeEvent(event, displayName)}
-          </p>
-        ))}
+        {events.map((event) =>
+          event.type === 'CHAT_MESSAGE' ? (
+            <p key={event.id} className="text-white">
+              <strong className="text-accent2">{displayName(event.actorSeat)}:</strong>{' '}
+              {(event.payload.text as string) ?? ''}
+            </p>
+          ) : (
+            <p
+              key={event.id}
+              className={AI_EVENT_TYPES.has(event.type) ? 'italic text-accent2' : 'text-slate-300'}
+            >
+              {describeEvent(event, displayName)}
+            </p>
+          ),
+        )}
         <div ref={bottomRef} />
       </div>
+      {onSendChat && (
+        <div className="flex flex-shrink-0 items-center gap-1.5 border-t border-white/10 p-2">
+          <input
+            value={chatText}
+            onChange={(e) => setChatText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSend();
+            }}
+            placeholder="Say something…"
+            maxLength={500}
+            className="flex-1 rounded border border-white/10 bg-panelLight px-2 py-1 text-sm text-white placeholder:text-slate-500"
+          />
+          <button
+            onClick={handleSend}
+            disabled={!chatText.trim()}
+            className="rounded bg-accent px-3 py-1 text-sm font-medium text-white hover:bg-accent/80 disabled:opacity-40"
+          >
+            Send
+          </button>
+        </div>
+      )}
     </div>
   );
 }
