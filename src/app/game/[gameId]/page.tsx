@@ -405,8 +405,9 @@ export default function GameTablePage() {
           <p className="mb-1">
             <strong>Opening hand:</strong> everyone is dealt a fresh 7-card hand automatically when the game starts.
             Not happy with it? Actions ▾ → Mulligan shuffles your hand back in and deals you another 7 — only
-            available during your first turn. Each mulligan taken means you owe that many cards on the bottom of
-            your library once you keep (drag them onto the library, or tap ⋯ → bottom of library on each one).
+            available during your first turn. Your first mulligan each game is free — no cards owed. Every
+            mulligan after that costs one more card on the bottom of your library once you keep (2nd mulligan
+            owes 1, 3rd owes 2, and so on) — drag them onto the library, or tap ⋯ → bottom of library on each one.
           </p>
           <p className="mb-1">
             <strong>More room:</strong> each battlefield is a scrollable canvas, not just the visible box — scroll

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { GameLogEntry } from '@/hooks/useGameState';
+import { mulliganCardsOwed } from '@/types/game';
 
 const AI_EVENT_TYPES = new Set(['AI_REASONING', 'AI_SKIPPED_NO_KEY', 'AI_ERROR', 'AI_TURN_CAPPED', 'AI_PROVIDER_FAILED']);
 
@@ -77,9 +78,11 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
     }
     case 'MULLIGAN': {
       const count = event.payload.mulliganCount as number | undefined;
-      return count
-        ? `${who} took a mulligan (drew a fresh 7 — owes ${count} card${count === 1 ? '' : 's'} on the bottom of their library once they keep).`
-        : `${who} took a mulligan.`;
+      if (!count) return `${who} took a mulligan.`;
+      const owed = mulliganCardsOwed(count);
+      return owed > 0
+        ? `${who} took a mulligan (drew a fresh 7 — owes ${owed} card${owed === 1 ? '' : 's'} on the bottom of their library once they keep).`
+        : `${who} took their free first mulligan (drew a fresh 7 — nothing owed).`;
     }
     case 'ROLL_DICE':
       return `${who} rolled a d${event.payload.sides}: ${event.payload.result}.`;

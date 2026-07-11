@@ -30,9 +30,16 @@ export interface ZoneState {
   /** Floating mana pool, keyed by color (W/U/B/R/G/C). */
   manaPool: Record<string, number>;
   /** Number of mulligans taken this game — reset on a fresh deal, incremented
-   * each time MULLIGAN is called. When keeping a hand after N mulligans, the
-   * player is expected to put N cards on the bottom of their library. */
+   * each time MULLIGAN is called. The first mulligan is free; see
+   * mulliganCardsOwed for how many cards a kept hand owes on the bottom. */
   mulliganCount: number;
+}
+
+/** The first mulligan each game is free (fresh 7, nothing owed) — each one
+ * after that costs one more card on the bottom of the library once the
+ * player keeps: 2nd mulligan owes 1, 3rd owes 2, and so on. */
+export function mulliganCardsOwed(mulliganCount: number): number {
+  return Math.max(0, mulliganCount - 1);
 }
 
 export const EMPTY_ZONES: ZoneState = {

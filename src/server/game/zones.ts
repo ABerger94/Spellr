@@ -270,11 +270,12 @@ export function randomDiscard(zones: ZoneState): { zones: ZoneState; discardedSc
 
 export const OPENING_HAND_SIZE = 7;
 
-/** London mulligan: shuffle the current hand back into the library, draw a
- * fresh 7, and record that a mulligan was taken. The player is expected to
- * put a number of cards equal to zones.mulliganCount on the bottom of their
- * library once they keep — nothing here enforces that part, same as every
- * other judgment call on this virtual tabletop. */
+/** Mulligan: shuffle the current hand back into the library, draw a fresh 7,
+ * and record that a mulligan was taken. The first mulligan is free; each one
+ * after that means the player is expected to put an extra card on the
+ * bottom of their library once they keep (see mulliganCardsOwed) — nothing
+ * here enforces that part, same as every other judgment call on this
+ * virtual tabletop. */
 export function mulligan(zones: ZoneState): ZoneState {
   const shuffled = cloneZones(zones);
   shuffled.library = shuffle([...shuffled.library, ...shuffled.hand]);

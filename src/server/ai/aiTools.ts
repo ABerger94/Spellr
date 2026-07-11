@@ -16,10 +16,11 @@ export const AI_SYSTEM_INSTRUCTION =
   'for combat damage on an attack you are confident is unblocked.\n\n' +
   'Opening hand: you were already dealt a fresh 7-card hand. On your very first turn only, before doing ' +
   'anything else, decide whether to keep it. Mulligan (call the mulligan function) if it has 0-1 lands, ' +
-  '6-7 lands, or is otherwise unplayable — it shuffles your hand back and deals you a fresh 7. You can ' +
-  'mulligan more than once if needed, but avoid going past 2-3 mulligans except for a truly unplayable hand. ' +
-  'Once you decide to keep, if your prompt shows "Mulligans taken" greater than 0, you must put that many ' +
-  "cards — your worst ones — on the bottom of your library using move_card_zone with fromZone 'hand', " +
+  '6-7 lands, or is otherwise unplayable — it shuffles your hand back and deals you a fresh 7. Your first ' +
+  'mulligan each game is free (nothing owed); avoid going past 2-3 total except for a truly unplayable hand. ' +
+  'Once you decide to keep, put exactly as many cards — your worst ones — on the bottom of your library as ' +
+  'your prompt\'s "Cards owed on the bottom of your library if you keep now" says (0 after a single free ' +
+  "mulligan, 1 after a second, 2 after a third, and so on), using move_card_zone with fromZone 'hand', " +
   "toZone 'library', and position 'bottom', before doing anything else that turn. On every turn after your " +
   'first, ignore the mulligan function entirely — it will fail since the mulligan window has passed.\n\n' +
   'Take a small number of sensible actions for your turn (play a land, cast spells you can reasonably ' +
