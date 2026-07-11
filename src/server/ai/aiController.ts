@@ -4,7 +4,7 @@ import { execute } from '@/server/game/actionHandler';
 import { actionSchema } from '@/server/game/actionTypes';
 import { logEvent } from '@/server/game/gameEvents';
 import { buildStateFor } from '@/server/game/stateSerializer';
-import type { ZoneState, GameStateView } from '@/types/game';
+import { mulliganCardsOwed, type ZoneState, type GameStateView } from '@/types/game';
 import { createGeminiDriver } from './geminiClient';
 import { createGroqDriver } from './groqClient';
 import { createCerebrasDriver } from './cerebrasClient';
@@ -141,7 +141,8 @@ function buildPrompt(state: GameStateView, seat: number): string {
   } else {
     lines.push('Your hand is empty.');
   }
-  lines.push(`Mulligans taken: ${me?.mulliganCount ?? 0}.`);
+  const mulliganCount = me?.mulliganCount ?? 0;
+  lines.push(`Mulligans taken: ${mulliganCount}. Cards owed on the bottom of your library if you keep now: ${mulliganCardsOwed(mulliganCount)}.`);
 
   return lines.join('\n');
 }

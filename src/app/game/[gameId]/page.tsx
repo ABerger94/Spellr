@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useGameState } from '@/hooks/useGameState';
+import { useVoiceChat } from '@/hooks/useVoiceChat';
 import { NavBar } from '@/components/layout/NavBar';
 import { PlayerPanel } from '@/components/game/PlayerPanel';
 import { FreeformBattlefield } from '@/components/game/FreeformBattlefield';
@@ -34,6 +35,8 @@ export default function GameTablePage() {
   const router = useRouter();
   const { data: session } = useSession();
   const { state, gameInfo, log, joinError, actionError, sendAction, onlineUserIds, refreshState } = useGameState(params.gameId);
+  const viewerUserId = (session?.user as { id?: string } | undefined)?.id ?? null;
+  const voiceChat = useVoiceChat(params.gameId, viewerUserId);
   const [menu, setMenu] = useState<{ x: number; y: number; options: ContextMenuOption[] } | null>(null);
   const [librarySearchOpen, setLibrarySearchOpen] = useState(false);
   const [mulliganOpen, setMulliganOpen] = useState(false);
@@ -312,7 +315,6 @@ export default function GameTablePage() {
     }
   }
 
-  const viewerUserId = (session?.user as { id?: string } | undefined)?.id;
   const isHost = !!viewerUserId && viewerUserId === gameInfo.hostUserId;
 
   return (
@@ -401,16 +403,24 @@ export default function GameTablePage() {
             inside to return it to hand, put it on the battlefield, or send it to the top/bottom of your library.
           </p>
           <p className="mb-1">
-            <strong>Game actions bar:</strong> at the top — Untap All, Draw, Pass are one tap; the Actions ▾ menu adds
-            Draw X, Scry, Surveil, Mill, Exile Top, Look at Top, Random Discard, Reveal Hand, Shuffle, Mulligan, and
-            Reset Deck (cards back to library, reshuffled, life reset). The +/− on the right zooms the whole table
-            in and out — handy for fitting more on screen or seeing a crowded board at a glance.
+            <strong>Game actions bar:</strong> at the top — Untap All and Draw are one tap; the Actions ▾ menu adds
+            Pass Turn, Draw X, Scry, Surveil, Mill, Exile Top, Look at Top, Random Discard, Reveal Hand, Shuffle,
+            Mulligan, Reset Life, and Reset Deck (cards back to library, reshuffled, life reset). The +/− on the
+            right zooms the whole table in and out — handy for fitting more on screen or seeing a crowded board at
+            a glance.
+          </p>
+          <p className="mb-1">
+            <strong>Voice chat:</strong> tap 🎙️ Join Voice to talk with the other players in this game over your
+            microphone (peer-to-peer, no recording) — the button then toggles Mute/Unmute, and Actions ▾ → Leave
+            Voice Chat disconnects you entirely.
           </p>
           <p className="mb-1">
             <strong>Opening hand:</strong> everyone is dealt a fresh 7-card hand automatically when the game starts.
             Not happy with it? Actions ▾ → Mulligan shuffles your hand back in and deals you another 7 — only
-            available during your first turn. Each mulligan taken means you owe that many cards on the bottom of
-            your library once you keep (drag them onto the library, or tap ⋯ → bottom of library on each one).
+            available during your first turn. Your first mulligan each game is free; take as many more as you
+            need after that. The platform doesn&apos;t track or enforce bottoming cards for extra mulligans — that&apos;s
+            between you and your table (drag cards onto the library, or tap ⋯ → bottom of library, if that&apos;s
+            how you&apos;re playing it).
           </p>
           <p className="mb-1">
             <strong>More room:</strong> each battlefield is a scrollable canvas, not just the visible box — scroll
@@ -491,6 +501,13 @@ export default function GameTablePage() {
           onMulligan={() => sendAction({ type: 'MULLIGAN' })}
           onResetLife={() => sendAction({ type: 'RESET_LIFE' })}
           onResetDeck={handleResetDeck}
+          voiceJoined={voiceChat.joined}
+          voiceMuted={voiceChat.muted}
+          voiceConnectedPeerCount={voiceChat.connectedPeerCount}
+          voiceMicError={voiceChat.micError}
+          onVoiceJoin={voiceChat.join}
+          onVoiceToggleMute={voiceChat.toggleMute}
+          onVoiceLeave={voiceChat.leave}
         />
       )}
 

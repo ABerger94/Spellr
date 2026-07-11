@@ -77,9 +77,9 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
     }
     case 'MULLIGAN': {
       const count = event.payload.mulliganCount as number | undefined;
-      return count
-        ? `${who} took a mulligan (drew a fresh 7 — owes ${count} card${count === 1 ? '' : 's'} on the bottom of their library once they keep).`
-        : `${who} took a mulligan.`;
+      return count === 1
+        ? `${who} took their free mulligan (drew a fresh 7).`
+        : `${who} took a mulligan (drew a fresh 7).`;
     }
     case 'ROLL_DICE':
       return `${who} rolled a d${event.payload.sides}: ${event.payload.result}.`;

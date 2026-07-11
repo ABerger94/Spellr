@@ -52,6 +52,14 @@ export async function broadcastGameLog(gameId: string, event: unknown): Promise<
   await getPusher().trigger(presenceGameChannel(gameId), 'game:log', event);
 }
 
+/** Relays a WebRTC signaling message (offer/answer/ICE candidate/join/leave)
+ * to every client subscribed to the game's presence channel; each client
+ * filters locally by `target`/`from`. This is a server-triggered relay
+ * rather than a Pusher "client event" so no dashboard config is needed. */
+export async function broadcastVoiceSignal(gameId: string, signal: unknown): Promise<void> {
+  await getPusher().trigger(presenceGameChannel(gameId), 'voice:signal', signal);
+}
+
 /** Notifies everyone still waiting in a lobby that the host cancelled it,
  * since the game row (and their per-seat channel) is about to disappear. */
 export async function broadcastGameCancelled(gameId: string): Promise<void> {

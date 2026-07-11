@@ -24,6 +24,13 @@ export function GameActionsBar({
   onMulligan,
   onResetLife,
   onResetDeck,
+  voiceJoined,
+  voiceMuted,
+  voiceConnectedPeerCount,
+  voiceMicError,
+  onVoiceJoin,
+  onVoiceToggleMute,
+  onVoiceLeave,
 }: {
   isMyTurn: boolean;
   lookInProgress: boolean;
@@ -45,6 +52,13 @@ export function GameActionsBar({
   onMulligan: () => void;
   onResetLife: () => void;
   onResetDeck: () => void;
+  voiceJoined: boolean;
+  voiceMuted: boolean;
+  voiceConnectedPeerCount: number;
+  voiceMicError: string | null;
+  onVoiceJoin: () => void;
+  onVoiceToggleMute: () => void;
+  onVoiceLeave: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
@@ -74,13 +88,6 @@ export function GameActionsBar({
       >
         Draw
       </button>
-      <button
-        onClick={onPassTurn}
-        disabled={!isMyTurn}
-        className="flex-shrink-0 rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/80 disabled:opacity-40"
-      >
-        Pass
-      </button>
       <div className="flex-shrink-0">
         <button
           ref={actionsButtonRef}
@@ -94,6 +101,8 @@ export function GameActionsBar({
             anchorRect={anchorRect}
             onClose={() => setMenuOpen(false)}
             lookInProgress={lookInProgress}
+            isMyTurn={isMyTurn}
+            onPassTurn={onPassTurn}
             onDrawX={onDrawX}
             onScry={onScry}
             onSurveil={onSurveil}
@@ -106,9 +115,25 @@ export function GameActionsBar({
             onMulligan={onMulligan}
             onResetLife={onResetLife}
             onResetDeck={onResetDeck}
+            voiceJoined={voiceJoined}
+            onVoiceLeave={onVoiceLeave}
           />
         )}
       </div>
+      <button
+        onClick={voiceJoined ? onVoiceToggleMute : onVoiceJoin}
+        title={voiceMicError ?? (voiceJoined ? (voiceMuted ? 'Unmute microphone' : 'Mute microphone') : 'Join voice chat')}
+        className={`flex-shrink-0 rounded px-3 py-1.5 text-sm font-medium ${
+          voiceJoined
+            ? voiceMuted
+              ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+              : 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+            : 'bg-panelLight text-white hover:bg-white/10'
+        }`}
+      >
+        {voiceJoined ? (voiceMuted ? '🔇 Unmute' : `🎤 Mute${voiceConnectedPeerCount > 0 ? ` (${voiceConnectedPeerCount})` : ''}`) : '🎙️ Join Voice'}
+      </button>
+      {voiceMicError && <span className="hidden flex-shrink-0 max-w-[14rem] truncate text-xs text-red-400 sm:inline">{voiceMicError}</span>}
       <div className="ml-auto flex flex-shrink-0 items-center gap-1">
         <button
           onClick={onZoomOut}
