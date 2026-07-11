@@ -29,7 +29,6 @@ export function GameActionsBar({
   voiceConnectedPeerCount,
   voiceConnectingPeerCount,
   voiceMicError,
-  voiceSignalingError,
   voiceAudioBlocked,
   onVoiceJoin,
   onVoiceToggleMute,
@@ -61,7 +60,6 @@ export function GameActionsBar({
   voiceConnectedPeerCount: number;
   voiceConnectingPeerCount: number;
   voiceMicError: string | null;
-  voiceSignalingError: string | null;
   voiceAudioBlocked: boolean;
   onVoiceJoin: () => void;
   onVoiceToggleMute: () => void;
@@ -145,11 +143,6 @@ export function GameActionsBar({
         <span className="hidden flex-shrink-0 text-xs text-slate-400 sm:inline">Connecting…</span>
       )}
       {voiceMicError && <span className="hidden flex-shrink-0 max-w-[14rem] truncate text-xs text-red-400 sm:inline">{voiceMicError}</span>}
-      {voiceSignalingError && (
-        <span className="hidden flex-shrink-0 max-w-[16rem] truncate text-xs text-red-400 sm:inline" title={voiceSignalingError}>
-          {voiceSignalingError}
-        </span>
-      )}
       {voiceJoined && voiceAudioBlocked && (
         <button
           onClick={onVoiceEnableAudio}

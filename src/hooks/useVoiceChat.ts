@@ -96,9 +96,10 @@ export function useVoiceChat(gameId: string, viewerUserId: string | null) {
       })
         .then(async (res) => {
           if (!res.ok) {
-            const body = await res.text().catch(() => '');
-            log('signal rejected', res.status, body);
-            setSignalingError(`Voice signaling failed (${res.status}) — the other player may not be receiving your connection request.`);
+            const body = await res.json().catch(() => null);
+            log('signal rejected', signal.type, res.status, body);
+            const detail = body?.detail ? ` — ${body.detail}` : '';
+            setSignalingError(`Voice signaling failed sending "${signal.type}" (${res.status})${detail}`);
           } else {
             setSignalingError(null);
           }
