@@ -32,6 +32,9 @@ export async function buildStateFor(gameId: string, viewerSeat: number | null): 
       imageNormal: row.imageNormal,
       typeLine: row.typeLine,
       manaCost: row.manaCost,
+      oracleText: row.oracleText,
+      power: row.power,
+      toughness: row.toughness,
     };
   }
 
