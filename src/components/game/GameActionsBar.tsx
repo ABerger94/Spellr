@@ -6,9 +6,6 @@ import { GameActionsMenu } from './GameActionsMenu';
 export function GameActionsBar({
   isMyTurn,
   lookInProgress,
-  zoom,
-  onZoomIn,
-  onZoomOut,
   onUntapAll,
   onDraw,
   onPassTurn,
@@ -27,9 +24,6 @@ export function GameActionsBar({
 }: {
   isMyTurn: boolean;
   lookInProgress: boolean;
-  zoom: number;
-  onZoomIn: () => void;
-  onZoomOut: () => void;
   onUntapAll: () => void;
   onDraw: () => void;
   onPassTurn: () => void;
@@ -108,23 +102,6 @@ export function GameActionsBar({
             onResetDeck={onResetDeck}
           />
         )}
-      </div>
-      <div className="ml-auto flex flex-shrink-0 items-center gap-1">
-        <button
-          onClick={onZoomOut}
-          title="Zoom out the whole table"
-          className="rounded bg-panelLight px-2 py-1.5 text-sm text-white hover:bg-white/10"
-        >
-          −
-        </button>
-        <span className="w-10 text-center text-xs text-slate-400">{Math.round(zoom * 100)}%</span>
-        <button
-          onClick={onZoomIn}
-          title="Zoom in the whole table"
-          className="rounded bg-panelLight px-2 py-1.5 text-sm text-white hover:bg-white/10"
-        >
-          +
-        </button>
       </div>
     </div>
   );
