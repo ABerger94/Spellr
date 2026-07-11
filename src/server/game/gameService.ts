@@ -51,11 +51,26 @@ export async function listGamesForUser(userId: string) {
   });
 }
 
+/** Public lobbies anyone can browse and join without an invite code —
+ * excludes games the user is already in (those already show under "Your
+ * games") and anything the host marked invite-only. */
+export async function listOpenPublicGames(excludeUserId: string) {
+  return prisma.game.findMany({
+    where: {
+      status: 'LOBBY',
+      isPublic: true,
+      players: { none: { userId: excludeUserId } },
+    },
+    orderBy: { createdAt: 'desc' },
+    include: { players: { include: { user: true } } },
+  });
+}
+
 export async function createGame(
   hostUserId: string,
   format: GameFormat,
   deckId: string,
-  opts: { seatCount?: number; fillAI?: boolean } = {},
+  opts: { seatCount?: number; fillAI?: boolean; isPublic?: boolean } = {},
 ) {
   const maxSeats = format === 'COMMANDER' ? Math.min(Math.max(opts.seatCount ?? 4, 2), 4) : 2;
 
@@ -75,6 +90,7 @@ export async function createGame(
       format,
       hostUserId,
       maxSeats,
+      isPublic: opts.isPublic ?? true,
       players: {
         create: [{ userId: hostUserId, deckId, seat: 0, isAI: false }, ...extraSeats],
       },
@@ -83,8 +99,10 @@ export async function createGame(
   });
 }
 
-export async function joinGame(inviteCode: string, userId: string, deckId: string) {
-  const game = await prisma.game.findUnique({ where: { inviteCode }, include: { players: true } });
+/** Shared "add me to an open seat" logic behind both invite-code joining and
+ * joining a game browsed from the open-lobbies list. */
+export async function joinGameById(gameId: string, userId: string, deckId: string) {
+  const game = await prisma.game.findUnique({ where: { id: gameId }, include: { players: true } });
   if (!game) throw new Error('Game not found');
   if (game.status !== 'LOBBY') throw new Error('That game has already started');
   if (game.players.some((p) => p.userId === userId)) {
@@ -98,6 +116,12 @@ export async function joinGame(inviteCode: string, userId: string, deckId: strin
 
   await prisma.gamePlayer.create({ data: { gameId: game.id, userId, deckId, seat, isAI: false } });
   return prisma.game.findUnique({ where: { id: game.id }, include: { players: true } });
+}
+
+export async function joinGame(inviteCode: string, userId: string, deckId: string) {
+  const game = await prisma.game.findUnique({ where: { inviteCode } });
+  if (!game) throw new Error('Game not found');
+  return joinGameById(game.id, userId, deckId);
 }
 
 /** Host-only. Permanently deletes a game that hasn't started yet (cascades

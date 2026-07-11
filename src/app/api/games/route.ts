@@ -18,6 +18,7 @@ const createSchema = z.object({
   deckId: z.string(),
   seatCount: z.number().int().min(2).max(4).optional(),
   fillAI: z.boolean().optional(),
+  isPublic: z.boolean().optional(),
 });
 
 export async function POST(req: Request) {
@@ -39,6 +40,7 @@ export async function POST(req: Request) {
   const game = await createGame(auth.userId, parsed.data.format, parsed.data.deckId, {
     seatCount: parsed.data.seatCount,
     fillAI: parsed.data.fillAI,
+    isPublic: parsed.data.isPublic,
   });
   return NextResponse.json({ game }, { status: 201 });
 }
