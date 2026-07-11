@@ -24,6 +24,10 @@ export interface ZoneState {
   pendingLookMode: LookMode | null;
   /** Floating mana pool, keyed by color (W/U/B/R/G/C). */
   manaPool: Record<string, number>;
+  /** Number of mulligans taken this game — reset on a fresh deal, incremented
+   * each time MULLIGAN is called. When keeping a hand after N mulligans, the
+   * player is expected to put N cards on the bottom of their library. */
+  mulliganCount: number;
 }
 
 export const EMPTY_ZONES: ZoneState = {
@@ -36,6 +40,7 @@ export const EMPTY_ZONES: ZoneState = {
   pendingLook: [],
   pendingLookMode: null,
   manaPool: {},
+  mulliganCount: 0,
 };
 
 export interface CardFacts {
@@ -68,6 +73,7 @@ export interface PlayerStateView {
   pendingLook: string[]; // only populated for the viewer's own seat
   pendingLookMode: LookMode | null;
   manaPool: Record<string, number>;
+  mulliganCount: number;
 }
 
 export interface GameStateView {

@@ -75,8 +75,12 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
       const names = (event.payload.cardNames as string[]) ?? [];
       return names.length > 0 ? `${who} revealed their hand: ${names.join(', ')}.` : `${who} revealed an empty hand.`;
     }
-    case 'MULLIGAN':
-      return `${who} took a mulligan.`;
+    case 'MULLIGAN': {
+      const count = event.payload.mulliganCount as number | undefined;
+      return count
+        ? `${who} took a mulligan (drew a fresh 7 — owes ${count} card${count === 1 ? '' : 's'} on the bottom of their library once they keep).`
+        : `${who} took a mulligan.`;
+    }
     case 'ROLL_DICE':
       return `${who} rolled a d${event.payload.sides}: ${event.payload.result}.`;
     case 'FLIP_COIN':

@@ -13,10 +13,18 @@ export const AI_SYSTEM_INSTRUCTION =
   'read it and act on it yourself: if a card you cast or a land you play would make you or another player gain ' +
   'or lose life (shock lands, painlands, burn spells, lifegain effects, etc.), call adjust_life for the right ' +
   'seat and amount as part of resolving it — do not just leave life totals unchanged. Likewise use adjust_life ' +
-  'for combat damage on an attack you are confident is unblocked. Take a small number of sensible actions for ' +
-  'your turn (play a land, cast spells you can reasonably afford, attack if favorable) using the provided ' +
-  'functions, briefly explaining your reasoning in the text alongside each function call, then call pass_turn ' +
-  'to end your turn.';
+  'for combat damage on an attack you are confident is unblocked.\n\n' +
+  'Opening hand: you were already dealt a fresh 7-card hand. On your very first turn only, before doing ' +
+  'anything else, decide whether to keep it. Mulligan (call the mulligan function) if it has 0-1 lands, ' +
+  '6-7 lands, or is otherwise unplayable — it shuffles your hand back and deals you a fresh 7. You can ' +
+  'mulligan more than once if needed, but avoid going past 2-3 mulligans except for a truly unplayable hand. ' +
+  'Once you decide to keep, if your prompt shows "Mulligans taken" greater than 0, you must put that many ' +
+  "cards — your worst ones — on the bottom of your library using move_card_zone with fromZone 'hand', " +
+  "toZone 'library', and position 'bottom', before doing anything else that turn. On every turn after your " +
+  'first, ignore the mulligan function entirely — it will fail since the mulligan window has passed.\n\n' +
+  'Take a small number of sensible actions for your turn (play a land, cast spells you can reasonably ' +
+  'afford, attack if favorable) using the provided functions, briefly explaining your reasoning in the text ' +
+  'alongside each function call, then call pass_turn to end your turn.';
 
 const zoneEnum = ['library', 'hand', 'battlefield', 'graveyard', 'exile', 'commandZone'];
 
@@ -74,9 +82,21 @@ export const AI_ACTIONS: AIActionSpec[] = [
         toZone: { type: 'string', enum: zoneEnum },
         instanceId: { type: 'string', description: 'Required if fromZone is battlefield.' },
         scryfallId: { type: 'string', description: 'Required if fromZone is not battlefield.' },
+        position: {
+          type: 'string',
+          enum: ['top', 'bottom'],
+          description: "Only meaningful when toZone is 'library'; defaults to 'top'. Use 'bottom' when putting cards away after keeping a mulliganed hand.",
+        },
       },
       required: ['fromZone', 'toZone'],
     },
+  },
+  {
+    name: 'mulligan',
+    description:
+      'Shuffle your current hand back into your library and draw a fresh 7. Only usable on your very first ' +
+      'turn, before taking any other action — it will fail on any later turn.',
+    parameters: { type: 'object', properties: {} },
   },
   {
     name: 'adjust_life',

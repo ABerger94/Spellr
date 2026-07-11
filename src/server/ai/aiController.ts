@@ -129,6 +129,7 @@ function buildPrompt(state: GameStateView, seat: number): string {
   } else {
     lines.push('Your hand is empty.');
   }
+  lines.push(`Mulligans taken: ${me?.mulliganCount ?? 0}.`);
 
   return lines.join('\n');
 }
@@ -178,11 +179,14 @@ async function mapFunctionCallToAction(
         toZone: args.toZone,
         instanceId: args.instanceId ? String(args.instanceId) : undefined,
         scryfallId: args.scryfallId ? String(args.scryfallId) : undefined,
+        position: args.position === 'top' || args.position === 'bottom' ? args.position : undefined,
       };
     case 'adjust_life':
       return { type: 'ADJUST_LIFE', seat: Number(args.seat), delta: Number(args.delta) };
     case 'draw_card':
       return { type: 'DRAW_CARD' };
+    case 'mulligan':
+      return { type: 'MULLIGAN' };
     case 'pass_turn':
       return { type: 'PASS_TURN' };
     default:
