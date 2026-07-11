@@ -1,5 +1,34 @@
 import { prisma } from '@/lib/prisma';
-import type { GameStateView, PlayerStateView, ZoneState, CardFacts } from '@/types/game';
+import { env } from '@/lib/env';
+import type { GameStateView, PlayerStateView, ZoneState, CardFacts, CardFace } from '@/types/game';
+
+interface RawScryfallFace {
+  name?: string;
+  type_line?: string;
+  oracle_text?: string;
+  power?: string;
+  toughness?: string;
+  image_uris?: { normal?: string };
+}
+
+/** Two-sided cards (transform/MDFC/battle) store each face's own image under
+ * card_faces — split cards (Fire // Ice) also have card_faces but share a
+ * single top-level image, so only a face with its own image counts as a
+ * real flippable back. */
+function extractBackFace(raw: unknown): CardFace | null {
+  const faces = (raw as { card_faces?: RawScryfallFace[] } | null)?.card_faces;
+  if (!Array.isArray(faces) || faces.length < 2) return null;
+  const back = faces[1];
+  if (!back?.image_uris?.normal) return null;
+  return {
+    name: back.name ?? 'Back face',
+    imageNormal: back.image_uris.normal,
+    typeLine: back.type_line ?? null,
+    oracleText: back.oracle_text ?? null,
+    power: back.power ?? null,
+    toughness: back.toughness ?? null,
+  };
+}
 
 export async function buildStateFor(gameId: string, viewerSeat: number | null): Promise<GameStateView> {
   const game = await prisma.game.findUniqueOrThrow({
@@ -19,6 +48,7 @@ export async function buildStateFor(gameId: string, viewerSeat: number | null): 
     if (p.seat === viewerSeat) {
       zones.library.forEach((id) => allIds.add(id));
       zones.hand.forEach((id) => allIds.add(id));
+      (zones.pendingLook ?? []).forEach((id) => allIds.add(id));
     }
   }
 
@@ -31,6 +61,10 @@ export async function buildStateFor(gameId: string, viewerSeat: number | null): 
       imageNormal: row.imageNormal,
       typeLine: row.typeLine,
       manaCost: row.manaCost,
+      oracleText: row.oracleText,
+      power: row.power,
+      toughness: row.toughness,
+      backFace: extractBackFace(row.raw),
     };
   }
 
@@ -56,7 +90,10 @@ export async function buildStateFor(gameId: string, viewerSeat: number | null): 
         library: isViewer ? zones.library : null,
         hand: isViewer ? zones.hand : null,
         handCount: zones.hand.length,
-        mulliganCount: ((p.counters as Record<string, number> | null)?.mulliganCount ?? 0),
+        pendingLook: isViewer ? zones.pendingLook ?? [] : [],
+        pendingLookMode: isViewer ? zones.pendingLookMode ?? null : null,
+        manaPool: zones.manaPool ?? {},
+        mulliganCount: zones.mulliganCount ?? 0,
       };
     });
 
@@ -69,5 +106,6 @@ export async function buildStateFor(gameId: string, viewerSeat: number | null): 
     viewerSeat,
     players,
     cards,
+    aiEnabled: !!(env.geminiApiKey || env.groqApiKey || env.cerebrasApiKey || env.openRouterApiKey),
   };
 }

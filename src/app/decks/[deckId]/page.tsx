@@ -53,7 +53,12 @@ export default function DeckEditorPage() {
 
   async function handleDelete() {
     if (!confirm('Delete this deck?')) return;
-    await fetch(`/api/decks/${params.deckId}`, { method: 'DELETE' });
+    const res = await fetch(`/api/decks/${params.deckId}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error ?? 'Failed to delete deck');
+      return;
+    }
     router.push('/decks');
   }
 

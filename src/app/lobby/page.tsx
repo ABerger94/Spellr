@@ -8,6 +8,11 @@ interface Deck {
   id: string;
   name: string;
   format: 'COMMANDER' | 'STANDARD_1V1';
+  cards: { quantity: number }[];
+}
+
+function cardCount(deck: Deck): number {
+  return deck.cards.reduce((sum, c) => sum + c.quantity, 0);
 }
 
 interface GamePlayer {
@@ -31,20 +36,27 @@ export default function LobbyPage() {
   const router = useRouter();
   const [decks, setDecks] = useState<Deck[]>([]);
   const [games, setGames] = useState<GameSummary[]>([]);
+  const [openGames, setOpenGames] = useState<GameSummary[]>([]);
   const [format, setFormat] = useState<'COMMANDER' | 'ONE_V_ONE'>('COMMANDER');
   const [deckId, setDeckId] = useState('');
   const [seatCount, setSeatCount] = useState(4);
-  const [fillAI, setFillAI] = useState(true);
+  const [isPublic, setIsPublic] = useState(true);
   const [inviteCode, setInviteCode] = useState('');
   const [joinDeckId, setJoinDeckId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [decksRes, gamesRes] = await Promise.all([fetch('/api/decks'), fetch('/api/games')]);
+    const [decksRes, gamesRes, openGamesRes] = await Promise.all([
+      fetch('/api/decks'),
+      fetch('/api/games'),
+      fetch('/api/games/open'),
+    ]);
     const decksData = await decksRes.json();
     const gamesData = await gamesRes.json();
+    const openGamesData = await openGamesRes.json();
     setDecks(decksData.decks ?? []);
     setGames(gamesData.games ?? []);
+    setOpenGames(openGamesData.games ?? []);
   }, []);
 
   useEffect(() => {
@@ -66,7 +78,7 @@ export default function LobbyPage() {
         format,
         deckId,
         seatCount: format === 'COMMANDER' ? seatCount : undefined,
-        fillAI,
+        isPublic,
       }),
     });
     const data = await res.json();
@@ -87,6 +99,25 @@ export default function LobbyPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ inviteCode: inviteCode.trim(), deckId: joinDeckId }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error ?? 'Failed to join game');
+      return;
+    }
+    router.push(`/game/${data.game.id}`);
+  }
+
+  async function handleJoinOpenGame(gameId: string) {
+    setError(null);
+    if (!joinDeckId) {
+      setError('Pick a deck in "Join a game" first, then tap Join on an open game below');
+      return;
+    }
+    const res = await fetch(`/api/games/${gameId}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deckId: joinDeckId }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -145,14 +176,14 @@ export default function LobbyPage() {
                   <option value="">Select a deck…</option>
                   {decksForFormat.map((d) => (
                     <option key={d.id} value={d.id}>
-                      {d.name}
+                      {d.name} ({cardCount(d)} cards)
                     </option>
                   ))}
                 </select>
               </div>
               <label className="flex items-center gap-2 text-sm text-slate-300">
-                <input type="checkbox" checked={fillAI} onChange={(e) => setFillAI(e.target.checked)} />
-                Fill remaining seats with AI
+                <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
+                Public — listed in Open games below for anyone to join (uncheck for invite-only)
               </label>
               <button onClick={handleCreate} className="w-full rounded bg-accent px-3 py-2 font-medium text-white hover:bg-accent/80">
                 Create game
@@ -181,7 +212,7 @@ export default function LobbyPage() {
                   <option value="">Select a deck…</option>
                   {decks.map((d) => (
                     <option key={d.id} value={d.id}>
-                      {d.name} ({d.format === 'COMMANDER' ? 'Commander' : '1v1'})
+                      {d.name} ({d.format === 'COMMANDER' ? 'Commander' : '1v1'}, {cardCount(d)} cards)
                     </option>
                   ))}
                 </select>
@@ -192,6 +223,47 @@ export default function LobbyPage() {
             </div>
           </section>
         </div>
+
+        <section className="mt-8">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-medium text-white">Open games</h2>
+            <button onClick={load} className="text-xs text-slate-400 hover:text-white">
+              ↻ Refresh
+            </button>
+          </div>
+          {openGames.length === 0 ? (
+            <p className="text-slate-400">
+              No public games waiting for players right now — create one above, or ask a friend for their invite code.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {openGames.map((g) => {
+                const host = g.players.find((p) => p.seat === 0);
+                const full = g.players.length >= g.maxSeats;
+                return (
+                  <div
+                    key={g.id}
+                    className="flex items-center justify-between rounded border border-white/10 bg-panel px-4 py-3"
+                  >
+                    <div>
+                      <p className="text-white">
+                        {g.format === 'COMMANDER' ? 'Commander' : '1v1'} · {g.players.length}/{g.maxSeats} seats
+                      </p>
+                      <p className="text-xs text-slate-500">Hosted by {host?.user?.displayName ?? 'Unknown'}</p>
+                    </div>
+                    <button
+                      onClick={() => handleJoinOpenGame(g.id)}
+                      disabled={full}
+                      className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {full ? 'Full' : 'Join'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
         <section className="mt-8">
           <h2 className="mb-4 text-lg font-medium text-white">Your games</h2>

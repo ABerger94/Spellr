@@ -46,7 +46,7 @@ export default function SignupPage() {
     <main className="flex min-h-screen items-center justify-center bg-ink px-4">
       <div className="w-full max-w-sm rounded-xl border border-white/10 bg-panel p-8 shadow-xl">
         <h1 className="mb-1 text-2xl font-semibold text-white">
-          Spell<span className="text-accent">r</span>
+          Mana<span className="text-accent">Verse</span>
         </h1>
         <p className="mb-6 text-sm text-slate-400">Create an account.</p>
         <form onSubmit={handleSubmit} className="space-y-4">

@@ -1,0 +1,129 @@
+'use client';
+
+import type { BattlefieldCard, CardFace, CardFacts } from '@/types/game';
+import { DraggableCard } from './DraggableCard';
+import { useDragDrop } from './DragDropContext';
+
+// The canvas is deliberately larger than most viewports (especially phones)
+// so permanents have real room and don't overlap — the outer box scrolls
+// (both axes) to reveal the rest instead of clipping or cramming everything
+// into a tiny area.
+const CANVAS_MIN_WIDTH = 720;
+const CANVAS_MIN_HEIGHT = 480;
+const CARD_WIDTH_PX = 96;
+/** How far each attached card (aura/equipment) peeks out from under its host. */
+const ATTACH_OFFSET_PX = 16;
+
+function faceFor(card: BattlefieldCard, facts: CardFacts | undefined): (CardFace & { manaCost?: string | null }) | undefined {
+  if (card.transformed && facts?.backFace) return facts.backFace;
+  return facts;
+}
+
+/** Freeform battlefield: cards sit wherever their x/y percent position says
+ * and can be dragged anywhere within the canvas, matching a real playmat.
+ * Cards attached to another card (auras/equipment) render stacked behind
+ * their host instead of getting their own spot. */
+export function FreeformBattlefield({
+  battlefield,
+  cards,
+  interactive,
+  onTapToggle,
+  onContextMenu,
+}: {
+  battlefield: BattlefieldCard[];
+  cards: Record<string, CardFacts>;
+  interactive: boolean;
+  onTapToggle?: (instanceId: string, tapped: boolean) => void;
+  onContextMenu?: (e: React.MouseEvent, card: BattlefieldCard) => void;
+}) {
+  const { dragging } = useDragDrop();
+  const isHover = interactive && dragging?.hoverZone === 'battlefield';
+
+  const byInstance = new Map(battlefield.map((c) => [c.instanceId, c]));
+  const attachedByHost = new Map<string, BattlefieldCard[]>();
+  const roots: BattlefieldCard[] = [];
+  for (const c of battlefield) {
+    if (c.attachedTo && byInstance.has(c.attachedTo)) {
+      if (!attachedByHost.has(c.attachedTo)) attachedByHost.set(c.attachedTo, []);
+      attachedByHost.get(c.attachedTo)!.push(c);
+    } else {
+      roots.push(c);
+    }
+  }
+
+  function renderCard(c: BattlefieldCard) {
+    const facts = cards[c.scryfallId];
+    const face = faceFor(c, facts);
+    return (
+      <DraggableCard
+        source={interactive ? { zone: 'battlefield', instanceId: c.instanceId } : null}
+        name={face?.name ?? c.scryfallId}
+        imageUrl={face?.imageNormal}
+        tapped={c.tapped}
+        counters={c.counters}
+        typeLine={face?.typeLine}
+        oracleText={face?.oracleText}
+        power={face?.power}
+        toughness={face?.toughness}
+        manaCost={c.transformed ? undefined : facts?.manaCost}
+        onClick={interactive && onTapToggle ? () => onTapToggle(c.instanceId, c.tapped) : undefined}
+        onContextMenu={
+          interactive && onContextMenu
+            ? (e) => {
+                e.preventDefault();
+                onContextMenu(e, c);
+              }
+            : undefined
+        }
+        onMore={interactive && onContextMenu ? (e) => onContextMenu(e, c) : undefined}
+      />
+    );
+  }
+
+  return (
+    <div className="h-72 w-full overflow-auto rounded border border-white/5">
+      <div
+        data-dropzone={interactive ? 'true' : undefined}
+        data-zone="battlefield"
+        className={`relative w-full ${isHover ? 'bg-accent/10 ring-2 ring-inset ring-accent' : ''}`}
+        style={{ minWidth: CANVAS_MIN_WIDTH, minHeight: CANVAS_MIN_HEIGHT }}
+      >
+        {battlefield.length === 0 && (
+          <div className="flex h-full items-center justify-center text-xs text-slate-600">
+            Battlefield is empty{interactive ? ' — drag cards here, scroll for more room' : ''}
+          </div>
+        )}
+        {roots.map((root) => {
+          const attachments = attachedByHost.get(root.instanceId) ?? [];
+          return (
+            <div
+              key={root.instanceId}
+              className="absolute"
+              style={{ left: `${root.x}%`, top: `${root.y}%`, width: CARD_WIDTH_PX }}
+            >
+              <div className="relative" style={{ width: CARD_WIDTH_PX }}>
+                {attachments.map((att, i) => (
+                  <div
+                    key={att.instanceId}
+                    data-battlefield-card={interactive ? att.instanceId : undefined}
+                    className="absolute"
+                    style={{ left: (i + 1) * ATTACH_OFFSET_PX, top: (i + 1) * ATTACH_OFFSET_PX, width: CARD_WIDTH_PX, zIndex: i + 1 }}
+                  >
+                    {renderCard(att)}
+                  </div>
+                ))}
+                <div
+                  data-battlefield-card={interactive ? root.instanceId : undefined}
+                  className="relative"
+                  style={{ zIndex: attachments.length + 1 }}
+                >
+                  {renderCard(root)}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

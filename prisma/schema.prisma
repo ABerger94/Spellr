@@ -3,8 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Only relevant when DATABASE_URL is a pooled connection (e.g. Supabase's
+  // PgBouncer pooler) — Prisma Migrate needs a direct, non-pooled connection
+  // since PgBouncer's transaction mode doesn't support prepared statements.
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -92,6 +96,9 @@ model Game {
   format          GameFormat
   status          GameStatus   @default(LOBBY)
   inviteCode      String       @unique @default(cuid())
+  // Public lobbies are listed for anyone to browse and join without the
+  // invite code; private ones are still joinable only by invite code.
+  isPublic        Boolean      @default(true)
   hostUserId      String
   hostUser        User         @relation("HostedGames", fields: [hostUserId], references: [id])
   maxSeats        Int
@@ -102,6 +109,8 @@ model Game {
   endedAt         DateTime?
   players         GamePlayer[]
   events          GameEvent[]
+
+  @@index([status, isPublic])
 }
 
 model GamePlayer {

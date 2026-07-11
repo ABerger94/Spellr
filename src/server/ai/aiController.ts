@@ -5,24 +5,80 @@ import { actionSchema } from '@/server/game/actionTypes';
 import { logEvent } from '@/server/game/gameEvents';
 import { buildStateFor } from '@/server/game/stateSerializer';
 import type { ZoneState, GameStateView } from '@/types/game';
-import { getModel } from './geminiClient';
+import { createGeminiDriver } from './geminiClient';
+import { createGroqDriver } from './groqClient';
+import { createCerebrasDriver } from './cerebrasClient';
+import { createOpenRouterDriver } from './openRouterClient';
+import type { AITurnDriver } from './aiDriver';
 
 const MAX_ACTIONS_PER_TURN = 12;
 
-export async function maybeTakeAITurn(gameId: string, seat: number): Promise<void> {
-  if (!env.geminiApiKey) {
+type ProviderName = 'gemini' | 'groq' | 'cerebras' | 'openrouter';
+
+const DRIVER_FACTORIES: Record<ProviderName, () => AITurnDriver> = {
+  gemini: createGeminiDriver,
+  groq: createGroqDriver,
+  cerebras: createCerebrasDriver,
+  openrouter: createOpenRouterDriver,
+};
+
+function createDriver(provider: ProviderName): AITurnDriver {
+  return DRIVER_FACTORIES[provider]();
+}
+
+// Guards against two concurrent requests (e.g. two connected players' clients
+// both noticing it's the AI's turn at once) triggering the same seat's turn
+// twice — a second call for a key already in flight just piggybacks on the
+// first's promise instead of starting a redundant one.
+const aiTurnLocks = new Map<string, Promise<void>>();
+
+export function runAITurnOnce(gameId: string, seat: number): Promise<void> {
+  const key = `${gameId}:${seat}`;
+  const existing = aiTurnLocks.get(key);
+  if (existing) return existing;
+
+  const run = maybeTakeAITurn(gameId, seat).finally(() => {
+    aiTurnLocks.delete(key);
+  });
+  aiTurnLocks.set(key, run);
+  return run;
+}
+
+// Tried in order of preference, falling through to the next only when the
+// current one is down, rate-limited, or misconfigured — not load-balanced
+// peers, since the open fallback models are less reliable at multi-step tool
+// calling than Gemini.
+async function maybeTakeAITurn(gameId: string, seat: number): Promise<void> {
+  const providers: ProviderName[] = [];
+  if (env.geminiApiKey) providers.push('gemini');
+  if (env.groqApiKey) providers.push('groq');
+  if (env.cerebrasApiKey) providers.push('cerebras');
+  if (env.openRouterApiKey) providers.push('openrouter');
+
+  if (providers.length === 0) {
     await logEvent(gameId, 'AI_SKIPPED_NO_KEY', {}, { seat });
     await forcePass(gameId, seat);
     return;
   }
 
-  try {
-    await takeTurn(gameId, seat);
-  } catch (err) {
-    console.error('[aiController]', err);
-    await logEvent(gameId, 'AI_ERROR', { message: err instanceof Error ? err.message : 'Unknown error' }, { seat });
-    await forcePass(gameId, seat);
+  for (let i = 0; i < providers.length; i++) {
+    const provider = providers[i];
+    try {
+      await takeTurn(gameId, seat, createDriver(provider));
+      return;
+    } catch (err) {
+      console.error(`[aiController] ${provider} failed`, err);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      const nextProvider = providers[i + 1];
+      if (nextProvider) {
+        await logEvent(gameId, 'AI_PROVIDER_FAILED', { provider, message, nextProvider }, { seat });
+      } else {
+        await logEvent(gameId, 'AI_ERROR', { provider, message }, { seat });
+      }
+    }
   }
+
+  await forcePass(gameId, seat);
 }
 
 async function forcePass(gameId: string, seat: number) {
@@ -33,6 +89,22 @@ async function forcePass(gameId: string, seat: number) {
   }
 }
 
+/** Oracle text is included for the AI's own cards (it needs the real rules
+ * text to know when a land enters tapped is its own business vs. already
+ * handled automatically, when a spell gains/loses life, etc.) but omitted
+ * for opponents' permanents to keep the prompt from ballooning — the AI
+ * only ever acts on its own cards anyway. */
+function cardLabel(state: GameStateView, id: string, includeText: boolean): string {
+  const facts = state.cards[id];
+  if (!facts) return id;
+  const bits = [facts.typeLine ?? 'unknown type'];
+  if (facts.manaCost) bits.push(facts.manaCost);
+  if (facts.power !== null && facts.toughness !== null) bits.push(`${facts.power}/${facts.toughness}`);
+  let label = `${facts.name} [${bits.join(', ')}]`;
+  if (includeText && facts.oracleText) label += ` {${facts.oracleText.replace(/\n/g, ' ')}}`;
+  return label;
+}
+
 function buildPrompt(state: GameStateView, seat: number): string {
   const me = state.players.find((p) => p.seat === seat);
   const lines: string[] = [];
@@ -40,20 +112,18 @@ function buildPrompt(state: GameStateView, seat: number): string {
   lines.push('');
 
   for (const p of state.players) {
+    const isMe = p.seat === seat;
     lines.push(
-      `Seat ${p.seat} (${p.displayName})${p.seat === seat ? ' [you]' : ''}: life ${p.life}, library ${p.libraryCount}, hand ${p.handCount} card(s).`,
+      `Seat ${p.seat} (${p.displayName})${isMe ? ' [you]' : ''}: life ${p.life}, library ${p.libraryCount}, hand ${p.handCount} card(s).`,
     );
     if (p.commandZone.length > 0) {
-      lines.push(`  Command zone: ${p.commandZone.map((id) => state.cards[id]?.name ?? id).join(', ')}`);
+      lines.push(`  Command zone: ${p.commandZone.map((id) => cardLabel(state, id, isMe)).join('; ')}`);
     }
     if (p.battlefield.length > 0) {
       lines.push(
         '  Battlefield: ' +
           p.battlefield
-            .map(
-              (c) =>
-                `${state.cards[c.scryfallId]?.name ?? c.scryfallId} (instanceId=${c.instanceId}${c.tapped ? ', tapped' : ''})`,
-            )
+            .map((c) => `${cardLabel(state, c.scryfallId, isMe)} (instanceId=${c.instanceId}${c.tapped ? ', tapped' : ''})`)
             .join('; '),
       );
     }
@@ -66,16 +136,12 @@ function buildPrompt(state: GameStateView, seat: number): string {
   if (me?.hand && me.hand.length > 0) {
     lines.push(
       'Your hand: ' +
-        me.hand
-          .map((id) => {
-            const facts = state.cards[id];
-            return `${facts?.name ?? id} [${facts?.typeLine ?? 'unknown type'}${facts?.manaCost ? `, ${facts.manaCost}` : ''}] (scryfallId=${id})`;
-          })
-          .join('; '),
+        me.hand.map((id) => `${cardLabel(state, id, true)} (scryfallId=${id})`).join('; '),
     );
   } else {
     lines.push('Your hand is empty.');
   }
+  lines.push(`Mulligans taken: ${me?.mulliganCount ?? 0}.`);
 
   return lines.join('\n');
 }
@@ -125,11 +191,14 @@ async function mapFunctionCallToAction(
         toZone: args.toZone,
         instanceId: args.instanceId ? String(args.instanceId) : undefined,
         scryfallId: args.scryfallId ? String(args.scryfallId) : undefined,
+        position: args.position === 'top' || args.position === 'bottom' ? args.position : undefined,
       };
     case 'adjust_life':
       return { type: 'ADJUST_LIFE', seat: Number(args.seat), delta: Number(args.delta) };
     case 'draw_card':
       return { type: 'DRAW_CARD' };
+    case 'mulligan':
+      return { type: 'MULLIGAN' };
     case 'pass_turn':
       return { type: 'PASS_TURN' };
     default:
@@ -137,45 +206,42 @@ async function mapFunctionCallToAction(
   }
 }
 
-async function takeTurn(gameId: string, seat: number): Promise<void> {
-  const model = getModel();
-  const chat = model.startChat();
-
+// Provider-agnostic turn loop — driver hides whether it's talking to Gemini
+// or Groq, so a mid-turn failure and fallback to the next provider just
+// means a fresh driver picks up from whatever the live game state now is.
+async function takeTurn(gameId: string, seat: number, driver: AITurnDriver): Promise<void> {
   const state = await buildStateFor(gameId, seat);
-  let result = await chat.sendMessage(buildPrompt(state, seat));
+  let step = await driver.sendInitial(buildPrompt(state, seat));
   let actionsTaken = 0;
 
   while (actionsTaken < MAX_ACTIONS_PER_TURN) {
-    const response = result.response;
-    const text = response.text().trim();
-    if (text) {
-      await logEvent(gameId, 'AI_REASONING', { text }, { seat });
+    if (step.reasoningText) {
+      await logEvent(gameId, 'AI_REASONING', { text: step.reasoningText }, { seat });
     }
 
-    const calls = response.functionCalls();
-    if (!calls || calls.length === 0) {
+    if (!step.toolCall) {
       // The model stopped calling functions without explicitly passing — end its turn here.
       break;
     }
 
-    const call = calls[0];
-    if (call.name === 'pass_turn') {
+    const { id: toolCallId, name, args } = step.toolCall;
+    if (name === 'pass_turn') {
       await execute(gameId, { seat }, { type: 'PASS_TURN' });
       return;
     }
 
-    let functionResponsePayload: Record<string, unknown>;
+    let resultPayload: Record<string, unknown>;
     try {
-      const rawAction = await mapFunctionCallToAction(gameId, seat, call.name, call.args as Record<string, unknown>);
+      const rawAction = await mapFunctionCallToAction(gameId, seat, name, args);
       const action = actionSchema.parse(rawAction);
       await execute(gameId, { seat }, action);
       actionsTaken += 1;
-      functionResponsePayload = { ok: true };
+      resultPayload = { ok: true };
     } catch (err) {
-      functionResponsePayload = { ok: false, error: err instanceof Error ? err.message : 'Action failed' };
+      resultPayload = { ok: false, error: err instanceof Error ? err.message : 'Action failed' };
     }
 
-    result = await chat.sendMessage([{ functionResponse: { name: call.name, response: functionResponsePayload } }]);
+    step = await driver.sendToolResult(toolCallId, name, resultPayload);
   }
 
   if (actionsTaken >= MAX_ACTIONS_PER_TURN) {

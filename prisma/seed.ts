@@ -76,6 +76,73 @@ const CARDS = [
     setCode: 'dom',
     raw: {},
   },
+  {
+    // Unconditionally-tapped land fixture, for testing/demoing the
+    // "enters the battlefield tapped" auto-tap behavior.
+    scryfallId: 'test-guildgate',
+    oracleId: 'oracle-guildgate',
+    name: 'Selesnya Guildgate',
+    typeLine: 'Land — Gate',
+    oracleText: 'Selesnya Guildgate enters the battlefield tapped.\n{T}: Add {G} or {W}.',
+    colors: [],
+    colorIdentity: ['G', 'W'],
+    setCode: 'rna',
+    raw: {},
+  },
+  {
+    // Conditionally-tapped land fixture (a shock land — the tapped-vs-life
+    // choice is the player's, so this must NOT be auto-tapped), paired with
+    // test-guildgate above to cover both sides of that behavior.
+    scryfallId: 'test-steam-vents',
+    oracleId: 'oracle-steam-vents',
+    name: 'Steam Vents',
+    typeLine: 'Land — Island Mountain',
+    oracleText:
+      "({T}: Add {U} or {R}.)\nAs Steam Vents enters the battlefield, you may pay 2 life. If you don't, Steam Vents enters the battlefield tapped.",
+    colors: [],
+    colorIdentity: ['U', 'R'],
+    setCode: 'rtr',
+    raw: {},
+  },
+  {
+    // Transform (two-sided) fixture, for testing/demoing the flip feature —
+    // card_faces carries its own image_uris per face, same shape Scryfall
+    // returns for real transform/MDFC cards.
+    scryfallId: 'test-delver',
+    oracleId: 'oracle-delver',
+    name: 'Delver of Secrets',
+    manaCost: '{U}',
+    typeLine: 'Creature — Human Wizard',
+    oracleText: 'At the beginning of your upkeep, look at the top card of your library. You may reveal that card. If an instant or sorcery card is revealed this way, transform Delver of Secrets.',
+    power: '1',
+    toughness: '1',
+    colors: ['U'],
+    colorIdentity: ['U'],
+    imageNormal: 'https://cards.scryfall.io/normal/front/f/e/fe3b1c50-2e34-4a1a-a68d-caf17d94ff28.jpg',
+    imageArtCrop: 'https://cards.scryfall.io/art_crop/front/f/e/fe3b1c50-2e34-4a1a-a68d-caf17d94ff28.jpg',
+    setCode: 'isd',
+    raw: {
+      card_faces: [
+        {
+          name: 'Delver of Secrets',
+          type_line: 'Creature — Human Wizard',
+          oracle_text:
+            'At the beginning of your upkeep, look at the top card of your library. You may reveal that card. If an instant or sorcery card is revealed this way, transform Delver of Secrets.',
+          power: '1',
+          toughness: '1',
+          image_uris: { normal: 'https://cards.scryfall.io/normal/front/f/e/fe3b1c50-2e34-4a1a-a68d-caf17d94ff28.jpg' },
+        },
+        {
+          name: 'Insectile Aberration',
+          type_line: 'Creature — Human Insect',
+          oracle_text: 'Flying',
+          power: '3',
+          toughness: '2',
+          image_uris: { normal: 'https://cards.scryfall.io/normal/back/f/e/fe3b1c50-2e34-4a1a-a68d-caf17d94ff28.jpg' },
+        },
+      ],
+    },
+  },
 ];
 
 async function main() {

@@ -19,7 +19,37 @@ export const env = {
   get geminiModel(): string {
     return process.env.GEMINI_MODEL || 'gemini-2.0-flash';
   },
-  get port(): number {
-    return Number(process.env.PORT) || 3000;
+  get groqApiKey(): string | undefined {
+    return process.env.GROQ_API_KEY || undefined;
+  },
+  get groqModel(): string {
+    return process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+  },
+  get cerebrasApiKey(): string | undefined {
+    return process.env.CEREBRAS_API_KEY || undefined;
+  },
+  get cerebrasModel(): string {
+    return process.env.CEREBRAS_MODEL || 'gpt-oss-120b';
+  },
+  get openRouterApiKey(): string | undefined {
+    return process.env.OPENROUTER_API_KEY || undefined;
+  },
+  get openRouterModel(): string {
+    // "openrouter/free" auto-routes to whichever free model is currently
+    // available and supports tool calling, so it doesn't rot as OpenRouter's
+    // free model lineup changes.
+    return process.env.OPENROUTER_MODEL || 'openrouter/free';
+  },
+  get pusherAppId() {
+    return required('PUSHER_APP_ID');
+  },
+  get pusherKey() {
+    return required('NEXT_PUBLIC_PUSHER_KEY');
+  },
+  get pusherSecret() {
+    return required('PUSHER_SECRET');
+  },
+  get pusherCluster() {
+    return required('NEXT_PUBLIC_PUSHER_CLUSTER');
   },
 };

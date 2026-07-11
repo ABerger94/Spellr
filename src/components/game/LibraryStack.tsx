@@ -1,20 +1,65 @@
 'use client';
 
 import { CardBack } from '@/components/card/CardBack';
+import { useDragDrop } from './DragDropContext';
 
-export function LibraryStack({ count, onDraw, onSearch }: { count: number; onDraw?: () => void; onSearch?: () => void }) {
+export function LibraryStack({
+  count,
+  onDraw,
+  onShuffle,
+  onSearch,
+  draggable,
+  compact,
+}: {
+  count: number;
+  onDraw?: () => void;
+  onShuffle?: () => void;
+  onSearch?: () => void;
+  draggable?: boolean;
+  /** Smaller footprint (no hint text, tighter shuffle button) for the quadrant layout. */
+  compact?: boolean;
+}) {
+  const { dragging } = useDragDrop();
+  const isHover = draggable && dragging?.hoverZone === 'library';
+
   return (
-    <div className="w-20">
-      <div onClick={onDraw} role={onDraw ? 'button' : undefined}>
+    <div className={compact ? 'w-10' : 'w-20'}>
+      <div
+        data-dropzone={draggable ? 'true' : undefined}
+        data-zone="library"
+        onClick={onDraw}
+        role={onDraw ? 'button' : undefined}
+        title={onDraw ? 'Click to draw a card, or drag a card here to put it on top of the library' : undefined}
+        className={`rounded ${onDraw ? 'cursor-pointer transition-transform hover:scale-[1.03]' : ''} ${
+          isHover ? 'bg-accent/10 ring-2 ring-accent' : ''
+        }`}
+      >
         <CardBack count={count} label="Library" />
       </div>
+      {!compact && onDraw && <p className="mt-0.5 text-center text-[10px] text-slate-500">Click to draw · drag for top</p>}
       {onSearch && (
         <button
           type="button"
           onClick={onSearch}
-          className="mt-2 w-full rounded bg-slate-700 px-2 py-1 text-[10px] font-medium text-slate-100 hover:bg-slate-600"
+          className={`mt-0.5 w-full rounded bg-slate-700 px-2 py-1 text-[10px] font-medium text-slate-100 hover:bg-slate-600 ${
+            compact ? 'py-0 text-[8px]' : ''
+          }`}
         >
           Search
+        </button>
+      )}
+      {onShuffle && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onShuffle();
+          }}
+          title="Shuffle your library"
+          className={`mt-0.5 w-full rounded bg-panelLight text-center text-slate-300 hover:bg-white/10 ${
+            compact ? 'py-0 text-[8px]' : 'py-0.5 text-[10px]'
+          }`}
+        >
+          🔀{!compact && ' Shuffle'}
         </button>
       )}
     </div>

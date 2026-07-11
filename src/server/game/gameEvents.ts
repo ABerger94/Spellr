@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { getIO, gameRoom } from '@/server/socket/io';
+import { broadcastGameLog } from '@/server/realtime/pusherServer';
 
 export async function logEvent(
   gameId: string,
@@ -18,9 +18,11 @@ export async function logEvent(
   });
 
   try {
-    getIO().to(gameRoom(gameId)).emit('game:log', event);
-  } catch {
-    // io not initialized yet (e.g. during a one-off script) — safe to skip.
+    await broadcastGameLog(gameId, event);
+  } catch (err) {
+    // Pusher not configured / unreachable — the event is still persisted and
+    // will show up next time a client fetches/reconnects, so this is safe to swallow.
+    console.error('[broadcastGameLog]', err);
   }
 
   return event;

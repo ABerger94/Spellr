@@ -9,7 +9,7 @@ export function NavBar() {
   return (
     <nav className="flex items-center justify-between border-b border-white/10 bg-panel px-6 py-3">
       <Link href="/lobby" className="text-lg font-semibold tracking-tight text-white">
-        Spell<span className="text-accent">r</span>
+        Mana<span className="text-accent">Verse</span>
       </Link>
       <div className="flex items-center gap-4 text-sm">
         <Link href="/decks" className="text-slate-300 hover:text-white">
