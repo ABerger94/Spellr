@@ -18,13 +18,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Missing socket_id/channel_name' }, { status: 400 });
   }
 
-  // Site-wide "who's online" presence — any authenticated user may join,
-  // no per-game membership check needed.
-  if (channelName === 'presence-online') {
-    const authResponse = authorizeChannel(socketId, channelName, { user_id: auth.userId });
-    return NextResponse.json(authResponse);
-  }
-
   const presenceMatch = channelName.match(PRESENCE_RE);
   if (presenceMatch) {
     const gameId = presenceMatch[1];

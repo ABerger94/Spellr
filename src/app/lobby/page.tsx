@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { NavBar } from '@/components/layout/NavBar';
-import { useOnlineCount } from '@/components/layout/OnlineCountProvider';
 
 interface Deck {
   id: string;
@@ -35,7 +34,6 @@ interface GameSummary {
 
 export default function LobbyPage() {
   const router = useRouter();
-  const { count: onlineCount, errored: onlineCountErrored } = useOnlineCount();
   const [decks, setDecks] = useState<Deck[]>([]);
   const [games, setGames] = useState<GameSummary[]>([]);
   const [openGames, setOpenGames] = useState<GameSummary[]>([]);
@@ -133,21 +131,7 @@ export default function LobbyPage() {
     <div>
       <NavBar />
       <main className="mx-auto max-w-5xl px-6 py-8">
-        <div className="mb-6 flex items-center gap-3">
-          <h1 className="text-2xl font-semibold text-white">Lobby</h1>
-          <span className="flex items-center gap-1.5 rounded-full bg-panel px-2.5 py-1 text-xs text-slate-400">
-            <span
-              className={`h-1.5 w-1.5 rounded-full ${
-                onlineCountErrored ? 'bg-red-400' : onlineCount !== null ? 'bg-emerald-400' : 'bg-slate-600'
-              }`}
-            />
-            {onlineCountErrored
-              ? 'Realtime unavailable'
-              : onlineCount !== null
-                ? `${onlineCount} player${onlineCount === 1 ? '' : 's'} online`
-                : 'Connecting…'}
-          </span>
-        </div>
+        <h1 className="mb-6 text-2xl font-semibold text-white">Lobby</h1>
 
         {error && <p className="mb-4 rounded bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>}
 
