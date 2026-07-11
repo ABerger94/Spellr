@@ -25,6 +25,21 @@ export const env = {
   get groqModel(): string {
     return process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
   },
+  get cerebrasApiKey(): string | undefined {
+    return process.env.CEREBRAS_API_KEY || undefined;
+  },
+  get cerebrasModel(): string {
+    return process.env.CEREBRAS_MODEL || 'gpt-oss-120b';
+  },
+  get openRouterApiKey(): string | undefined {
+    return process.env.OPENROUTER_API_KEY || undefined;
+  },
+  get openRouterModel(): string {
+    // "openrouter/free" auto-routes to whichever free model is currently
+    // available and supports tool calling, so it doesn't rot as OpenRouter's
+    // free model lineup changes.
+    return process.env.OPENROUTER_MODEL || 'openrouter/free';
+  },
   get pusherAppId() {
     return required('PUSHER_APP_ID');
   },

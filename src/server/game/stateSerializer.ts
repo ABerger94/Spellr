@@ -79,6 +79,6 @@ export async function buildStateFor(gameId: string, viewerSeat: number | null): 
     viewerSeat,
     players,
     cards,
-    aiEnabled: !!(env.geminiApiKey || env.groqApiKey),
+    aiEnabled: !!(env.geminiApiKey || env.groqApiKey || env.cerebrasApiKey || env.openRouterApiKey),
   };
 }
