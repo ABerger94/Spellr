@@ -58,7 +58,7 @@ export function CardImage({
   previewable = true,
 }: CardImageProps) {
   const counterEntries = Object.entries(counters ?? {}).filter(([, count]) => count > 0);
-  const { showPreviewNow, showPreviewOnHover, hidePreview } = useCardPreview();
+  const { showPreviewOnHover, hidePreview } = useCardPreview();
 
   function previewPayload() {
     return { name, imageUrl, manaCost, typeLine, oracleText, power, toughness };
@@ -83,19 +83,6 @@ export function CardImage({
         <div className="flex h-full w-full items-center justify-center p-2 text-center text-[10px] leading-tight text-slate-300">
           {name}
         </div>
-      )}
-      {previewable && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            showPreviewNow(previewPayload());
-          }}
-          title="Enlarge card"
-          className="absolute right-0.5 top-0.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/70 text-[10px] text-white hover:bg-black/90"
-        >
-          🔍
-        </button>
       )}
       {onMore && (
         <button
