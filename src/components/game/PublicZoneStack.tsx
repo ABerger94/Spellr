@@ -12,6 +12,7 @@ export function PublicZoneStack({
   cards,
   draggable,
   onCardAction,
+  compact,
 }: {
   label: string;
   zone: 'graveyard' | 'exile';
@@ -21,6 +22,8 @@ export function PublicZoneStack({
   draggable?: boolean;
   /** Opens a move-to-zone menu for a card inside the pile viewer modal. */
   onCardAction?: (e: React.MouseEvent, scryfallId: string) => void;
+  /** Smaller footprint for the quadrant layout. */
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const { dragging } = useDragDrop();
@@ -33,7 +36,7 @@ export function PublicZoneStack({
       <div
         data-dropzone={draggable ? 'true' : undefined}
         data-zone={zone}
-        className={`w-20 cursor-pointer rounded ${isHover ? 'bg-accent/10 ring-2 ring-accent' : ''}`}
+        className={`cursor-pointer rounded ${compact ? 'w-10' : 'w-20'} ${isHover ? 'bg-accent/10 ring-2 ring-accent' : ''}`}
         onClick={() => scryfallIds.length > 0 && setOpen(true)}
       >
         {scryfallIds.length > 0 ? (
@@ -45,7 +48,7 @@ export function PublicZoneStack({
           </div>
         ) : (
           <div className="flex aspect-[5/7] items-center justify-center rounded border border-dashed border-white/10 text-[10px] text-slate-600">
-            {label}
+            {compact ? label.slice(0, 2) : label}
           </div>
         )}
       </div>

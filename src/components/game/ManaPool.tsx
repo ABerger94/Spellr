@@ -14,15 +14,22 @@ export function ManaPool({
   interactive,
   onAdjust,
   onEmpty,
+  compact,
 }: {
   pool: Record<string, number>;
   /** Read-only display (opponents' pools) when false. */
   interactive: boolean;
   onAdjust?: (color: string, delta: number) => void;
   onEmpty?: () => void;
+  /** Smaller footprint for the quadrant layout. */
+  compact?: boolean;
 }) {
   const hasAny = Object.values(pool).some((n) => n > 0);
   if (!interactive && !hasAny) return null;
+
+  const pipSize = compact ? 'h-4 w-4' : 'h-6 w-6';
+  const countSize = compact ? 'h-4 w-4' : 'h-6 w-5';
+  const textSize = compact ? 'text-[9px]' : 'text-[11px]';
 
   return (
     <div className="flex flex-wrap items-center gap-1">
@@ -35,16 +42,16 @@ export function ManaPool({
               type="button"
               onClick={interactive && onAdjust ? () => onAdjust(code, 1) : undefined}
               disabled={!interactive}
-              className={`flex h-6 w-6 items-center justify-center text-[11px] font-bold ${className} ${
+              className={`flex items-center justify-center font-bold ${pipSize} ${textSize} ${className} ${
                 interactive ? 'cursor-pointer hover:opacity-80' : ''
               }`}
             >
               {code}
             </button>
-            <span className="flex h-6 w-5 items-center justify-center bg-panelLight text-xs font-medium text-white">
+            <span className={`flex items-center justify-center bg-panelLight font-medium text-white ${countSize} ${textSize}`}>
               {count}
             </span>
-            {interactive && onAdjust && (
+            {interactive && onAdjust && !compact && (
               <button
                 type="button"
                 onClick={() => onAdjust(code, -1)}
@@ -57,7 +64,7 @@ export function ManaPool({
           </div>
         );
       })}
-      {interactive && onEmpty && hasAny && (
+      {interactive && onEmpty && hasAny && !compact && (
         <button
           type="button"
           onClick={onEmpty}
