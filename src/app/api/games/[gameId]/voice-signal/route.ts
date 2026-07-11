@@ -4,20 +4,16 @@ import { requireSession } from '@/server/auth/session';
 import { prisma } from '@/lib/prisma';
 import { broadcastVoiceSignal } from '@/server/realtime/pusherServer';
 
+// sdp carries every ICE candidate already embedded in it (see useVoiceChat's
+// waitForIceGatheringComplete) rather than trickling candidates as their own
+// signals, so there's no separate 'ice-candidate' signal type to validate.
 const sdpSchema = z.object({ type: z.string(), sdp: z.string().optional() });
-const candidateSchema = z.object({
-  candidate: z.string().optional(),
-  sdpMid: z.string().nullable().optional(),
-  sdpMLineIndex: z.number().nullable().optional(),
-  usernameFragment: z.string().nullable().optional(),
-});
 
 const voiceSignalSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('voice-joined'), target: z.string().optional() }),
   z.object({ type: z.literal('voice-left') }),
   z.object({ type: z.literal('offer'), target: z.string(), sdp: sdpSchema }),
   z.object({ type: z.literal('answer'), target: z.string(), sdp: sdpSchema }),
-  z.object({ type: z.literal('ice-candidate'), target: z.string(), candidate: candidateSchema }),
 ]);
 
 export async function POST(req: Request, { params }: { params: { gameId: string } }) {
