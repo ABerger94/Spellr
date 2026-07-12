@@ -29,12 +29,16 @@ export function FreeformBattlefield({
   interactive,
   onTapToggle,
   onContextMenu,
+  compact,
 }: {
   battlefield: BattlefieldCard[];
   cards: Record<string, CardFacts>;
   interactive: boolean;
   onTapToggle?: (instanceId: string, tapped: boolean) => void;
   onContextMenu?: (e: React.MouseEvent, card: BattlefieldCard) => void;
+  /** Shorter visible height for a grid quadrant (opponents) — the canvas
+   * itself is unchanged and still scrolls to reach every card. */
+  compact?: boolean;
 }) {
   const { dragging } = useDragDrop();
   const isHover = interactive && dragging?.hoverZone === 'battlefield';
@@ -81,7 +85,7 @@ export function FreeformBattlefield({
   }
 
   return (
-    <div className="h-72 w-full overflow-auto rounded border border-white/5">
+    <div className={`w-full overflow-auto rounded border border-white/5 ${compact ? 'h-40' : 'h-72'}`}>
       <div
         data-dropzone={interactive ? 'true' : undefined}
         data-zone="battlefield"
