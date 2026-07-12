@@ -9,6 +9,7 @@ export interface DeckStatCard {
     typeLine: string | null;
     manaCost: string | null;
     oracleText: string | null;
+    colorIdentity: string[];
   };
 }
 
@@ -72,20 +73,36 @@ function isLand(typeLine: string | null): boolean {
  * covers lands, mana rocks, and dorks alike since they all phrase it as
  * "Add {W}" (or "Add one mana of any color"). A heuristic, not a rules
  * engine: conditional/situational mana abilities are counted the same as
- * unconditional ones. */
-function producedColors(oracleText: string | null): Set<ManaColorCode> {
+ * unconditional ones.
+ *
+ * "Any color" is only unconditionally 5-color (Chromatic Lantern, Gilded
+ * Lotus, ...) when nothing scopes it down. Command Tower, Arcane Signet,
+ * and the like read "add one mana of any color in your commander's color
+ * identity" — that clause is restricted to `deckColorIdentity`, not every
+ * color in the game, or a mono-U/R deck would wrongly show green/black/
+ * white sources just from running Command Tower. */
+function producedColors(oracleText: string | null, deckColorIdentity: Set<ManaColorCode>): Set<ManaColorCode> {
   const colors = new Set<ManaColorCode>();
   if (!oracleText) return colors;
 
-  if (/mana of any color|any color of mana/i.test(oracleText)) {
-    (['W', 'U', 'B', 'R', 'G'] as ManaColorCode[]).forEach((c) => colors.add(c));
-  }
+  // Sentence-by-sentence so "in your commander's color identity" only
+  // scopes down the "any color" clause it actually appears next to.
+  const sentences = oracleText.split(/(?<=\.)\s+/);
+  for (const sentence of sentences) {
+    if (/mana of any color|any color of mana/i.test(sentence)) {
+      if (/commander/i.test(sentence)) {
+        deckColorIdentity.forEach((c) => colors.add(c));
+      } else {
+        (['W', 'U', 'B', 'R', 'G'] as ManaColorCode[]).forEach((c) => colors.add(c));
+      }
+    }
 
-  const addClauses = oracleText.match(/add[^.]*\./gi) ?? [];
-  for (const clause of addClauses) {
-    const symbols = clause.match(/\{([WUBRGC])\}/gi) ?? [];
-    for (const s of symbols) {
-      colors.add(s.slice(1, -1).toUpperCase() as ManaColorCode);
+    const addClauses = sentence.match(/add[^.]*\.?/gi) ?? [];
+    for (const clause of addClauses) {
+      const symbols = clause.match(/\{([WUBRGC])\}/gi) ?? [];
+      for (const s of symbols) {
+        colors.add(s.slice(1, -1).toUpperCase() as ManaColorCode);
+      }
     }
   }
   return colors;
@@ -145,7 +162,26 @@ const CURVE_BUCKETS = ['0', '1', '2', '3', '4', '5', '6+'];
 const OPENING_HAND = 7;
 const BY_SECOND_DRAW_STEP = 10; // opening hand + 3 draws, a common "early game" checkpoint
 
+/** The colors "any color in your commander's color identity" (Command
+ * Tower, Arcane Signet, ...) actually resolves to: the commander's own
+ * color identity when one is set, or the union of every card's color
+ * identity in the deck as a fallback (1v1 decks have no commander, and an
+ * in-progress Commander deck might not have one chosen yet either). */
+function resolveDeckColorIdentity(cards: DeckStatCard[]): Set<ManaColorCode> {
+  const commanderCards = cards.filter((c) => c.isCommander);
+  const source = commanderCards.length > 0 ? commanderCards : cards;
+  const identity = new Set<ManaColorCode>();
+  for (const { cardCache } of source) {
+    for (const color of cardCache.colorIdentity) {
+      if (MANA_COLOR_ORDER.includes(color as ManaColorCode)) identity.add(color as ManaColorCode);
+    }
+  }
+  return identity;
+}
+
 export function computeDeckStats(cards: DeckStatCard[]): DeckStats {
+  const deckColorIdentity = resolveDeckColorIdentity(cards);
+
   let totalCards = 0;
   let landCount = 0;
   let nonlandCmcSum = 0;
@@ -175,7 +211,7 @@ export function computeDeckStats(cards: DeckStatCard[]): DeckStats {
       }
     }
 
-    for (const color of producedColors(cardCache.oracleText)) {
+    for (const color of producedColors(cardCache.oracleText, deckColorIdentity)) {
       sourceTotals[color] = (sourceTotals[color] ?? 0) + quantity;
     }
   }
