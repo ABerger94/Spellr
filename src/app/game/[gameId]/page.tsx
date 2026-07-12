@@ -552,7 +552,8 @@ export default function GameTablePage() {
           <p className="mb-1">
             <strong>Declaring attackers &amp; blockers:</strong> tap ⋯ on a creature and choose &quot;Attack…&quot;
             to pick a target — an opponent&apos;s face, or one of their planeswalkers/battles — which taps the
-            creature and shows a red ring/badge naming the target (choose &quot;Cancel attack&quot; to undo). On the
+            creature (unless its rules text has vigilance) and shows a red ring/badge naming the target (choose
+            &quot;Cancel attack&quot; to undo). On the
             defending side, tap ⋯ → &quot;Block…&quot; on your own creature to pick an attacker aimed at you or your
             permanents — it shows a sky-blue ring/badge (tap the attacker again, or &quot;Stop blocking…&quot;, to
             undo). This is bookkeeping only — no damage math happens automatically, same as the rest of the table.

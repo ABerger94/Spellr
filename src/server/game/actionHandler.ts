@@ -85,6 +85,21 @@ async function resolveEnterTapped(scryfallId: string | undefined): Promise<boole
   return entersTappedUnconditionally(card?.oracleText ?? null);
 }
 
+/** Whether a card has vigilance, so declaring it as an attacker shouldn't
+ * tap it — keyword abilities are always printed as their own bare word
+ * (e.g. "Vigilance" or "Flying, vigilance"), so a substring check is safe
+ * here, same as the enters-tapped detection above. */
+function hasVigilance(oracleText: string | null): boolean {
+  if (!oracleText) return false;
+  return oracleText.toLowerCase().includes('vigilance');
+}
+
+async function resolveHasVigilance(scryfallId: string | undefined): Promise<boolean> {
+  if (!scryfallId) return false;
+  const card = await prisma.cardCache.findUnique({ where: { scryfallId }, select: { oracleText: true } });
+  return hasVigilance(card?.oracleText ?? null);
+}
+
 async function broadcastState(gameId: string) {
   try {
     await broadcastGameState(gameId);
@@ -487,11 +502,18 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
     case 'DECLARE_ATTACK': {
       const player = await getPlayer(gameId, actor.seat);
       const zones = player.zones as unknown as ZoneState;
-      const nextZones = declareAttack(zones, action.instanceId, {
-        targetType: action.targetType,
-        targetSeat: action.targetSeat,
-        targetInstanceId: action.targetInstanceId,
-      });
+      const attackingCard = zones.battlefield.find((c) => c.instanceId === action.instanceId);
+      const vigilant = await resolveHasVigilance(attackingCard?.scryfallId);
+      const nextZones = declareAttack(
+        zones,
+        action.instanceId,
+        {
+          targetType: action.targetType,
+          targetSeat: action.targetSeat,
+          targetInstanceId: action.targetInstanceId,
+        },
+        { hasVigilance: vigilant },
+      );
       await updateZones(player.id, nextZones);
       event = await logEvent(
         gameId,

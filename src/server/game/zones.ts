@@ -286,17 +286,22 @@ export interface AttackTarget {
 }
 
 /** Combat helper — declares this card as attacking a target (a player's
- * face or one of their planeswalkers/battles). Also taps the card unless
- * it's already tapped, matching a normal (non-vigilance) attacker; untap it
- * yourself afterward if it has vigilance. Bookkeeping only — no damage math,
+ * face or one of their planeswalkers/battles). Also taps the card, matching
+ * a normal attacker — unless the caller says it has vigilance, in which
+ * case its tapped state is left alone. Bookkeeping only — no damage math,
  * same as the rest of the table. */
-export function declareAttack(zones: ZoneState, instanceId: string, target: AttackTarget): ZoneState {
+export function declareAttack(
+  zones: ZoneState,
+  instanceId: string,
+  target: AttackTarget,
+  options?: { hasVigilance?: boolean },
+): ZoneState {
   const idx = zones.battlefield.findIndex((c) => c.instanceId === instanceId);
   if (idx === -1) throw new Error('Card not found on battlefield');
 
   const next = cloneZones(zones);
   const card = next.battlefield[idx];
-  next.battlefield[idx] = { ...card, attacking: target, tapped: true };
+  next.battlefield[idx] = { ...card, attacking: target, tapped: options?.hasVigilance ? card.tapped : true };
   return next;
 }
 
