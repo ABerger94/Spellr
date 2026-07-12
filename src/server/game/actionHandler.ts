@@ -225,19 +225,9 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       });
       event = await logEvent(gameId, 'TURN_PASSED', { nextSeat }, actor);
 
-      // Every turn draws a card for the player whose turn it now is, same as
-      // real Magic — the only exception (the very first player's very first
-      // turn) is never reached via PASS_TURN, since that's the game's initial
-      // state right after it starts, before anyone has passed a turn yet.
-      const nextPlayer = players.find((p) => p.seat === nextSeat);
-      if (nextPlayer) {
-        const nextZones = nextPlayer.zones as unknown as ZoneState;
-        const { zones: drawnZones, drawnScryfallIds } = drawCards(nextZones, 1);
-        if (drawnScryfallIds.length > 0) {
-          await updateZones(nextPlayer.id, drawnZones);
-          await logEvent(gameId, 'DRAW_CARD', { count: 1 }, { userId: nextPlayer.userId, seat: nextSeat });
-        }
-      }
+      // Drawing for turn is left to the player (Draw button / D shortcut /
+      // the AI's own draw_card call) rather than happening automatically here
+      // — upkeep triggers sometimes need to resolve before the draw step.
       // If the next seat is AI, a connected client's useGameState hook
       // notices via the returned state and calls POST /api/games/[gameId]/ai-turn
       // itself — a real, fully-awaited request, not backgrounded off of this
