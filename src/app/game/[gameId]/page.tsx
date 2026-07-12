@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
@@ -43,6 +43,14 @@ export default function GameTablePage() {
   const [showHelp, setShowHelp] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [showLog, setShowLog] = useState(true);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+
+  function scrollTableTo(position: 'top' | 'bottom') {
+    tableScrollRef.current?.scrollTo({
+      top: position === 'top' ? 0 : tableScrollRef.current.scrollHeight,
+      behavior: 'smooth',
+    });
+  }
   const [counterEditor, setCounterEditor] = useState<{ instanceId: string; name: string } | null>(null);
   const [attachPicker, setAttachPicker] = useState<{ instanceId: string; name: string } | null>(null);
   const [addTokenOpen, setAddTokenOpen] = useState(false);
@@ -442,7 +450,8 @@ export default function GameTablePage() {
           <p className="mb-1">
             <strong>More room:</strong> each battlefield is a scrollable canvas, not just the visible box — scroll
             (or drag) to reach cards placed further out. Your hand strip scrolls too; use the ‹ › arrows if it&apos;s
-            hard to swipe, especially with lots of cards.
+            hard to swipe, especially with lots of cards. The ↑ / ↓ buttons above the opponents jump the whole table
+            between the opponents&apos; boards and your own battlefield/hand.
           </p>
           <p className="mb-1">
             <strong>Dice &amp; coins:</strong> below the game log — pick a die size and tap Roll, or tap Flip for a
@@ -539,7 +548,27 @@ export default function GameTablePage() {
       )}
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4 lg:flex-row">
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+        <div className="relative flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto" ref={tableScrollRef}>
+          {opponents.length > 0 && (
+            <div className="pointer-events-none sticky top-0 z-30 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => scrollTableTo('top')}
+                title="Scroll to opponents"
+                className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-base text-white shadow-lg hover:bg-black/90"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollTableTo('bottom')}
+                title="Scroll to your board"
+                className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-base text-white shadow-lg hover:bg-black/90"
+              >
+                ↓
+              </button>
+            </div>
+          )}
           <div className="flex flex-col gap-4" style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
           {/* Opponents */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
