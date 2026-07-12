@@ -174,6 +174,7 @@ export default function GameTablePage() {
         scryfallId: source.scryfallId,
         x: target.xPercent,
         y: target.yPercent,
+        transformed: source.transformed,
       });
       return;
     }
@@ -646,7 +647,7 @@ export default function GameTablePage() {
                 <HandZone
                   hand={me.hand ?? []}
                   cards={state.cards}
-                  onPlay={(scryfallId) => sendAction({ type: 'PLAY_CARD', scryfallId, fromZone: 'hand' })}
+                  onPlay={(scryfallId, transformed) => sendAction({ type: 'PLAY_CARD', scryfallId, fromZone: 'hand', transformed })}
                   onContextMenu={(e, scryfallId) =>
                     setMenu({
                       x: e.clientX,

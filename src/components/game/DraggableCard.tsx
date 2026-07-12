@@ -17,6 +17,7 @@ export function DraggableCard({
   onClick,
   onContextMenu,
   onMore,
+  onFlip,
   touchAction = 'none',
   manaCost,
   typeLine,
@@ -35,6 +36,7 @@ export function DraggableCard({
   onClick?: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
   onMore?: (e: React.MouseEvent) => void;
+  onFlip?: (e: React.MouseEvent) => void;
   /** 'pan-x' lets a horizontal swipe fall through to a scrollable ancestor
    * (e.g. the hand strip) instead of always being claimed for dragging. */
   touchAction?: 'none' | 'pan-x';
@@ -108,6 +110,7 @@ export function DraggableCard({
         onClick={onClick}
         onContextMenu={onContextMenu}
         onMore={onMore}
+        onFlip={onFlip}
         manaCost={manaCost}
         typeLine={typeLine}
         oracleText={oracleText}

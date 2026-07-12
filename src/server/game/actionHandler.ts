@@ -116,6 +116,7 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
         x: action.x,
         y: action.y,
         enterTapped,
+        enterTransformed: action.transformed,
       });
       await updateZones(player.id, nextZones);
       event = await logEvent(gameId, 'PLAY_CARD', { scryfallId: action.scryfallId, fromZone: action.fromZone }, actor);

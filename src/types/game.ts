@@ -128,7 +128,7 @@ export type ContentZone = 'library' | 'hand' | 'battlefield' | 'graveyard' | 'ex
 
 export type GameActionPayload =
   | { type: 'DRAW_CARD'; count?: number }
-  | { type: 'PLAY_CARD'; scryfallId: string; fromZone: 'hand' | 'commandZone'; x?: number; y?: number }
+  | { type: 'PLAY_CARD'; scryfallId: string; fromZone: 'hand' | 'commandZone'; x?: number; y?: number; transformed?: boolean }
   | { type: 'TAP_CARD'; instanceId: string }
   | { type: 'UNTAP_CARD'; instanceId: string }
   | {
