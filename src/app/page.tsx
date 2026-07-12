@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { authOptions } from '@/server/auth/authOptions';
+import { HeroBackground } from '@/components/layout/HeroBackground';
 
 const FEATURES = [
   {
@@ -27,44 +28,47 @@ export default async function HomePage() {
   if (session?.user) redirect('/lobby');
 
   return (
-    <main className="min-h-screen bg-ink">
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
-        <span className="text-lg font-semibold tracking-tight text-white">
-          Mana<span className="text-accent">Verse</span>
-        </span>
-        <Link href="/login" className="text-sm text-slate-300 hover:text-white">
-          Sign in
-        </Link>
-      </header>
-
-      <section className="mx-auto max-w-3xl px-6 pb-16 pt-12 text-center sm:pt-20">
-        <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-5xl">
-          Play Magic: The Gathering online, free
-        </h1>
-        <p className="mx-auto mt-5 max-w-xl text-base text-slate-400 sm:text-lg">
-          No physical cards, no webcam — just a real virtual tabletop with real card art, live multiplayer, and a
-          (beta) AI opponent when you're short a player. Build a deck, pull up a seat, and start slinging spells.
-        </p>
-        <div className="mt-8 flex items-center justify-center gap-3">
-          <Link
-            href="/login"
-            className="rounded bg-accent px-6 py-3 font-medium text-white shadow-lg shadow-accent/20 hover:bg-accent/80"
-          >
-            Sign in / Sign up
+    <main className="relative min-h-screen bg-ink">
+      <HeroBackground />
+      <div className="relative z-10">
+        <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
+          <span className="text-lg font-semibold tracking-tight text-white">
+            Mana<span className="text-accent">Verse</span>
+          </span>
+          <Link href="/login" className="text-sm text-slate-300 hover:text-white">
+            Sign in
           </Link>
-        </div>
-      </section>
+        </header>
 
-      <section className="mx-auto max-w-5xl px-6 pb-24">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {FEATURES.map((f) => (
-            <div key={f.title} className="rounded-lg border border-white/10 bg-panel p-5">
-              <h2 className="mb-1.5 text-base font-semibold text-white">{f.title}</h2>
-              <p className="text-sm text-slate-400">{f.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+        <section className="mx-auto max-w-3xl px-6 pb-16 pt-12 text-center sm:pt-20">
+          <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-5xl">
+            Play Magic: The Gathering online, free
+          </h1>
+          <p className="mx-auto mt-5 max-w-xl text-base text-slate-300 sm:text-lg">
+            No physical cards, no webcam — just a real virtual tabletop with real card art, live multiplayer, and a
+            (beta) AI opponent when you're short a player. Build a deck, pull up a seat, and start slinging spells.
+          </p>
+          <div className="mt-8 flex items-center justify-center gap-3">
+            <Link
+              href="/login"
+              className="rounded bg-accent px-6 py-3 font-medium text-white shadow-lg shadow-accent/20 hover:bg-accent/80"
+            >
+              Sign in / Sign up
+            </Link>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-5xl px-6 pb-24">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {FEATURES.map((f) => (
+              <div key={f.title} className="rounded-lg border border-white/10 bg-panel/90 p-5 backdrop-blur-sm">
+                <h2 className="mb-1.5 text-base font-semibold text-white">{f.title}</h2>
+                <p className="text-sm text-slate-400">{f.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
     </main>
   );
 }

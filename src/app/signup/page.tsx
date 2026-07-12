@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { HeroBackground } from '@/components/layout/HeroBackground';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -43,8 +44,9 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-ink px-4">
-      <div className="w-full max-w-sm rounded-xl border border-white/10 bg-panel p-8 shadow-xl">
+    <main className="relative flex min-h-screen items-center justify-center bg-ink px-4">
+      <HeroBackground />
+      <div className="relative z-10 w-full max-w-sm rounded-xl border border-white/10 bg-panel p-8 shadow-xl">
         <h1 className="mb-1 text-2xl font-semibold text-white">
           Mana<span className="text-accent">Verse</span>
         </h1>
