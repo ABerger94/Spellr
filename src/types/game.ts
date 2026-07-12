@@ -17,7 +17,11 @@ export interface BattlefieldCard {
   isToken?: boolean;
 }
 
-export type LookMode = 'scry' | 'surveil';
+/** 'reorder' is a Sensei's Divining Top-style look: no destination choice per
+ * card, just rearranging the looked-at cards and putting all of them back on
+ * top in the chosen order — resolved in one shot via CONFIRM_REORDER rather
+ * than the one-card-at-a-time RESOLVE_LOOK flow scry/surveil use. */
+export type LookMode = 'scry' | 'surveil' | 'reorder';
 
 export type ManaColor = 'W' | 'U' | 'B' | 'R' | 'G' | 'C';
 
@@ -151,6 +155,8 @@ export type GameActionPayload =
   | { type: 'SCRY'; count: number }
   | { type: 'SURVEIL'; count: number }
   | { type: 'RESOLVE_LOOK'; scryfallId: string; destination: LookDestination }
+  | { type: 'REORDER_TOP'; count: number }
+  | { type: 'CONFIRM_REORDER'; order: string[] }
   | { type: 'SHUFFLE_LIBRARY' }
   | { type: 'SEARCH_LIBRARY' }
   | { type: 'UNTAP_ALL' }

@@ -51,6 +51,8 @@ export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('SCRY'), count: z.number().int().min(1).max(20) }),
   z.object({ type: z.literal('SURVEIL'), count: z.number().int().min(1).max(20) }),
   z.object({ type: z.literal('RESOLVE_LOOK'), scryfallId: z.string(), destination: lookDestination }),
+  z.object({ type: z.literal('REORDER_TOP'), count: z.number().int().min(1).max(20) }),
+  z.object({ type: z.literal('CONFIRM_REORDER'), order: z.array(z.string()).min(1).max(20) }),
   z.object({ type: z.literal('SHUFFLE_LIBRARY') }),
   z.object({ type: z.literal('SEARCH_LIBRARY') }),
   z.object({ type: z.literal('UNTAP_ALL') }),

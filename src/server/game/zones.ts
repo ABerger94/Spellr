@@ -370,6 +370,8 @@ export function startLook(zones: ZoneState, count: number, mode: LookMode): Zone
 const ALLOWED_DESTINATIONS: Record<LookMode, LookDestination[]> = {
   scry: ['top', 'bottom'],
   surveil: ['top', 'graveyard'],
+  // Reorder resolves all at once via confirmReorder, not card-by-card.
+  reorder: [],
 };
 
 /** Resolves one card from an in-progress scry/surveil to its chosen destination. */
@@ -390,5 +392,26 @@ export function resolveLook(zones: ZoneState, scryfallId: string, destination: L
   else next.graveyard.push(scryfallId);
 
   if (next.pendingLook.length === 0) next.pendingLookMode = null;
+  return next;
+}
+
+/** Resolves an in-progress reorder (Sensei's Divining Top-style: look at the
+ * top X, rearrange them, put all of them back on top) in one shot — `order`
+ * must be a permutation of the cards currently in pendingLook, top-to-bottom.
+ * Unlike resolveLook, nothing is shuffled and nothing leaves the library. */
+export function confirmReorder(zones: ZoneState, order: string[]): ZoneState {
+  if (zones.pendingLookMode !== 'reorder') throw new Error('No reorder in progress');
+
+  const pending = [...zones.pendingLook].sort();
+  const proposed = [...order].sort();
+  const sameCards = pending.length === proposed.length && pending.every((id, i) => id === proposed[i]);
+  if (!sameCards) {
+    throw new Error('The new order must contain exactly the cards being looked at, with none added or removed');
+  }
+
+  const next = cloneZones(zones);
+  next.library = [...order, ...next.library];
+  next.pendingLook = [];
+  next.pendingLookMode = null;
   return next;
 }
