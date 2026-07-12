@@ -7,12 +7,13 @@ import { CardSearchAutocomplete } from '@/components/deck/CardSearchAutocomplete
 import { DecklistPasteBox } from '@/components/deck/DecklistPasteBox';
 import { DeckUrlImportBox } from '@/components/deck/DeckUrlImportBox';
 import { DeckCardGrid } from '@/components/deck/DeckCardGrid';
+import { DeckStatsPanel } from '@/components/deck/DeckStatsPanel';
 
 interface DeckCardEntry {
   scryfallId: string;
   quantity: number;
   isCommander: boolean;
-  cardCache: { name: string; imageNormal: string | null; typeLine: string | null };
+  cardCache: { name: string; imageNormal: string | null; typeLine: string | null; manaCost: string | null; oracleText: string | null };
 }
 
 interface DeckData {
@@ -126,6 +127,11 @@ export default function DeckEditorPage() {
               <DeckUrlImportBox deckId={deck.id} onImported={loadDeck} />
             </div>
           </div>
+        </div>
+
+        <div className="mt-8 rounded-lg border border-white/10 bg-panel p-4">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Deck stats</h2>
+          <DeckStatsPanel cards={deck.cards} format={deck.format} />
         </div>
       </main>
     </div>
