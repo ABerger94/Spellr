@@ -12,12 +12,14 @@ interface SearchResult {
 
 export function CardSearchAutocomplete({
   onAdd,
-  queryPrefix,
+  tokensOnly,
   placeholder,
 }: {
   onAdd: (scryfallId: string, name: string) => void;
-  /** Prepended to the Scryfall search query (not autocomplete) — e.g. 't:token' to bias results toward tokens. */
-  queryPrefix?: string;
+  /** Restricts results to token cards (Treasure, Clue, 1/1 Soldier, ...),
+   * filtered server-side on the actual type line Scryfall returns — not
+   * just a query-string hint — so a real card can never show up here. */
+  tokensOnly?: boolean;
   placeholder?: string;
 }) {
   const [query, setQuery] = useState('');
@@ -29,7 +31,11 @@ export function CardSearchAutocomplete({
   const requestIdRef = useRef(0);
 
   useEffect(() => {
-    if (!query.trim()) {
+    // Scryfall's autocomplete endpoint matches card names generally and
+    // can't be scoped to tokens — suggesting non-token names here would
+    // just lead to a dead-end "no tokens found" click, so skip it entirely
+    // in tokensOnly mode and let Search do the (correctly filtered) work.
+    if (!query.trim() || tokensOnly) {
       setSuggestions([]);
       return;
     }
@@ -47,15 +53,16 @@ export function CardSearchAutocomplete({
       }
     }, 200);
     return () => clearTimeout(debounceRef.current);
-  }, [query]);
+  }, [query, tokensOnly]);
 
   async function runSearch(q: string) {
     setLoading(true);
     setError(null);
     setSuggestions([]);
     try {
-      const fullQuery = queryPrefix ? `${queryPrefix} ${q}` : q;
-      const res = await fetch(`/api/cards/search?q=${encodeURIComponent(fullQuery)}`);
+      const params = new URLSearchParams({ q });
+      if (tokensOnly) params.set('tokens', '1');
+      const res = await fetch(`/api/cards/search?${params.toString()}`);
       const data = await res.json();
       if (data.error) {
         setError(data.error);
