@@ -5,6 +5,48 @@ import type { GameLogEntry } from '@/hooks/useGameState';
 
 const AI_EVENT_TYPES = new Set(['AI_REASONING', 'AI_SKIPPED_NO_KEY', 'AI_ERROR', 'AI_TURN_CAPPED', 'AI_PROVIDER_FAILED']);
 
+// Color-codes the log by category rather than exact event type, so the
+// handful of colors stay meaningful instead of turning into visual noise —
+// routine/system events (turn passed, shuffle, restart, ...) stay neutral
+// gray and only these four categories stand out.
+const SEARCH_EVENT_TYPES = new Set([
+  'SEARCH_LIBRARY',
+  'SCRY',
+  'SURVEIL',
+  'REORDER_TOP',
+  'CONFIRM_REORDER',
+  'LOOK_RESOLVED',
+  'REVEAL_HAND',
+]);
+const MOVE_EVENT_TYPES = new Set([
+  'PLAY_CARD',
+  'MOVE_CARD',
+  'DRAW_CARD',
+  'MILL',
+  'RANDOM_DISCARD',
+  'CREATE_TOKEN',
+  'REMOVE_TOKEN',
+  'FLIP_CARD',
+  'ATTACH_CARD',
+]);
+const TAP_EVENT_TYPES = new Set(['TAP_CARD', 'UNTAP_CARD', 'UNTAP_ALL']);
+const LIFE_EVENT_TYPES = new Set([
+  'ADJUST_LIFE',
+  'ADJUST_COMMANDER_DAMAGE',
+  'ADJUST_PLAYER_COUNTER',
+  'ADJUST_COUNTER',
+  'ADJUST_MANA',
+  'EMPTY_MANA_POOL',
+]);
+
+function eventColorClass(type: string): string {
+  if (SEARCH_EVENT_TYPES.has(type)) return 'text-violet-400';
+  if (MOVE_EVENT_TYPES.has(type)) return 'text-sky-400';
+  if (TAP_EVENT_TYPES.has(type)) return 'text-amber-400';
+  if (LIFE_EVENT_TYPES.has(type)) return 'text-emerald-400';
+  return 'text-slate-300';
+}
+
 const MANA_COLOR_NAMES: Record<string, string> = {
   W: 'White',
   U: 'Blue',
@@ -231,7 +273,7 @@ export function GameLog({
           ) : (
             <p
               key={event.id}
-              className={AI_EVENT_TYPES.has(event.type) ? 'italic text-accent2' : 'text-slate-300'}
+              className={AI_EVENT_TYPES.has(event.type) ? 'italic text-accent2' : eventColorClass(event.type)}
             >
               {describeEvent(event, displayName)}
             </p>
