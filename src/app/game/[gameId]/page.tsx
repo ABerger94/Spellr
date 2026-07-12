@@ -32,6 +32,10 @@ import type { BattlefieldCard, ManaColor } from '@/types/game';
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 1.5;
 
+const DEFAULT_HAND_HEIGHT_PX = 190;
+const MIN_HAND_HEIGHT_PX = 120;
+const MAX_HAND_HEIGHT_PX = 560;
+
 export default function GameTablePage() {
   const params = useParams<{ gameId: string }>();
   const router = useRouter();
@@ -45,6 +49,7 @@ export default function GameTablePage() {
   const [zoom, setZoom] = useState(1);
   const [showLog, setShowLog] = useState(true);
   const [handCollapsed, setHandCollapsed] = useState(false);
+  const [handHeightPx, setHandHeightPx] = useState(DEFAULT_HAND_HEIGHT_PX);
   const [counterEditor, setCounterEditor] = useState<{ instanceId: string; name: string } | null>(null);
   const [attachPicker, setAttachPicker] = useState<{ instanceId: string; name: string } | null>(null);
   const [addTokenOpen, setAddTokenOpen] = useState(false);
@@ -311,6 +316,25 @@ export default function GameTablePage() {
     });
   };
 
+  // Drag the handle above the hand bar up/down to resize it — the bar is
+  // pinned to the bottom of the screen, so dragging up (negative delta)
+  // should grow it and dragging down should shrink it.
+  function handleHandResizeStart(e: React.PointerEvent) {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = handHeightPx;
+    function onMove(ev: PointerEvent) {
+      const delta = startY - ev.clientY;
+      setHandHeightPx(Math.min(MAX_HAND_HEIGHT_PX, Math.max(MIN_HAND_HEIGHT_PX, startHeight + delta)));
+    }
+    function onUp() {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    }
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }
+
   function handleResetDeck() {
     if (window.confirm('Put all your cards back in your library and reshuffle? This also resets your life.')) {
       sendAction({ type: 'RESET_BOARD' });
@@ -453,14 +477,16 @@ export default function GameTablePage() {
           </p>
           <p className="mb-1">
             <strong>More room:</strong> each player&apos;s battlefield (including yours) is its own scrollable canvas
-            within its board — scroll (or drag) to reach cards placed further out. Your hand strip scrolls
-            horizontally too; use the ‹ › arrows if it&apos;s hard to swipe, especially with lots of cards.
+            within its board — scroll (or drag) to reach cards placed further out. Your hand wraps into rows and
+            shrinks cards to fit as needed, so up to 20 cards are visible at once with no scrolling; drag the ▬
+            handle above the hand bar up or down to make it bigger or smaller, and beyond 20 cards it scrolls
+            vertically instead of shrinking further.
           </p>
           <p className="mb-1">
             <strong>Layout:</strong> every player&apos;s board — including yours — sits in a grid sized to fit the
             whole table on screen at once, no scrolling needed; your own board is highlighted, and your hand floats
-            over the bottom of the grid in its own bar rather than taking up a permanent row of its own. Tap ▼ Hide
-            hand / ▲ Show hand on that bar to collapse it entirely and see the full boards underneath.
+            over the bottom of the grid in its own resizable bar rather than taking up a permanent row of its own.
+            Tap ▼ Hide hand / ▲ Show hand on that bar to collapse it entirely and see the full boards underneath.
           </p>
           <p className="mb-1">
             <strong>Dice &amp; coins:</strong> below the game log — pick a die size and tap Roll, or tap Flip for a
@@ -713,15 +739,26 @@ export default function GameTablePage() {
           {me && (
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center px-1 pb-1">
               <div className="pointer-events-auto w-full max-w-3xl rounded-t-lg border border-white/10 bg-panel/95 shadow-2xl backdrop-blur">
+                {!handCollapsed && (
+                  <div
+                    onPointerDown={handleHandResizeStart}
+                    title="Drag to resize your hand"
+                    className="flex h-2.5 w-full cursor-ns-resize items-center justify-center rounded-t-lg hover:bg-white/5"
+                  >
+                    <div className="h-1 w-10 rounded-full bg-white/20" />
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => setHandCollapsed((v) => !v)}
-                  className="flex w-full items-center justify-center gap-1 rounded-t-lg px-2 py-1 text-[11px] text-slate-400 hover:bg-white/5"
+                  className={`flex w-full items-center justify-center gap-1 px-2 py-1 text-[11px] text-slate-400 hover:bg-white/5 ${
+                    handCollapsed ? 'rounded-t-lg' : ''
+                  }`}
                 >
                   {handCollapsed ? `▲ Show hand (${me.hand?.length ?? 0})` : '▼ Hide hand'}
                 </button>
                 {!handCollapsed && (
-                  <div className="p-1.5 pt-0">
+                  <div className="p-1.5 pt-0" style={{ height: handHeightPx }}>
                     <HandZone
                       hand={me.hand ?? []}
                       cards={state.cards}
@@ -889,6 +926,7 @@ export default function GameTablePage() {
             <CounterEditor
               cardName={counterEditor.name}
               counters={card.counters ?? {}}
+              knownCustomTypes={state.customCounterTypes ?? []}
               onAdjust={(counterType, delta) =>
                 sendAction({ type: 'ADJUST_COUNTER', instanceId: counterEditor.instanceId, counterType, delta })
               }

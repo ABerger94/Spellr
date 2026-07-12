@@ -108,6 +108,12 @@ model Game {
   maxSeats        Int
   currentTurnSeat Int?
   turnNumber      Int          @default(0)
+  // Custom (non +1/+1 / -1/-1) counter type names ever used on a card in
+  // this game, table-wide rather than per-card — once someone types a new
+  // counter name on any card it becomes a quick-pick option for every
+  // other card too, and stays available even if every card's count of it
+  // later drops back to zero.
+  customCounterTypes Json       @default("[]")
   createdAt       DateTime     @default(now())
   startedAt       DateTime?
   endedAt         DateTime?

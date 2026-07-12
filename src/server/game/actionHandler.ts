@@ -32,6 +32,11 @@ export interface ActionActor {
   seat: number;
 }
 
+// Kept in sync with zones.ts's PLUS_ONE_COUNTER/MINUS_ONE_COUNTER — these
+// are always available on every card and never need to be added to the
+// game-wide custom counter type registry below.
+const BUILT_IN_COUNTER_TYPES = ['+1/+1', '-1/-1'];
+
 // Serializes all actions for a given game so two concurrent requests (e.g. a
 // double-clicked button, or a human and the AI acting back-to-back) can't
 // race on the same GamePlayer's zones/life with a read-modify-write.
@@ -385,6 +390,17 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       const zones = player.zones as unknown as ZoneState;
       const nextZones = adjustCounter(zones, action.instanceId, action.counterType, action.delta);
       await updateZones(player.id, nextZones);
+      // Any non-built-in counter name typed on one card becomes a quick-pick
+      // option for every card in the game from now on — tracked here rather
+      // than derived from live counter values, so it doesn't disappear again
+      // once every card's count of it drops back to zero.
+      if (!BUILT_IN_COUNTER_TYPES.includes(action.counterType)) {
+        const known = (game.customCounterTypes as unknown as string[]) ?? [];
+        if (!known.includes(action.counterType)) {
+          const updatedTypes = [...known, action.counterType];
+          await prisma.game.update({ where: { id: gameId }, data: { customCounterTypes: updatedTypes } });
+        }
+      }
       event = await logEvent(
         gameId,
         'ADJUST_COUNTER',
