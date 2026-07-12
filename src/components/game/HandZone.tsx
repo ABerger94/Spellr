@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { CardFacts } from '@/types/game';
 import { DraggableCard } from './DraggableCard';
 import { useDragDrop } from './DragDropContext';
@@ -15,12 +15,28 @@ export function HandZone({
 }: {
   hand: string[];
   cards: Record<string, CardFacts>;
-  onPlay: (scryfallId: string) => void;
+  /** transformed is true when the card was flipped to its back face before
+   * being played (modal double-faced cards like Sink into Stupor //
+   * Sophoric Springs, castable as either side straight from hand). */
+  onPlay: (scryfallId: string, transformed: boolean) => void;
   onContextMenu?: (e: React.MouseEvent, scryfallId: string) => void;
 }) {
   const { dragging } = useDragDrop();
   const isHover = dragging?.hoverZone === 'hand';
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Keyed by `${scryfallId}-${index in hand}` so two copies of the same MDFC
+  // can be flipped independently — purely a local "which face am I looking
+  // at" preview, not persisted game state, until the card is actually played.
+  const [flippedKeys, setFlippedKeys] = useState<Set<string>>(new Set());
+
+  function toggleFlip(key: string) {
+    setFlippedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   function scrollBy(amount: number) {
     scrollRef.current?.scrollBy({ left: amount, behavior: 'smooth' });
@@ -29,7 +45,8 @@ export function HandZone({
   return (
     <div>
       <p className="mb-1 text-[10px] text-slate-500">
-        Hand — tap a card to play it, drag it onto a zone, tap ⋯ (or right-click) for more options
+        Hand — tap a card to play it, drag it onto a zone, tap ⋯ (or right-click) for more options. Double-faced cards
+        show a ⇄ button to flip which side you're about to play
       </p>
       <div className="relative">
         {hand.length > 2 && (
@@ -54,20 +71,23 @@ export function HandZone({
           )}
           {hand.map((scryfallId, i) => {
             const facts = cards[scryfallId];
+            const key = `${scryfallId}-${i}`;
+            const isFlipped = flippedKeys.has(key) && !!facts?.backFace;
+            const face = isFlipped ? facts!.backFace! : null;
             return (
-              <div key={`${scryfallId}-${i}`} className="w-28 flex-shrink-0">
+              <div key={key} className="w-28 flex-shrink-0">
                 <DraggableCard
-                  source={{ zone: 'hand', scryfallId }}
-                  name={facts?.name ?? scryfallId}
-                  imageUrl={facts?.imageNormal}
-                  onClick={() => onPlay(scryfallId)}
-                  title={`Click or drag to play ${facts?.name ?? 'this card'}`}
+                  source={{ zone: 'hand', scryfallId, transformed: isFlipped }}
+                  name={face?.name ?? facts?.name ?? scryfallId}
+                  imageUrl={face?.imageNormal ?? facts?.imageNormal}
+                  onClick={() => onPlay(scryfallId, isFlipped)}
+                  title={`Click or drag to play ${face?.name ?? facts?.name ?? 'this card'}`}
                   touchAction="pan-x"
-                  manaCost={facts?.manaCost}
-                  typeLine={facts?.typeLine}
-                  oracleText={facts?.oracleText}
-                  power={facts?.power}
-                  toughness={facts?.toughness}
+                  manaCost={face ? undefined : facts?.manaCost}
+                  typeLine={face?.typeLine ?? facts?.typeLine}
+                  oracleText={face?.oracleText ?? facts?.oracleText}
+                  power={face?.power ?? facts?.power}
+                  toughness={face?.toughness ?? facts?.toughness}
                   onContextMenu={
                     onContextMenu
                       ? (e) => {
@@ -77,6 +97,7 @@ export function HandZone({
                       : undefined
                   }
                   onMore={onContextMenu ? (e) => onContextMenu(e, scryfallId) : undefined}
+                  onFlip={facts?.backFace ? () => toggleFlip(key) : undefined}
                 />
               </div>
             );

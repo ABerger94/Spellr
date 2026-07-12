@@ -16,6 +16,11 @@ export const actionSchema = z.discriminatedUnion('type', [
     fromZone: z.enum(['hand', 'commandZone']),
     x: percent.optional(),
     y: percent.optional(),
+    // Modal double-faced cards (e.g. Sink into Stupor // Sophoric Springs)
+    // are chosen before/while casting, not after — this plays the card
+    // already showing its back face rather than requiring a separate flip
+    // once it's on the battlefield.
+    transformed: z.boolean().optional(),
   }),
   z.object({ type: z.literal('TAP_CARD'), instanceId: z.string() }),
   z.object({ type: z.literal('UNTAP_CARD'), instanceId: z.string() }),

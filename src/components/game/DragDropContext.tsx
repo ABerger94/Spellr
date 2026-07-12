@@ -10,6 +10,9 @@ export interface DragSource {
   instanceId?: string;
   /** Identifies the card in non-battlefield source zones. */
   scryfallId?: string;
+  /** Double-faced card currently showing its back face in hand/command zone —
+   * carried through so dropping it onto the battlefield plays that face. */
+  transformed?: boolean;
 }
 
 export interface DropTarget {

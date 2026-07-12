@@ -21,6 +21,11 @@ interface CardImageProps {
    * touch devices, so this renders a visible "more options" button instead
    * of relying on long-press. Called with the same handler shape. */
   onMore?: (e: React.MouseEvent) => void;
+  /** Double-faced cards (transform/MDFC) only — shows a dedicated flip button
+   * rather than burying it in the "more options" menu, since choosing which
+   * face to play is a common, front-and-center decision (e.g. modal DFCs
+   * like Sink into Stupor // Sophoric Springs, castable as either side). */
+  onFlip?: (e: React.MouseEvent) => void;
   /** Extra facts (beyond name/image) shown in the hover/tap enlarge preview. */
   manaCost?: string | null;
   typeLine?: string | null;
@@ -54,6 +59,7 @@ export function CardImage({
   onClick,
   onContextMenu,
   onMore,
+  onFlip,
   manaCost,
   typeLine,
   oracleText,
@@ -147,8 +153,27 @@ export function CardImage({
           ⋯
         </button>
       )}
+      {onFlip && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onFlip(e);
+          }}
+          title="Flip to other side"
+          className={`absolute bottom-0.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs text-white hover:bg-black/90 ${
+            onMore ? 'left-7' : 'left-0.5'
+          }`}
+        >
+          ⇄
+        </button>
+      )}
       {counterEntries.length > 0 && (
-        <div className={`absolute bottom-0.5 right-0.5 z-10 flex flex-wrap justify-end gap-0.5 ${onMore ? 'left-7' : 'left-0.5'}`}>
+        <div
+          className={`absolute bottom-0.5 right-0.5 z-10 flex flex-wrap justify-end gap-0.5 ${
+            onMore && onFlip ? 'left-14' : onMore || onFlip ? 'left-7' : 'left-0.5'
+          }`}
+        >
           {counterEntries.map(([type, count]) => (
             <span
               key={type}
