@@ -14,7 +14,7 @@ const FEATURES = [
   },
   {
     title: 'Play with friends or strangers',
-    body: 'Create a private table or drop into a bracket-tagged open Commander pod. Short a player? Fill the seat with an AI opponent that plays its own deck.',
+    body: 'Create a private table or drop into a bracket-tagged open Commander pod. Short a player? Fill the seat with an AI opponent that plays its own deck (beta).',
   },
   {
     title: 'Everything in one tab',
@@ -42,8 +42,8 @@ export default async function HomePage() {
           Play Magic: The Gathering online, free
         </h1>
         <p className="mx-auto mt-5 max-w-xl text-base text-slate-400 sm:text-lg">
-          No physical cards, no webcam — just a real virtual tabletop with real card art, live multiplayer, and an AI
-          opponent when you're short a player. Build a deck, pull up a seat, and start slinging spells.
+          No physical cards, no webcam — just a real virtual tabletop with real card art, live multiplayer, and a
+          (beta) AI opponent when you're short a player. Build a deck, pull up a seat, and start slinging spells.
         </p>
         <div className="mt-8 flex items-center justify-center gap-3">
           <Link
