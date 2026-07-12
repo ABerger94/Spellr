@@ -69,6 +69,14 @@ function isLand(typeLine: string | null): boolean {
   return typesOnLine(typeLine).includes('Land');
 }
 
+/** Cards phrase a scoped-down "any color" in several ways: Command Tower /
+ * Arcane Signet key off the commander's color identity; Fellwar Stone /
+ * Reflecting Pool / Exotic Orchard key off what lands you (or opponents)
+ * control. None of these can actually produce every color in a deck that
+ * isn't already that color, so all of them get capped to the deck's own
+ * color identity rather than the full WUBRG. */
+const RESTRICTED_ANY_COLOR = /commander|land you control|lands you control|land your opponents control|lands your opponents control|opponent/i;
+
 /** Which colors a card can add to a pool, read off its own oracle text —
  * covers lands, mana rocks, and dorks alike since they all phrase it as
  * "Add {W}" (or "Add one mana of any color"). A heuristic, not a rules
@@ -76,21 +84,20 @@ function isLand(typeLine: string | null): boolean {
  * unconditional ones.
  *
  * "Any color" is only unconditionally 5-color (Chromatic Lantern, Gilded
- * Lotus, ...) when nothing scopes it down. Command Tower, Arcane Signet,
- * and the like read "add one mana of any color in your commander's color
- * identity" — that clause is restricted to `deckColorIdentity`, not every
- * color in the game, or a mono-U/R deck would wrongly show green/black/
- * white sources just from running Command Tower. */
+ * Lotus, ...) when nothing scopes it down — see RESTRICTED_ANY_COLOR for
+ * the common qualifiers that cap it to `deckColorIdentity` instead, or a
+ * mono-U/R deck would wrongly show green/black/white sources just from
+ * running Command Tower or Fellwar Stone. */
 function producedColors(oracleText: string | null, deckColorIdentity: Set<ManaColorCode>): Set<ManaColorCode> {
   const colors = new Set<ManaColorCode>();
   if (!oracleText) return colors;
 
-  // Sentence-by-sentence so "in your commander's color identity" only
-  // scopes down the "any color" clause it actually appears next to.
+  // Sentence-by-sentence so a qualifier only scopes down the "any color"
+  // clause it actually appears next to.
   const sentences = oracleText.split(/(?<=\.)\s+/);
   for (const sentence of sentences) {
     if (/mana of any color|any color of mana/i.test(sentence)) {
-      if (/commander/i.test(sentence)) {
+      if (RESTRICTED_ANY_COLOR.test(sentence)) {
         deckColorIdentity.forEach((c) => colors.add(c));
       } else {
         (['W', 'U', 'B', 'R', 'G'] as ManaColorCode[]).forEach((c) => colors.add(c));
