@@ -24,6 +24,7 @@ export function DraggableCard({
   oracleText,
   power,
   toughness,
+  combatBadge,
 }: {
   /** Pass null to disable dragging (e.g. opponents' cards, read-only views). */
   source: DragSource | null;
@@ -47,6 +48,8 @@ export function DraggableCard({
   oracleText?: string | null;
   power?: string | null;
   toughness?: string | null;
+  /** Combat helper badge (attacking/blocking) — see CardImage. */
+  combatBadge?: { text: string; variant: 'attacking' | 'blocking' };
 }) {
   const { startDrag, updateDrag, endDrag, cancelDrag } = useDragDrop();
   const elRef = useRef<HTMLDivElement>(null);
@@ -117,6 +120,7 @@ export function DraggableCard({
         oracleText={oracleText}
         power={power}
         toughness={toughness}
+        combatBadge={combatBadge}
       />
     </div>
   );

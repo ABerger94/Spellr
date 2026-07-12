@@ -15,6 +15,16 @@ export interface BattlefieldCard {
    * onto the battlefield rather than played from hand — tokens cease to
    * exist when removed rather than moving to another zone. */
   isToken?: boolean;
+  /** Combat helper: what this card is declared as attacking, if anything —
+   * either a player's face or one of their planeswalkers/battles. Cleared
+   * automatically at the end of the attacking player's turn. No damage math
+   * happens automatically; this is bookkeeping only, same philosophy as the
+   * rest of the table. */
+  attacking?: { targetType: 'player' | 'planeswalker'; targetSeat: number; targetInstanceId?: string };
+  /** Combat helper: instanceIds of attacking cards (anywhere in the game)
+   * this card is declared as blocking. An array since multiple attackers
+   * could theoretically be blocked by one creature with the right ability. */
+  blocking?: string[];
 }
 
 /** 'reorder' is a Sensei's Divining Top-style look: no destination choice per
@@ -181,5 +191,16 @@ export type GameActionPayload =
   | { type: 'EMPTY_MANA_POOL' }
   | { type: 'CREATE_TOKEN'; scryfallId: string; x?: number; y?: number }
   | { type: 'REMOVE_TOKEN'; instanceId: string }
+  | {
+      type: 'DECLARE_ATTACK';
+      instanceId: string;
+      targetType: 'player' | 'planeswalker';
+      targetSeat: number;
+      targetInstanceId?: string;
+    }
+  | { type: 'CANCEL_ATTACK'; instanceId: string }
+  | { type: 'DECLARE_BLOCK'; instanceId: string; attackerInstanceId: string }
+  | { type: 'CANCEL_BLOCK'; instanceId: string; attackerInstanceId: string }
+  | { type: 'CLEAR_MY_COMBAT' }
   | { type: 'END_GAME' }
   | { type: 'CHAT_MESSAGE'; text: string };

@@ -34,6 +34,10 @@ interface CardImageProps {
   toughness?: string | null;
   /** Set false to suppress the enlarge-preview trigger (e.g. a card-back). */
   previewable?: boolean;
+  /** Combat helper badge — a short label plus a colored ring, shown while
+   * this card is declared as attacking or blocking. Bookkeeping only, no
+   * damage math. */
+  combatBadge?: { text: string; variant: 'attacking' | 'blocking' };
 }
 
 function counterLabel(type: string, count: number): string {
@@ -66,6 +70,7 @@ export function CardImage({
   power,
   toughness,
   previewable = true,
+  combatBadge,
 }: CardImageProps) {
   const counterEntries = Object.entries(counters ?? {}).filter(([, count]) => count > 0);
   const { showPreviewNow, showPreviewOnHover, hidePreview } = useCardPreview();
@@ -129,7 +134,13 @@ export function CardImage({
       title={title ?? name}
       className={`card-image relative block w-full select-none overflow-hidden bg-panelLight shadow-md transition-transform duration-150 ${
         tapped ? 'rotate-90' : ''
-      } ${selected ? 'ring-2 ring-accent2' : ''} ${onClick ? 'cursor-pointer hover:scale-[1.03] hover:shadow-xl' : ''} ${className}`}
+      } ${selected ? 'ring-2 ring-accent2' : ''} ${
+        combatBadge?.variant === 'attacking'
+          ? 'ring-2 ring-red-500'
+          : combatBadge?.variant === 'blocking'
+            ? 'ring-2 ring-sky-400'
+            : ''
+      } ${onClick ? 'cursor-pointer hover:scale-[1.03] hover:shadow-xl' : ''} ${className}`}
       style={{ aspectRatio: '5 / 7' }}
     >
       {imageUrl ? (
@@ -138,6 +149,16 @@ export function CardImage({
       ) : (
         <div className="flex h-full w-full items-center justify-center p-2 text-center text-[10px] leading-tight text-slate-300">
           {name}
+        </div>
+      )}
+      {combatBadge && (
+        <div
+          title={combatBadge.text}
+          className={`absolute left-0.5 top-0.5 z-10 max-w-[92%] truncate rounded px-1 text-[9px] font-bold leading-tight text-white ${
+            combatBadge.variant === 'attacking' ? 'bg-red-600/90' : 'bg-sky-500/90'
+          }`}
+        >
+          {combatBadge.text}
         </div>
       )}
       {onMore && (

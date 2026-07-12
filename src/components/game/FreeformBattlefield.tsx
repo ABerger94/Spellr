@@ -31,6 +31,7 @@ export function FreeformBattlefield({
   onContextMenu,
   compact,
   zoom = 1,
+  combatLabels,
 }: {
   battlefield: BattlefieldCard[];
   cards: Record<string, CardFacts>;
@@ -46,6 +47,10 @@ export function FreeformBattlefield({
    * footprint, so zooming out fits more cards into the same space instead
    * of shrinking (and wasting) the zone around them. */
   zoom?: number;
+  /** Combat helper badges, keyed by instanceId, precomputed table-wide by
+   * the caller (a card's attack target or blocked attacker may belong to a
+   * different player, so the label text can't be resolved locally here). */
+  combatLabels?: Record<string, { text: string; variant: 'attacking' | 'blocking' }>;
 }) {
   const { dragging } = useDragDrop();
   const isHover = interactive && dragging?.hoverZone === 'battlefield';
@@ -89,6 +94,7 @@ export function FreeformBattlefield({
             : undefined
         }
         onMore={interactive && onContextMenu ? (e) => onContextMenu(e, c) : undefined}
+        combatBadge={combatLabels?.[c.instanceId]}
       />
     );
   }

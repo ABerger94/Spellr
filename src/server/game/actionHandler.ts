@@ -5,8 +5,13 @@ import {
   adjustCounter,
   adjustMana,
   attachCard,
+  cancelAttack,
+  cancelBlock,
+  clearCombat,
   confirmReorder,
   createToken,
+  declareAttack,
+  declareBlock,
   drawCards,
   emptyManaPool,
   flipCard,
@@ -274,6 +279,13 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       });
       event = await logEvent(gameId, 'TURN_PASSED', { nextSeat }, actor);
 
+      // Combat is over once the turn passes — clear every player's attack/
+      // block declarations, not just the actor's own, since blockers live on
+      // the defending players' cards.
+      await Promise.all(
+        players.map((p) => updateZones(p.id, clearCombat(p.zones as unknown as ZoneState))),
+      );
+
       // Drawing for turn is left to the player (Draw button / D shortcut /
       // the AI's own draw_card call) rather than happening automatically here
       // — upkeep triggers sometimes need to resolve before the draw step.
@@ -469,6 +481,75 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       await updateZones(player.id, nextZones);
       const cardCache = removed ? await prisma.cardCache.findUnique({ where: { scryfallId: removed.scryfallId }, select: { name: true } }) : null;
       event = await logEvent(gameId, 'REMOVE_TOKEN', { scryfallId: removed?.scryfallId, name: cardCache?.name }, actor);
+      break;
+    }
+
+    case 'DECLARE_ATTACK': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const nextZones = declareAttack(zones, action.instanceId, {
+        targetType: action.targetType,
+        targetSeat: action.targetSeat,
+        targetInstanceId: action.targetInstanceId,
+      });
+      await updateZones(player.id, nextZones);
+      event = await logEvent(
+        gameId,
+        'DECLARE_ATTACK',
+        {
+          instanceId: action.instanceId,
+          targetType: action.targetType,
+          targetSeat: action.targetSeat,
+          targetInstanceId: action.targetInstanceId,
+        },
+        actor,
+      );
+      break;
+    }
+
+    case 'CANCEL_ATTACK': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const nextZones = cancelAttack(zones, action.instanceId);
+      await updateZones(player.id, nextZones);
+      event = await logEvent(gameId, 'CANCEL_ATTACK', { instanceId: action.instanceId }, actor);
+      break;
+    }
+
+    case 'DECLARE_BLOCK': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const nextZones = declareBlock(zones, action.instanceId, action.attackerInstanceId);
+      await updateZones(player.id, nextZones);
+      event = await logEvent(
+        gameId,
+        'DECLARE_BLOCK',
+        { instanceId: action.instanceId, attackerInstanceId: action.attackerInstanceId },
+        actor,
+      );
+      break;
+    }
+
+    case 'CANCEL_BLOCK': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const nextZones = cancelBlock(zones, action.instanceId, action.attackerInstanceId);
+      await updateZones(player.id, nextZones);
+      event = await logEvent(
+        gameId,
+        'CANCEL_BLOCK',
+        { instanceId: action.instanceId, attackerInstanceId: action.attackerInstanceId },
+        actor,
+      );
+      break;
+    }
+
+    case 'CLEAR_MY_COMBAT': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const nextZones = clearCombat(zones);
+      await updateZones(player.id, nextZones);
+      event = await logEvent(gameId, 'CLEAR_MY_COMBAT', {}, actor);
       break;
     }
 

@@ -25,6 +25,7 @@ export function GameActionsBar({
   onResetLife,
   onResetDeck,
   onAddToken,
+  onClearCombat,
   voiceJoined,
   voiceMuted,
   voiceConnectedPeerCount,
@@ -57,6 +58,7 @@ export function GameActionsBar({
   onResetLife: () => void;
   onResetDeck: () => void;
   onAddToken: () => void;
+  onClearCombat: () => void;
   voiceJoined: boolean;
   voiceMuted: boolean;
   voiceConnectedPeerCount: number;
@@ -124,6 +126,7 @@ export function GameActionsBar({
             onResetLife={onResetLife}
             onResetDeck={onResetDeck}
             onAddToken={onAddToken}
+            onClearCombat={onClearCombat}
             voiceJoined={voiceJoined}
             onVoiceLeave={onVoiceLeave}
           />

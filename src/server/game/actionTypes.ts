@@ -76,6 +76,17 @@ export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('EMPTY_MANA_POOL') }),
   z.object({ type: z.literal('CREATE_TOKEN'), scryfallId: z.string(), x: percent.optional(), y: percent.optional() }),
   z.object({ type: z.literal('REMOVE_TOKEN'), instanceId: z.string() }),
+  z.object({
+    type: z.literal('DECLARE_ATTACK'),
+    instanceId: z.string(),
+    targetType: z.enum(['player', 'planeswalker']),
+    targetSeat: z.number().int(),
+    targetInstanceId: z.string().optional(),
+  }),
+  z.object({ type: z.literal('CANCEL_ATTACK'), instanceId: z.string() }),
+  z.object({ type: z.literal('DECLARE_BLOCK'), instanceId: z.string(), attackerInstanceId: z.string() }),
+  z.object({ type: z.literal('CANCEL_BLOCK'), instanceId: z.string(), attackerInstanceId: z.string() }),
+  z.object({ type: z.literal('CLEAR_MY_COMBAT') }),
   z.object({ type: z.literal('END_GAME') }),
   z.object({ type: z.literal('CHAT_MESSAGE'), text: z.string().trim().min(1).max(500) }),
 ]);
