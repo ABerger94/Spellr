@@ -8,6 +8,7 @@ import { DecklistPasteBox } from '@/components/deck/DecklistPasteBox';
 import { DeckUrlImportBox } from '@/components/deck/DeckUrlImportBox';
 import { DeckCardGrid } from '@/components/deck/DeckCardGrid';
 import { DeckStatsPanel } from '@/components/deck/DeckStatsPanel';
+import { DeckExportBox } from '@/components/deck/DeckExportBox';
 
 interface DeckCardEntry {
   scryfallId: string;
@@ -132,6 +133,10 @@ export default function DeckEditorPage() {
             <div>
               <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Import from a deck URL</h2>
               <DeckUrlImportBox deckId={deck.id} onImported={loadDeck} />
+            </div>
+            <div>
+              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Export decklist</h2>
+              <DeckExportBox deckName={deck.name} cards={deck.cards} />
             </div>
           </div>
         </div>
