@@ -5,6 +5,7 @@ import {
   adjustCounter,
   adjustMana,
   attachCard,
+  confirmReorder,
   createToken,
   drawCards,
   emptyManaPool,
@@ -175,6 +176,26 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       const nextZones = resolveLook(zones, action.scryfallId, action.destination);
       await updateZones(player.id, nextZones);
       event = await logEvent(gameId, 'LOOK_RESOLVED', { mode, destination: action.destination }, actor);
+      break;
+    }
+
+    // Sensei's Divining Top-style look: no shuffling, just look at the top
+    // count cards and rearrange them — see REORDER_TOP/CONFIRM_REORDER below.
+    case 'REORDER_TOP': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const nextZones = startLook(zones, action.count, 'reorder');
+      await updateZones(player.id, nextZones);
+      event = await logEvent(gameId, 'REORDER_TOP', { count: nextZones.pendingLook.length }, actor);
+      break;
+    }
+
+    case 'CONFIRM_REORDER': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const nextZones = confirmReorder(zones, action.order);
+      await updateZones(player.id, nextZones);
+      event = await logEvent(gameId, 'CONFIRM_REORDER', { count: action.order.length }, actor);
       break;
     }
 

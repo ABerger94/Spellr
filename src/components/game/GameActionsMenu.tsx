@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { LookCountPrompt } from './LookCountPrompt';
 
-type CountPrompt = 'drawX' | 'scry' | 'surveil' | 'mill';
+type CountPrompt = 'drawX' | 'scry' | 'surveil' | 'mill' | 'lookAtTop';
 
 const MENU_WIDTH = 200;
 const VIEWPORT_MARGIN = 8;
@@ -44,7 +44,7 @@ export function GameActionsMenu({
   onSurveil: (count: number) => void;
   onMill: (count: number) => void;
   onExileTop: () => void;
-  onLookAtTop: () => void;
+  onLookAtTop: (count: number) => void;
   onRandomDiscard: () => void;
   onRevealHand: () => void;
   onShuffle: () => void;
@@ -130,7 +130,7 @@ export function GameActionsMenu({
       <CountRow label="Surveil" prompt="surveil" disabled={lookInProgress} onConfirm={onSurveil} />
       <CountRow label="Mill" prompt="mill" onConfirm={onMill} />
       <Row label="Exile Top" onClick={onExileTop} />
-      <Row label="Look at Top" onClick={onLookAtTop} disabled={lookInProgress} />
+      <CountRow label="Look at Top" prompt="lookAtTop" disabled={lookInProgress} onConfirm={onLookAtTop} />
       <Row label="Random Discard" onClick={onRandomDiscard} />
       <div className="my-1 border-t border-white/10" />
       <Row label="Reveal Hand" onClick={onRevealHand} />

@@ -49,7 +49,7 @@ export function GameActionsBar({
   onSurveil: (count: number) => void;
   onMill: (count: number) => void;
   onExileTop: () => void;
-  onLookAtTop: () => void;
+  onLookAtTop: (count: number) => void;
   onRandomDiscard: () => void;
   onRevealHand: () => void;
   onShuffle: () => void;

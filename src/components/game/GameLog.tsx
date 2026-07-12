@@ -61,6 +61,14 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
       return `${who} scries ${event.payload.count}.`;
     case 'SURVEIL':
       return `${who} surveils ${event.payload.count}.`;
+    case 'REORDER_TOP': {
+      const count = event.payload.count as number;
+      return `${who} looked at the top ${count} card${count === 1 ? '' : 's'} of their library to reorder ${count === 1 ? 'it' : 'them'}.`;
+    }
+    case 'CONFIRM_REORDER': {
+      const count = event.payload.count as number;
+      return `${who} put the top ${count} card${count === 1 ? '' : 's'} of their library back in a new order.`;
+    }
     case 'LOOK_RESOLVED': {
       const dest = event.payload.destination as string;
       const destLabel = dest === 'top' ? 'kept it on top' : dest === 'bottom' ? 'put it on the bottom' : 'put it in the graveyard';

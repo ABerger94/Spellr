@@ -16,6 +16,7 @@ import { CommandZone } from '@/components/game/CommandZone';
 import { GameLog } from '@/components/game/GameLog';
 import { GameLobbyWait } from '@/components/game/GameLobbyWait';
 import { ScryModal } from '@/components/game/ScryModal';
+import { ReorderTopModal } from '@/components/game/ReorderTopModal';
 import { GameActionsBar } from '@/components/game/GameActionsBar';
 import { DiceRoller } from '@/components/game/DiceRoller';
 import { CardContextMenu, type ContextMenuOption } from '@/components/game/CardContextMenu';
@@ -432,6 +433,12 @@ export default function GameTablePage() {
             zooming out just fits more cards into the same space, handy for a crowded board.
           </p>
           <p className="mb-1">
+            <strong>Look at Top (Sensei&apos;s Divining Top-style):</strong> pick a count to look at that many cards
+            off the top of your library, then use the ▲/▼ arrows to put them back in whatever order you want and
+            tap Confirm order — nothing is shuffled and nothing leaves the library, only the top cards get
+            rearranged.
+          </p>
+          <p className="mb-1">
             <strong>Voice chat:</strong> tap 🎙️ Join Voice to talk with the other players in this game over your
             microphone (peer-to-peer, no recording) — the button then toggles Mute/Unmute, and Actions ▾ → Leave
             Voice Chat disconnects you entirely.
@@ -534,7 +541,7 @@ export default function GameTablePage() {
           onSurveil={(count) => sendAction({ type: 'SURVEIL', count })}
           onMill={(count) => sendAction({ type: 'MILL', count })}
           onExileTop={() => sendAction({ type: 'MOVE_CARD', fromZone: 'library', toZone: 'exile' })}
-          onLookAtTop={() => sendAction({ type: 'SCRY', count: 1 })}
+          onLookAtTop={(count) => sendAction({ type: 'REORDER_TOP', count })}
           onRandomDiscard={() => sendAction({ type: 'RANDOM_DISCARD' })}
           onRevealHand={() => sendAction({ type: 'REVEAL_HAND' })}
           onShuffle={() => sendAction({ type: 'SHUFFLE_LIBRARY' })}
@@ -850,7 +857,15 @@ export default function GameTablePage() {
         </div>
       )}
 
-      {me && me.pendingLookMode && me.pendingLook.length > 0 && (
+      {me && me.pendingLookMode === 'reorder' && me.pendingLook.length > 0 && (
+        <ReorderTopModal
+          cards={me.pendingLook}
+          cardFacts={state.cards}
+          onConfirm={(order) => sendAction({ type: 'CONFIRM_REORDER', order })}
+        />
+      )}
+
+      {me && (me.pendingLookMode === 'scry' || me.pendingLookMode === 'surveil') && me.pendingLook.length > 0 && (
         <ScryModal
           mode={me.pendingLookMode}
           cards={me.pendingLook}

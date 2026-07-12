@@ -1,9 +1,13 @@
 'use client';
 
-import type { CardFacts, LookDestination, LookMode } from '@/types/game';
+import type { CardFacts, LookDestination } from '@/types/game';
 import { CardImage } from '@/components/card/CardImage';
 
-const DESTINATION_OPTIONS: Record<LookMode, { label: string; destination: LookDestination }[]> = {
+/** 'reorder' has its own dedicated ReorderTopModal — it resolves the whole
+ * batch at once rather than one card at a time, so it never reaches here. */
+type ScryOrSurveil = 'scry' | 'surveil';
+
+const DESTINATION_OPTIONS: Record<ScryOrSurveil, { label: string; destination: LookDestination }[]> = {
   scry: [
     { label: 'Keep on top', destination: 'top' },
     { label: 'Put on bottom', destination: 'bottom' },
@@ -14,7 +18,7 @@ const DESTINATION_OPTIONS: Record<LookMode, { label: string; destination: LookDe
   ],
 };
 
-const MODE_LABEL: Record<LookMode, string> = { scry: 'Scry', surveil: 'Surveil' };
+const MODE_LABEL: Record<ScryOrSurveil, string> = { scry: 'Scry', surveil: 'Surveil' };
 
 export function ScryModal({
   mode,
@@ -22,7 +26,7 @@ export function ScryModal({
   cardFacts,
   onResolve,
 }: {
-  mode: LookMode;
+  mode: ScryOrSurveil;
   cards: string[];
   cardFacts: Record<string, CardFacts>;
   onResolve: (scryfallId: string, destination: LookDestination) => void;
