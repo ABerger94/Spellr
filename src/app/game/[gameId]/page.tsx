@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
@@ -43,14 +43,6 @@ export default function GameTablePage() {
   const [showHelp, setShowHelp] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [showLog, setShowLog] = useState(true);
-  const tableScrollRef = useRef<HTMLDivElement>(null);
-
-  function scrollTableTo(position: 'top' | 'bottom') {
-    tableScrollRef.current?.scrollTo({
-      top: position === 'top' ? 0 : tableScrollRef.current.scrollHeight,
-      behavior: 'smooth',
-    });
-  }
   const [counterEditor, setCounterEditor] = useState<{ instanceId: string; name: string } | null>(null);
   const [attachPicker, setAttachPicker] = useState<{ instanceId: string; name: string } | null>(null);
   const [addTokenOpen, setAddTokenOpen] = useState(false);
@@ -136,7 +128,6 @@ export default function GameTablePage() {
   }
 
   const me = state.players.find((p) => p.seat === state.viewerSeat);
-  const opponents = state.players.filter((p) => p.seat !== state.viewerSeat);
 
   const displayName = (seat: number | null) =>
     seat === null ? 'System' : state.players.find((p) => p.seat === seat)?.displayName ?? `Seat ${seat}`;
@@ -448,10 +439,14 @@ export default function GameTablePage() {
             how you&apos;re playing it).
           </p>
           <p className="mb-1">
-            <strong>More room:</strong> each battlefield is a scrollable canvas, not just the visible box — scroll
-            (or drag) to reach cards placed further out. Your hand strip scrolls too; use the ‹ › arrows if it&apos;s
-            hard to swipe, especially with lots of cards. The ↑ / ↓ buttons above the opponents jump the whole table
-            between the opponents&apos; boards and your own battlefield/hand.
+            <strong>More room:</strong> each player&apos;s battlefield (including yours) is its own scrollable canvas
+            within its board — scroll (or drag) to reach cards placed further out. Your hand strip scrolls
+            horizontally too; use the ‹ › arrows if it&apos;s hard to swipe, especially with lots of cards.
+          </p>
+          <p className="mb-1">
+            <strong>Layout:</strong> every player&apos;s board — including yours — sits in a grid so the whole table
+            is visible at once; your own board is highlighted, and your hand stays pinned at the bottom of the
+            screen so it&apos;s always visible no matter how the grid above scrolls.
           </p>
           <p className="mb-1">
             <strong>Dice &amp; coins:</strong> below the game log — pick a die size and tap Roll, or tap Flip for a
@@ -547,151 +542,122 @@ export default function GameTablePage() {
         />
       )}
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4 lg:flex-row">
-        <div className="relative flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto" ref={tableScrollRef}>
-          {opponents.length > 0 && (
-            <div className="pointer-events-none sticky top-0 z-30 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => scrollTableTo('top')}
-                title="Scroll to opponents"
-                className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-base text-white shadow-lg hover:bg-black/90"
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                onClick={() => scrollTableTo('bottom')}
-                title="Scroll to your board"
-                className="pointer-events-auto flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-base text-white shadow-lg hover:bg-black/90"
-              >
-                ↓
-              </button>
-            </div>
-          )}
-          <div className="flex flex-col gap-4" style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
-          {/* Opponents — a compact grid so everyone's board is visible at once
-              instead of stacking one full-size panel per row (which used to
-              mean scrolling past each opponent individually, especially on
-              mobile portrait). */}
-          <div
-            className={`grid gap-3 ${opponents.length <= 1 ? 'grid-cols-1' : 'grid-cols-2'} ${
-              opponents.length >= 3 ? 'sm:grid-cols-3' : ''
-            }`}
-          >
-            {opponents.map((p, i) => {
-              const isActiveTurn = state.currentTurnSeat === p.seat;
-              const isLastOdd = opponents.length > 1 && opponents.length % 2 === 1 && i === opponents.length - 1;
-              return (
-                <div
-                  key={p.seat}
-                  className={`rounded-lg border bg-panel p-2 ${isLastOdd ? 'col-span-2 sm:col-span-1' : ''} ${
-                    isActiveTurn ? 'border-accent2 ring-1 ring-accent2/50' : 'border-white/10'
-                  }`}
-                >
-                  <PlayerPanel
-                    player={p}
-                    isViewer={false}
-                    isActiveTurn={isActiveTurn}
-                    isOnline={p.isAI || (p.userId !== null && onlineUserIds.has(p.userId))}
-                    aiKeyMissing={!state.aiEnabled}
-                    onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: p.seat, delta })}
-                    commanderDamageFrom={state.format === 'COMMANDER' ? otherSeatsFor(p.seat) : undefined}
-                    onCommanderDamageChange={(fromSeat, delta) =>
-                      sendAction({ type: 'ADJUST_COMMANDER_DAMAGE', seat: p.seat, fromSeat, delta })
-                    }
-                    compact
-                  />
-                  <ManaPool pool={p.manaPool} interactive={false} compact />
-                  <div className="mt-1 flex items-center gap-1">
-                    <LibraryStack count={p.libraryCount} compact />
-                    <PublicZoneStack label="Graveyard" zone="graveyard" scryfallIds={p.graveyard} cards={state.cards} compact />
-                    <PublicZoneStack label="Exile" zone="exile" scryfallIds={p.exile} cards={state.cards} compact />
-                    {state.format === 'COMMANDER' && (
-                      <CommandZone scryfallIds={p.commandZone} cards={state.cards} compact />
-                    )}
-                    <span className="text-[10px] text-slate-500">Hand: {p.handCount}</span>
-                  </div>
-                  <div className="mt-1">
-                    <FreeformBattlefield battlefield={p.battlefield} cards={state.cards} interactive={false} compact />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Turn indicator */}
-          <div className="text-center text-xs text-slate-500">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-2 lg:flex-row lg:gap-4 lg:p-4">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {/* Turn indicator — outside the scrollable grid so it's always visible. */}
+          <div className="flex-shrink-0 pb-2 text-center text-xs text-slate-500">
             Turn {state.turnNumber} · {displayName(state.currentTurnSeat)}&apos;s turn
           </div>
 
-          {/* My side */}
+          {/* Every seat, including your own, in one grid so the whole table is
+              visible together (edhplay-style) instead of your board living in
+              a separate full-size section below everyone else's. */}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div
+              className={`grid gap-2 ${state.players.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
+              style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}
+            >
+              {state.players.map((p, i) => {
+                const isViewer = !!me && p.seat === me.seat;
+                const isActiveTurn = state.currentTurnSeat === p.seat;
+                const isLastOdd = state.players.length % 2 === 1 && i === state.players.length - 1;
+                return (
+                  <div
+                    key={p.seat}
+                    className={`rounded-lg border bg-panel p-2 ${isLastOdd ? 'col-span-2' : ''} ${
+                      isActiveTurn ? 'border-accent2 ring-1 ring-accent2/50' : isViewer ? 'border-accent/40' : 'border-white/10'
+                    }`}
+                  >
+                    <PlayerPanel
+                      player={p}
+                      isViewer={isViewer}
+                      isActiveTurn={isActiveTurn}
+                      isOnline={isViewer || p.isAI || (p.userId !== null && onlineUserIds.has(p.userId))}
+                      aiKeyMissing={!state.aiEnabled}
+                      onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: p.seat, delta })}
+                      commanderDamageFrom={state.format === 'COMMANDER' ? otherSeatsFor(p.seat) : undefined}
+                      onCommanderDamageChange={(fromSeat, delta) =>
+                        sendAction({ type: 'ADJUST_COMMANDER_DAMAGE', seat: p.seat, fromSeat, delta })
+                      }
+                      compact
+                    />
+                    <ManaPool
+                      pool={p.manaPool}
+                      interactive={isViewer}
+                      onAdjust={
+                        isViewer ? (color, delta) => sendAction({ type: 'ADJUST_MANA', color: color as ManaColor, delta }) : undefined
+                      }
+                      onEmpty={isViewer ? () => sendAction({ type: 'EMPTY_MANA_POOL' }) : undefined}
+                      compact
+                    />
+                    <div className="mt-1 flex items-center gap-1">
+                      <LibraryStack
+                        count={p.libraryCount}
+                        onDraw={isViewer ? () => sendAction({ type: 'DRAW_CARD' }) : undefined}
+                        onSearch={isViewer ? () => setLibrarySearchOpen(true) : undefined}
+                        onShuffle={isViewer ? () => sendAction({ type: 'SHUFFLE_LIBRARY' }) : undefined}
+                        draggable={isViewer}
+                        compact
+                      />
+                      <PublicZoneStack
+                        label="Graveyard"
+                        zone="graveyard"
+                        scryfallIds={p.graveyard}
+                        cards={state.cards}
+                        draggable={isViewer}
+                        onCardAction={isViewer ? (e, scryfallId) => openPileMenu(e, 'graveyard', scryfallId) : undefined}
+                        compact
+                      />
+                      <PublicZoneStack
+                        label="Exile"
+                        zone="exile"
+                        scryfallIds={p.exile}
+                        cards={state.cards}
+                        draggable={isViewer}
+                        onCardAction={isViewer ? (e, scryfallId) => openPileMenu(e, 'exile', scryfallId) : undefined}
+                        compact
+                      />
+                      {state.format === 'COMMANDER' && (
+                        <CommandZone
+                          scryfallIds={p.commandZone}
+                          cards={state.cards}
+                          onPlay={
+                            isViewer
+                              ? (scryfallId) => sendAction({ type: 'PLAY_CARD', scryfallId, fromZone: 'commandZone' })
+                              : undefined
+                          }
+                          draggable={isViewer}
+                          compact
+                        />
+                      )}
+                      <span className="text-[10px] text-slate-500">Hand: {p.handCount}</span>
+                    </div>
+                    <div className="mt-1">
+                      <FreeformBattlefield
+                        battlefield={p.battlefield}
+                        cards={state.cards}
+                        interactive={isViewer}
+                        onTapToggle={
+                          isViewer
+                            ? (instanceId, tapped) =>
+                                sendAction(tapped ? { type: 'UNTAP_CARD', instanceId } : { type: 'TAP_CARD', instanceId })
+                            : undefined
+                        }
+                        onContextMenu={isViewer ? openBattlefieldCardMenu : undefined}
+                        compact
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Your hand — pinned at the bottom of the screen, always visible,
+              regardless of how the grid above scrolls. */}
           {me && (
-            <div className="rounded-lg border border-accent/30 bg-panel p-3">
-              <PlayerPanel
-                player={me}
-                isViewer
-                isActiveTurn={state.currentTurnSeat === me.seat}
-                isOnline
-                onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: me.seat, delta })}
-                commanderDamageFrom={state.format === 'COMMANDER' ? otherSeatsFor(me.seat) : undefined}
-                onCommanderDamageChange={(fromSeat, delta) =>
-                  sendAction({ type: 'ADJUST_COMMANDER_DAMAGE', seat: me.seat, fromSeat, delta })
-                }
-              />
-              <div className="mt-2">
-                <ManaPool
-                  pool={me.manaPool}
-                  interactive
-                  onAdjust={(color, delta) => sendAction({ type: 'ADJUST_MANA', color: color as ManaColor, delta })}
-                  onEmpty={() => sendAction({ type: 'EMPTY_MANA_POOL' })}
-                />
-              </div>
-              <div className="mt-2 flex items-center gap-2">
-                <LibraryStack
-                  count={me.libraryCount}
-                  onDraw={() => sendAction({ type: 'DRAW_CARD' })}
-                  onSearch={() => setLibrarySearchOpen(true)}
-                  onShuffle={() => sendAction({ type: 'SHUFFLE_LIBRARY' })}
-                  draggable
-                />
-                <PublicZoneStack
-                  label="Graveyard"
-                  zone="graveyard"
-                  scryfallIds={me.graveyard}
-                  cards={state.cards}
-                  draggable
-                  onCardAction={(e, scryfallId) => openPileMenu(e, 'graveyard', scryfallId)}
-                />
-                <PublicZoneStack
-                  label="Exile"
-                  zone="exile"
-                  scryfallIds={me.exile}
-                  cards={state.cards}
-                  draggable
-                  onCardAction={(e, scryfallId) => openPileMenu(e, 'exile', scryfallId)}
-                />
-                {state.format === 'COMMANDER' && (
-                  <CommandZone
-                    scryfallIds={me.commandZone}
-                    cards={state.cards}
-                    onPlay={(scryfallId) => sendAction({ type: 'PLAY_CARD', scryfallId, fromZone: 'commandZone' })}
-                    draggable
-                  />
-                )}
-              </div>
-              <div className="mt-2">
-                <FreeformBattlefield
-                  battlefield={me.battlefield}
-                  cards={state.cards}
-                  interactive
-                  onTapToggle={(instanceId, tapped) =>
-                    sendAction(tapped ? { type: 'UNTAP_CARD', instanceId } : { type: 'TAP_CARD', instanceId })
-                  }
-                  onContextMenu={openBattlefieldCardMenu}
-                />
-              </div>
-              <div className="mt-3 border-t border-white/10 pt-2">
+            <div className="flex-shrink-0 border-t border-white/10 pt-2">
+              <div className="mx-auto max-w-3xl">
                 <HandZone
                   hand={me.hand ?? []}
                   cards={state.cards}
@@ -726,7 +692,6 @@ export default function GameTablePage() {
               </div>
             </div>
           )}
-          </div>
         </div>
 
         {showLog && (
