@@ -22,6 +22,7 @@ import { CardContextMenu, type ContextMenuOption } from '@/components/game/CardC
 import { CardImage } from '@/components/card/CardImage';
 import { CounterEditor } from '@/components/game/CounterEditor';
 import { AttachPicker } from '@/components/game/AttachPicker';
+import { AddTokenModal } from '@/components/game/AddTokenModal';
 import { CardPreviewProvider } from '@/components/game/CardPreviewContext';
 import { ManaPool } from '@/components/game/ManaPool';
 import { DragDropProvider, type DragSource, type DropTarget } from '@/components/game/DragDropContext';
@@ -44,6 +45,7 @@ export default function GameTablePage() {
   const [showLog, setShowLog] = useState(true);
   const [counterEditor, setCounterEditor] = useState<{ instanceId: string; name: string } | null>(null);
   const [attachPicker, setAttachPicker] = useState<{ instanceId: string; name: string } | null>(null);
+  const [addTokenOpen, setAddTokenOpen] = useState(false);
 
   const isMyTurn = state?.status === 'ACTIVE' && state.currentTurnSeat === state.viewerSeat;
 
@@ -130,6 +132,9 @@ export default function GameTablePage() {
 
   const displayName = (seat: number | null) =>
     seat === null ? 'System' : state.players.find((p) => p.seat === seat)?.displayName ?? `Seat ${seat}`;
+
+  const otherSeatsFor = (seat: number) =>
+    state.players.filter((p) => p.seat !== seat).map((p) => ({ seat: p.seat, name: p.displayName }));
 
   function handleDrop(source: DragSource, target: DropTarget) {
     if (!me) return;
@@ -252,41 +257,54 @@ export default function GameTablePage() {
         ...(!hasDependents && !card.attachedTo
           ? [{ label: 'Attach to…', onClick: () => setAttachPicker({ instanceId: card.instanceId, name: cardName }) }]
           : []),
-        {
-          label: 'Move to graveyard',
-          onClick: () =>
-            sendAction({ type: 'MOVE_CARD', fromZone: 'battlefield', toZone: 'graveyard', instanceId: card.instanceId }),
-        },
-        {
-          label: 'Exile',
-          onClick: () => sendAction({ type: 'MOVE_CARD', fromZone: 'battlefield', toZone: 'exile', instanceId: card.instanceId }),
-        },
-        {
-          label: 'Return to hand',
-          onClick: () => sendAction({ type: 'MOVE_CARD', fromZone: 'battlefield', toZone: 'hand', instanceId: card.instanceId }),
-        },
-        {
-          label: 'Put on top of library',
-          onClick: () =>
-            sendAction({
-              type: 'MOVE_CARD',
-              fromZone: 'battlefield',
-              toZone: 'library',
-              instanceId: card.instanceId,
-              position: 'top',
-            }),
-        },
-        {
-          label: 'Put on bottom of library',
-          onClick: () =>
-            sendAction({
-              type: 'MOVE_CARD',
-              fromZone: 'battlefield',
-              toZone: 'library',
-              instanceId: card.instanceId,
-              position: 'bottom',
-            }),
-        },
+        // Tokens don't exist anywhere except the battlefield — leaving it
+        // means ceasing to exist, not moving to hand/library/graveyard/exile.
+        ...(card.isToken
+          ? [
+              {
+                label: 'Remove token (destroy)',
+                onClick: () => sendAction({ type: 'REMOVE_TOKEN', instanceId: card.instanceId }),
+              },
+            ]
+          : [
+              {
+                label: 'Move to graveyard',
+                onClick: () =>
+                  sendAction({ type: 'MOVE_CARD', fromZone: 'battlefield', toZone: 'graveyard', instanceId: card.instanceId }),
+              },
+              {
+                label: 'Exile',
+                onClick: () =>
+                  sendAction({ type: 'MOVE_CARD', fromZone: 'battlefield', toZone: 'exile', instanceId: card.instanceId }),
+              },
+              {
+                label: 'Return to hand',
+                onClick: () =>
+                  sendAction({ type: 'MOVE_CARD', fromZone: 'battlefield', toZone: 'hand', instanceId: card.instanceId }),
+              },
+              {
+                label: 'Put on top of library',
+                onClick: () =>
+                  sendAction({
+                    type: 'MOVE_CARD',
+                    fromZone: 'battlefield',
+                    toZone: 'library',
+                    instanceId: card.instanceId,
+                    position: 'top',
+                  }),
+              },
+              {
+                label: 'Put on bottom of library',
+                onClick: () =>
+                  sendAction({
+                    type: 'MOVE_CARD',
+                    fromZone: 'battlefield',
+                    toZone: 'library',
+                    instanceId: card.instanceId,
+                    position: 'bottom',
+                  }),
+              },
+            ]),
       ],
     });
   };
@@ -505,6 +523,7 @@ export default function GameTablePage() {
           onMulligan={() => sendAction({ type: 'MULLIGAN' })}
           onResetLife={() => sendAction({ type: 'RESET_LIFE' })}
           onResetDeck={handleResetDeck}
+          onAddToken={() => setAddTokenOpen(true)}
           voiceJoined={voiceChat.joined}
           voiceMuted={voiceChat.muted}
           voiceConnectedPeerCount={voiceChat.connectedPeerCount}
@@ -532,6 +551,10 @@ export default function GameTablePage() {
                   isOnline={p.isAI || (p.userId !== null && onlineUserIds.has(p.userId))}
                   aiKeyMissing={!state.aiEnabled}
                   onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: p.seat, delta })}
+                  commanderDamageFrom={state.format === 'COMMANDER' ? otherSeatsFor(p.seat) : undefined}
+                  onCommanderDamageChange={(fromSeat, delta) =>
+                    sendAction({ type: 'ADJUST_COMMANDER_DAMAGE', seat: p.seat, fromSeat, delta })
+                  }
                 />
                 <ManaPool pool={p.manaPool} interactive={false} />
                 <div className="mt-2 flex items-center gap-2">
@@ -562,6 +585,10 @@ export default function GameTablePage() {
                 isActiveTurn={state.currentTurnSeat === me.seat}
                 isOnline
                 onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: me.seat, delta })}
+                commanderDamageFrom={state.format === 'COMMANDER' ? otherSeatsFor(me.seat) : undefined}
+                onCommanderDamageChange={(fromSeat, delta) =>
+                  sendAction({ type: 'ADJUST_COMMANDER_DAMAGE', seat: me.seat, fromSeat, delta })
+                }
               />
               <div className="mt-2">
                 <ManaPool
@@ -732,6 +759,13 @@ export default function GameTablePage() {
           cards={me.pendingLook}
           cardFacts={state.cards}
           onResolve={(scryfallId, destination) => sendAction({ type: 'RESOLVE_LOOK', scryfallId, destination })}
+        />
+      )}
+
+      {addTokenOpen && (
+        <AddTokenModal
+          onAdd={(scryfallId) => sendAction({ type: 'CREATE_TOKEN', scryfallId })}
+          onClose={() => setAddTokenOpen(false)}
         />
       )}
 

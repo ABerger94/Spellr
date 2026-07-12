@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { NavBar } from '@/components/layout/NavBar';
 import { CardSearchAutocomplete } from '@/components/deck/CardSearchAutocomplete';
 import { DecklistPasteBox } from '@/components/deck/DecklistPasteBox';
+import { DeckUrlImportBox } from '@/components/deck/DeckUrlImportBox';
 import { DeckCardGrid } from '@/components/deck/DeckCardGrid';
 
 interface DeckCardEntry {
@@ -119,6 +120,10 @@ export default function DeckEditorPage() {
             <div>
               <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Paste a decklist</h2>
               <DecklistPasteBox deckId={deck.id} onImported={loadDeck} />
+            </div>
+            <div>
+              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Import from a deck URL</h2>
+              <DeckUrlImportBox deckId={deck.id} onImported={loadDeck} />
             </div>
           </div>
         </div>

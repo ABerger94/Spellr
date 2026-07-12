@@ -24,6 +24,7 @@ export function GameActionsBar({
   onMulligan,
   onResetLife,
   onResetDeck,
+  onAddToken,
   voiceJoined,
   voiceMuted,
   voiceConnectedPeerCount,
@@ -55,6 +56,7 @@ export function GameActionsBar({
   onMulligan: () => void;
   onResetLife: () => void;
   onResetDeck: () => void;
+  onAddToken: () => void;
   voiceJoined: boolean;
   voiceMuted: boolean;
   voiceConnectedPeerCount: number;
@@ -121,6 +123,7 @@ export function GameActionsBar({
             onMulligan={onMulligan}
             onResetLife={onResetLife}
             onResetDeck={onResetDeck}
+            onAddToken={onAddToken}
             voiceJoined={voiceJoined}
             onVoiceLeave={onVoiceLeave}
           />

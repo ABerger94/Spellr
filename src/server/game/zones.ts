@@ -130,6 +130,30 @@ export function moveCard(zones: ZoneState, params: MoveCardParams): MoveCardResu
   return { zones: next, movedScryfallId };
 }
 
+/** Creates a token directly onto the battlefield — not sourced from any
+ * other zone, since a token doesn't exist anywhere before this. */
+export function createToken(zones: ZoneState, scryfallId: string, x?: number, y?: number): ZoneState {
+  const next = cloneZones(zones);
+  const pos = x !== undefined && y !== undefined ? { x: clampPercent(x), y: clampPercent(y) } : nextBattlefieldSlot(next.battlefield);
+  next.battlefield.push({ instanceId: uuidv4(), scryfallId, tapped: false, x: pos.x, y: pos.y, isToken: true });
+  return next;
+}
+
+/** Removes a token from the battlefield entirely — tokens cease to exist
+ * once they'd leave the battlefield, rather than moving to another zone. */
+export function removeToken(zones: ZoneState, instanceId: string): ZoneState {
+  const idx = zones.battlefield.findIndex((c) => c.instanceId === instanceId);
+  if (idx === -1) throw new Error('Token not found on battlefield');
+  if (!zones.battlefield[idx].isToken) throw new Error('That card is not a token');
+
+  const next = cloneZones(zones);
+  next.battlefield.splice(idx, 1);
+  // Anything attached to the removed token comes loose rather than pointing
+  // at a card that no longer exists.
+  next.battlefield = next.battlefield.map((c) => (c.attachedTo === instanceId ? { ...c, attachedTo: undefined } : c));
+  return next;
+}
+
 export function tapCard(zones: ZoneState, instanceId: string, tapped: boolean): ZoneState {
   if (!zones.battlefield.some((c) => c.instanceId === instanceId)) {
     throw new Error('Card not found on battlefield');

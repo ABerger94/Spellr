@@ -30,6 +30,12 @@ export const actionSchema = z.discriminatedUnion('type', [
     y: percent.optional(),
   }),
   z.object({ type: z.literal('ADJUST_LIFE'), seat: z.number().int(), delta: z.number().int() }),
+  z.object({
+    type: z.literal('ADJUST_COMMANDER_DAMAGE'),
+    seat: z.number().int(),
+    fromSeat: z.number().int(),
+    delta: z.number().int(),
+  }),
   z.object({ type: z.literal('PASS_TURN') }),
   z.object({ type: z.literal('SCRY'), count: z.number().int().min(1).max(20) }),
   z.object({ type: z.literal('SURVEIL'), count: z.number().int().min(1).max(20) }),
@@ -54,6 +60,8 @@ export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ATTACH_CARD'), instanceId: z.string(), targetInstanceId: z.string().nullable() }),
   z.object({ type: z.literal('ADJUST_MANA'), color: manaColor, delta: z.number().int().min(-99).max(99) }),
   z.object({ type: z.literal('EMPTY_MANA_POOL') }),
+  z.object({ type: z.literal('CREATE_TOKEN'), scryfallId: z.string(), x: percent.optional(), y: percent.optional() }),
+  z.object({ type: z.literal('REMOVE_TOKEN'), instanceId: z.string() }),
   z.object({ type: z.literal('END_GAME') }),
   z.object({ type: z.literal('CHAT_MESSAGE'), text: z.string().trim().min(1).max(500) }),
 ]);
