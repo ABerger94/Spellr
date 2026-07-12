@@ -31,6 +31,7 @@ export interface GameInfo {
   hostUserId: string;
   maxSeats: number;
   inviteCode: string;
+  bracket: number;
 }
 
 export function useGameState(gameId: string) {

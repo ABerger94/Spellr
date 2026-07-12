@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Game" ADD COLUMN     "bracket" INTEGER NOT NULL DEFAULT 3;

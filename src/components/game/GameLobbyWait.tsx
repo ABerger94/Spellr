@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { GameStateView } from '@/types/game';
 import type { GameInfo } from '@/hooks/useGameState';
+import { bracketTagLabel } from '@/lib/bracket';
 
 export function GameLobbyWait({
   state,
@@ -73,8 +74,11 @@ export function GameLobbyWait({
   return (
     <div className="mx-auto max-w-lg px-6 py-12">
       <h1 className="mb-2 text-2xl font-semibold text-white">Waiting for players</h1>
-      <p className="mb-6 text-sm text-slate-400">
+      <p className="mb-6 flex flex-wrap items-center gap-2 text-sm text-slate-400">
         Invite code: <span className="font-mono text-accent2">{gameInfo.inviteCode}</span>
+        <span className="rounded bg-accent2/20 px-1.5 py-0.5 text-[10px] font-medium text-accent2">
+          {bracketTagLabel(gameInfo.bracket)}
+        </span>
       </p>
 
       <div className="mb-6 space-y-2">

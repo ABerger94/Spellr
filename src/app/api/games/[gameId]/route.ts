@@ -14,7 +14,13 @@ export async function GET(_req: Request, { params }: { params: { gameId: string 
   const state = await buildStateFor(params.gameId, viewerSeat);
 
   return NextResponse.json({
-    game: { id: game.id, hostUserId: game.hostUserId, maxSeats: game.maxSeats, inviteCode: game.inviteCode },
+    game: {
+      id: game.id,
+      hostUserId: game.hostUserId,
+      maxSeats: game.maxSeats,
+      inviteCode: game.inviteCode,
+      bracket: game.bracket,
+    },
     state,
   });
 }

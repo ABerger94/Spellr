@@ -99,6 +99,10 @@ model Game {
   // Public lobbies are listed for anyone to browse and join without the
   // invite code; private ones are still joinable only by invite code.
   isPublic        Boolean      @default(true)
+  // Commander power-level bracket (1-5, per WOTC's Commander Brackets
+  // system) the host sets when creating the game, shown as a tag so
+  // players can gauge the room before joining.
+  bracket         Int          @default(3)
   hostUserId      String
   hostUser        User         @relation("HostedGames", fields: [hostUserId], references: [id])
   maxSeats        Int
