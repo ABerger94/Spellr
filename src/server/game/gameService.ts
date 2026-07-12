@@ -71,9 +71,10 @@ export async function createGame(
   hostUserId: string,
   format: GameFormat,
   deckId: string,
-  opts: { seatCount?: number; isPublic?: boolean } = {},
+  opts: { seatCount?: number; isPublic?: boolean; bracket?: number } = {},
 ) {
   const maxSeats = format === 'COMMANDER' ? Math.min(Math.max(opts.seatCount ?? 4, 2), 4) : 2;
+  const bracket = Math.min(Math.max(opts.bracket ?? 3, 1), 5);
 
   return prisma.game.create({
     data: {
@@ -81,6 +82,7 @@ export async function createGame(
       hostUserId,
       maxSeats,
       isPublic: opts.isPublic ?? true,
+      bracket,
       players: {
         create: [{ userId: hostUserId, deckId, seat: 0, isAI: false }],
       },

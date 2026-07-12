@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { NavBar } from '@/components/layout/NavBar';
+import { BRACKET_OPTIONS, bracketTagLabel } from '@/lib/bracket';
 
 interface Deck {
   id: string;
@@ -29,7 +30,16 @@ interface GameSummary {
   maxSeats: number;
   hostUserId: string;
   inviteCode: string;
+  bracket: number;
   players: GamePlayer[];
+}
+
+function BracketTag({ bracket }: { bracket: number }) {
+  return (
+    <span className="rounded bg-accent2/20 px-1.5 py-0.5 text-[10px] font-medium text-accent2" title={bracketTagLabel(bracket)}>
+      B{bracket}
+    </span>
+  );
 }
 
 export default function LobbyPage() {
@@ -41,6 +51,7 @@ export default function LobbyPage() {
   const [deckId, setDeckId] = useState('');
   const [seatCount, setSeatCount] = useState(4);
   const [isPublic, setIsPublic] = useState(true);
+  const [bracket, setBracket] = useState(3);
   const [inviteCode, setInviteCode] = useState('');
   const [joinDeckId, setJoinDeckId] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +90,7 @@ export default function LobbyPage() {
         deckId,
         seatCount: format === 'COMMANDER' ? seatCount : undefined,
         isPublic,
+        bracket,
       }),
     });
     const data = await res.json();
@@ -167,6 +179,20 @@ export default function LobbyPage() {
                 </div>
               )}
               <div>
+                <label className="mb-1 block text-sm text-slate-300">Bracket (power level)</label>
+                <select
+                  value={bracket}
+                  onChange={(e) => setBracket(Number(e.target.value))}
+                  className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
+                >
+                  {BRACKET_OPTIONS.map((b) => (
+                    <option key={b} value={b}>
+                      {bracketTagLabel(b)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label className="mb-1 block text-sm text-slate-300">Your deck</label>
                 <select
                   value={deckId}
@@ -246,8 +272,9 @@ export default function LobbyPage() {
                     className="flex items-center justify-between rounded border border-white/10 bg-panel px-4 py-3"
                   >
                     <div>
-                      <p className="text-white">
+                      <p className="flex items-center gap-2 text-white">
                         {g.format === 'COMMANDER' ? 'Commander' : '1v1'} · {g.players.length}/{g.maxSeats} seats
+                        <BracketTag bracket={g.bracket} />
                       </p>
                       <p className="text-xs text-slate-500">Hosted by {host?.user?.displayName ?? 'Unknown'}</p>
                     </div>
@@ -277,8 +304,9 @@ export default function LobbyPage() {
                   className="flex items-center justify-between rounded border border-white/10 bg-panel px-4 py-3"
                 >
                   <div>
-                    <p className="text-white">
+                    <p className="flex items-center gap-2 text-white">
                       {g.format === 'COMMANDER' ? 'Commander' : '1v1'} · {g.status} · {g.players.length}/{g.maxSeats} seats
+                      <BracketTag bracket={g.bracket} />
                     </p>
                     <p className="text-xs text-slate-500">Invite code: {g.inviteCode}</p>
                   </div>
