@@ -121,6 +121,11 @@ export interface GameStateView {
    * AI seat will just pass its turn instead of playing. Surfaced so players
    * can tell "AI is intentionally sitting out" apart from "AI is broken". */
   aiEnabled: boolean;
+  /** Every non-built-in counter type name any card in this game has ever
+   * used — table-wide, so it shows up as a quick-pick option on every card,
+   * not just the one it was first typed on, and stays listed even after
+   * every card's count of it returns to zero. */
+  customCounterTypes: string[];
 }
 
 export type LibraryPosition = 'top' | 'bottom';

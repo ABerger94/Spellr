@@ -107,5 +107,6 @@ export async function buildStateFor(gameId: string, viewerSeat: number | null): 
     players,
     cards,
     aiEnabled: !!(env.geminiApiKey || env.groqApiKey || env.cerebrasApiKey || env.openRouterApiKey),
+    customCounterTypes: (game.customCounterTypes as unknown as string[]) ?? [],
   };
 }

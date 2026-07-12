@@ -127,7 +127,7 @@ export function CardImage({
       onPointerUp={previewable ? clearLongPressTimer : undefined}
       onPointerCancel={previewable ? clearLongPressTimer : undefined}
       title={title ?? name}
-      className={`card-image relative inline-block w-full select-none overflow-hidden bg-panelLight shadow-md transition-transform duration-150 ${
+      className={`card-image relative block w-full select-none overflow-hidden bg-panelLight shadow-md transition-transform duration-150 ${
         tapped ? 'rotate-90' : ''
       } ${selected ? 'ring-2 ring-accent2' : ''} ${onClick ? 'cursor-pointer hover:scale-[1.03] hover:shadow-xl' : ''} ${className}`}
       style={{ aspectRatio: '5 / 7' }}

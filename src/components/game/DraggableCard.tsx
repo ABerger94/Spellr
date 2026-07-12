@@ -37,9 +37,10 @@ export function DraggableCard({
   onContextMenu?: (e: React.MouseEvent) => void;
   onMore?: (e: React.MouseEvent) => void;
   onFlip?: (e: React.MouseEvent) => void;
-  /** 'pan-x' lets a horizontal swipe fall through to a scrollable ancestor
-   * (e.g. the hand strip) instead of always being claimed for dragging. */
-  touchAction?: 'none' | 'pan-x';
+  /** 'pan-x'/'pan-y' let a swipe in that direction fall through to a
+   * scrollable ancestor (e.g. the hand grid) instead of always being
+   * claimed for dragging. */
+  touchAction?: 'none' | 'pan-x' | 'pan-y';
   /** Extra facts (beyond name/image) shown in the hover/tap enlarge preview. */
   manaCost?: string | null;
   typeLine?: string | null;

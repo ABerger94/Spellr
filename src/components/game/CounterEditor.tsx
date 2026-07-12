@@ -7,16 +7,26 @@ const QUICK_TYPES = ['+1/+1', '-1/-1'];
 export function CounterEditor({
   cardName,
   counters,
+  knownCustomTypes,
   onAdjust,
   onClose,
 }: {
   cardName: string;
   counters: Record<string, number>;
+  /** Every custom counter type name used anywhere in this game so far —
+   * shown as quick-pick rows on every card (not just the one they were
+   * first added to), and kept listed even once this card's own count of
+   * one drops to zero. */
+  knownCustomTypes: string[];
   onAdjust: (counterType: string, delta: number) => void;
   onClose: () => void;
 }) {
   const [customType, setCustomType] = useState('');
-  const customTypes = Object.keys(counters).filter((type) => !QUICK_TYPES.includes(type) && counters[type] > 0);
+  // Union with this card's own counters in case it somehow has a type not
+  // yet in the registry (e.g. stale state right after adding it).
+  const customTypes = [...new Set([...knownCustomTypes, ...Object.keys(counters)])].filter(
+    (type) => !QUICK_TYPES.includes(type),
+  );
 
   function Row({ type }: { type: string }) {
     const count = counters[type] ?? 0;
