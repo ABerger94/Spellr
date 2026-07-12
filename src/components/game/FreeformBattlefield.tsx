@@ -30,15 +30,21 @@ export function FreeformBattlefield({
   onTapToggle,
   onContextMenu,
   compact,
+  zoom = 1,
 }: {
   battlefield: BattlefieldCard[];
   cards: Record<string, CardFacts>;
   interactive: boolean;
   onTapToggle?: (instanceId: string, tapped: boolean) => void;
   onContextMenu?: (e: React.MouseEvent, card: BattlefieldCard) => void;
-  /** Shorter visible height for a grid quadrant (opponents) — the canvas
-   * itself is unchanged and still scrolls to reach every card. */
+  /** Fills the height of its parent instead of a fixed height — used in the
+   * grid quadrant layout, where the parent itself is already sized to fit
+   * the available space. The canvas is unchanged and still scrolls to reach
+   * every card. */
   compact?: boolean;
+  /** Scales the canvas (and everything on it) — the outer box still scrolls
+   * to reach whatever zooming pushes out of view. */
+  zoom?: number;
 }) {
   const { dragging } = useDragDrop();
   const isHover = interactive && dragging?.hoverZone === 'battlefield';
@@ -85,12 +91,12 @@ export function FreeformBattlefield({
   }
 
   return (
-    <div className={`w-full overflow-auto rounded border border-white/5 ${compact ? 'h-40' : 'h-72'}`}>
+    <div className={`w-full overflow-auto rounded border border-white/5 ${compact ? 'h-full' : 'h-72'}`}>
       <div
         data-dropzone={interactive ? 'true' : undefined}
         data-zone="battlefield"
         className={`relative w-full ${isHover ? 'bg-accent/10 ring-2 ring-inset ring-accent' : ''}`}
-        style={{ minWidth: CANVAS_MIN_WIDTH, minHeight: CANVAS_MIN_HEIGHT }}
+        style={{ minWidth: CANVAS_MIN_WIDTH, minHeight: CANVAS_MIN_HEIGHT, transform: `scale(${zoom})`, transformOrigin: 'top left' }}
       >
         {battlefield.length === 0 && (
           <div className="flex h-full items-center justify-center text-xs text-slate-600">
