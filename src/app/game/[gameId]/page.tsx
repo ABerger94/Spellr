@@ -23,6 +23,8 @@ import { CardContextMenu, type ContextMenuOption } from '@/components/game/CardC
 import { CardImage } from '@/components/card/CardImage';
 import { CounterEditor } from '@/components/game/CounterEditor';
 import { AttachPicker } from '@/components/game/AttachPicker';
+import { AttackTargetPicker, type AttackTargetOption } from '@/components/game/AttackTargetPicker';
+import { BlockTargetPicker, type BlockAttackerOption } from '@/components/game/BlockTargetPicker';
 import { AddTokenModal } from '@/components/game/AddTokenModal';
 import { CardPreviewProvider } from '@/components/game/CardPreviewContext';
 import { ManaPool } from '@/components/game/ManaPool';
@@ -56,6 +58,8 @@ export default function GameTablePage() {
   const [handWidthPx, setHandWidthPx] = useState(DEFAULT_HAND_WIDTH_PX);
   const [counterEditor, setCounterEditor] = useState<{ instanceId: string; name: string } | null>(null);
   const [attachPicker, setAttachPicker] = useState<{ instanceId: string; name: string } | null>(null);
+  const [attackPicker, setAttackPicker] = useState<{ instanceId: string; name: string } | null>(null);
+  const [blockPicker, setBlockPicker] = useState<{ instanceId: string; name: string } | null>(null);
   const [addTokenOpen, setAddTokenOpen] = useState(false);
 
   const isMyTurn = state?.status === 'ACTIVE' && state.currentTurnSeat === state.viewerSeat;
@@ -145,6 +149,82 @@ export default function GameTablePage() {
 
   const otherSeatsFor = (seat: number) =>
     state.players.filter((p) => p.seat !== seat).map((p) => ({ seat: p.seat, name: p.displayName }));
+
+  // Combat helper (bookkeeping only — no damage math): looks up a card's name
+  // by instanceId across every player's battlefield, since an attack target
+  // or blocked attacker can live on a different player's board than the
+  // card carrying the badge.
+  const cardNameByInstance = new Map<string, string>();
+  for (const p of state.players) {
+    for (const c of p.battlefield) {
+      cardNameByInstance.set(c.instanceId, state.cards[c.scryfallId]?.name ?? c.scryfallId);
+    }
+  }
+
+  const combatLabels: Record<string, { text: string; variant: 'attacking' | 'blocking' }> = {};
+  for (const p of state.players) {
+    for (const c of p.battlefield) {
+      if (c.attacking) {
+        const targetName =
+          c.attacking.targetType === 'player'
+            ? displayName(c.attacking.targetSeat)
+            : (c.attacking.targetInstanceId && cardNameByInstance.get(c.attacking.targetInstanceId)) ?? 'a planeswalker';
+        combatLabels[c.instanceId] = { text: `Attacking ${targetName}`, variant: 'attacking' };
+      }
+      if (c.blocking && c.blocking.length > 0) {
+        const names = c.blocking.map((id) => cardNameByInstance.get(id) ?? 'an attacker');
+        combatLabels[c.instanceId] = { text: `Blocking ${names.join(', ')}`, variant: 'blocking' };
+      }
+    }
+  }
+
+  function computeAttackOptions(): AttackTargetOption[] {
+    if (!me || !state) return [];
+    const options: AttackTargetOption[] = [];
+    for (const p of state.players) {
+      if (p.seat === me.seat) continue;
+      options.push({ targetType: 'player', targetSeat: p.seat, label: `${p.displayName} (face)` });
+      for (const c of p.battlefield) {
+        const typeLine = state.cards[c.scryfallId]?.typeLine ?? '';
+        if (typeLine.includes('Planeswalker') || typeLine.includes('Battle')) {
+          const name = state.cards[c.scryfallId]?.name ?? c.scryfallId;
+          options.push({
+            targetType: 'planeswalker',
+            targetSeat: p.seat,
+            targetInstanceId: c.instanceId,
+            label: `${name} (${p.displayName})`,
+          });
+        }
+      }
+    }
+    return options;
+  }
+
+  function computeBlockOptions(blockerInstanceId: string): BlockAttackerOption[] {
+    if (!me || !state) return [];
+    const myInstanceIds = new Set(me.battlefield.map((c) => c.instanceId));
+    const blockerCard = me.battlefield.find((c) => c.instanceId === blockerInstanceId);
+    const alreadyBlockingSet = new Set(blockerCard?.blocking ?? []);
+    const options: BlockAttackerOption[] = [];
+    for (const p of state.players) {
+      if (p.seat === me.seat) continue;
+      for (const c of p.battlefield) {
+        if (!c.attacking) continue;
+        const targetsMe =
+          c.attacking.targetType === 'player'
+            ? c.attacking.targetSeat === me.seat
+            : c.attacking.targetInstanceId !== undefined && myInstanceIds.has(c.attacking.targetInstanceId);
+        if (!targetsMe) continue;
+        const name = state.cards[c.scryfallId]?.name ?? c.scryfallId;
+        options.push({
+          attackerInstanceId: c.instanceId,
+          label: `${name} (${p.displayName})`,
+          alreadyBlocking: alreadyBlockingSet.has(c.instanceId),
+        });
+      }
+    }
+    return options;
+  }
 
   function handleDrop(source: DragSource, target: DropTarget) {
     if (!me) return;
@@ -241,6 +321,8 @@ export default function GameTablePage() {
     const cardName = state.cards[card.scryfallId]?.name ?? card.scryfallId;
     const hasBackFace = !!state.cards[card.scryfallId]?.backFace;
     const hasDependents = !!me?.battlefield.some((c) => c.attachedTo === card.instanceId);
+    const typeLine = state.cards[card.scryfallId]?.typeLine ?? '';
+    const isCreature = typeLine.includes('Creature');
 
     setMenu({
       x: e.clientX,
@@ -254,6 +336,22 @@ export default function GameTablePage() {
               name: cardName,
             }),
         },
+        // Combat helper: bookkeeping only, no automatic damage — declares an
+        // attack target or a blocked attacker and shows a badge, same spirit
+        // as the rest of the table.
+        ...(isCreature && !card.attacking
+          ? [{ label: 'Attack…', onClick: () => setAttackPicker({ instanceId: card.instanceId, name: cardName }) }]
+          : []),
+        ...(card.attacking
+          ? [{ label: 'Cancel attack', onClick: () => sendAction({ type: 'CANCEL_ATTACK', instanceId: card.instanceId }) }]
+          : []),
+        ...(isCreature
+          ? [{ label: 'Block…', onClick: () => setBlockPicker({ instanceId: card.instanceId, name: cardName }) }]
+          : []),
+        ...(card.blocking ?? []).map((attackerInstanceId) => ({
+          label: `Stop blocking ${cardNameByInstance.get(attackerInstanceId) ?? 'attacker'}`,
+          onClick: () => sendAction({ type: 'CANCEL_BLOCK', instanceId: card.instanceId, attackerInstanceId }),
+        })),
         ...(hasBackFace
           ? [{ label: 'Flip card', onClick: () => sendAction({ type: 'FLIP_CARD', instanceId: card.instanceId }) }]
           : []),
@@ -452,6 +550,17 @@ export default function GameTablePage() {
             their ⋯ menu once they&apos;re on the battlefield, to show the other face.
           </p>
           <p className="mb-1">
+            <strong>Declaring attackers &amp; blockers:</strong> tap ⋯ on a creature and choose &quot;Attack…&quot;
+            to pick a target — an opponent&apos;s face, or one of their planeswalkers/battles — which taps the
+            creature (unless its rules text has vigilance) and shows a red ring/badge naming the target (choose
+            &quot;Cancel attack&quot; to undo). On the
+            defending side, tap ⋯ → &quot;Block…&quot; on your own creature to pick an attacker aimed at you or your
+            permanents — it shows a sky-blue ring/badge (tap the attacker again, or &quot;Stop blocking…&quot;, to
+            undo). This is bookkeeping only — no damage math happens automatically, same as the rest of the table.
+            Everyone&apos;s attack/block declarations clear automatically when the turn passes, or manually via
+            Actions ▾ → Clear My Combat.
+          </p>
+          <p className="mb-1">
             <strong>See a card bigger:</strong> hover your mouse over any card to see it enlarged with its full text.
           </p>
           <p className="mb-1">
@@ -589,6 +698,7 @@ export default function GameTablePage() {
           onResetLife={() => sendAction({ type: 'RESET_LIFE' })}
           onResetDeck={handleResetDeck}
           onAddToken={() => setAddTokenOpen(true)}
+          onClearCombat={() => sendAction({ type: 'CLEAR_MY_COMBAT' })}
           voiceJoined={voiceChat.joined}
           voiceMuted={voiceChat.muted}
           voiceConnectedPeerCount={voiceChat.connectedPeerCount}
@@ -735,6 +845,7 @@ export default function GameTablePage() {
                           onContextMenu={isViewer ? openBattlefieldCardMenu : undefined}
                           compact
                           zoom={zoom}
+                          combatLabels={combatLabels}
                         />
                       </div>
                       {!sidebarOnLeft && sidebar}
@@ -974,6 +1085,40 @@ export default function GameTablePage() {
             setAttachPicker(null);
           }}
           onClose={() => setAttachPicker(null)}
+        />
+      )}
+
+      {attackPicker && me && (
+        <AttackTargetPicker
+          cardName={attackPicker.name}
+          options={computeAttackOptions()}
+          onPick={(option) => {
+            sendAction({
+              type: 'DECLARE_ATTACK',
+              instanceId: attackPicker.instanceId,
+              targetType: option.targetType,
+              targetSeat: option.targetSeat,
+              targetInstanceId: option.targetInstanceId,
+            });
+            setAttackPicker(null);
+          }}
+          onClose={() => setAttackPicker(null)}
+        />
+      )}
+
+      {blockPicker && me && (
+        <BlockTargetPicker
+          cardName={blockPicker.name}
+          options={computeBlockOptions(blockPicker.instanceId)}
+          onPick={(attackerInstanceId, currentlyBlocking) => {
+            sendAction(
+              currentlyBlocking
+                ? { type: 'CANCEL_BLOCK', instanceId: blockPicker.instanceId, attackerInstanceId }
+                : { type: 'DECLARE_BLOCK', instanceId: blockPicker.instanceId, attackerInstanceId },
+            );
+            setBlockPicker(null);
+          }}
+          onClose={() => setBlockPicker(null)}
         />
       )}
     </div>

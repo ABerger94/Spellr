@@ -28,6 +28,7 @@ export function GameActionsMenu({
   onResetLife,
   onResetDeck,
   onAddToken,
+  onClearCombat,
   voiceJoined,
   onVoiceLeave,
 }: {
@@ -52,6 +53,7 @@ export function GameActionsMenu({
   onResetLife: () => void;
   onResetDeck: () => void;
   onAddToken: () => void;
+  onClearCombat: () => void;
   voiceJoined: boolean;
   onVoiceLeave: () => void;
 }) {
@@ -124,6 +126,7 @@ export function GameActionsMenu({
       className="z-[200] overflow-y-auto rounded border border-white/10 bg-panel py-1 shadow-2xl"
     >
       <Row label="Pass Turn" onClick={onPassTurn} disabled={!isMyTurn} />
+      <Row label="Clear My Combat" onClick={onClearCombat} />
       <div className="my-1 border-t border-white/10" />
       <CountRow label="Draw X" prompt="drawX" onConfirm={onDrawX} />
       <CountRow label="Scry" prompt="scry" disabled={lookInProgress} onConfirm={onScry} />

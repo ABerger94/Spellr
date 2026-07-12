@@ -38,12 +38,16 @@ const LIFE_EVENT_TYPES = new Set([
   'ADJUST_MANA',
   'EMPTY_MANA_POOL',
 ]);
+const ATTACK_EVENT_TYPES = new Set(['DECLARE_ATTACK', 'CANCEL_ATTACK']);
+const BLOCK_EVENT_TYPES = new Set(['DECLARE_BLOCK', 'CANCEL_BLOCK']);
 
 function eventColorClass(type: string): string {
   if (SEARCH_EVENT_TYPES.has(type)) return 'text-violet-400';
   if (MOVE_EVENT_TYPES.has(type)) return 'text-sky-400';
   if (TAP_EVENT_TYPES.has(type)) return 'text-amber-400';
   if (LIFE_EVENT_TYPES.has(type)) return 'text-emerald-400';
+  if (ATTACK_EVENT_TYPES.has(type)) return 'text-red-400';
+  if (BLOCK_EVENT_TYPES.has(type)) return 'text-blue-400';
   return 'text-slate-300';
 }
 
@@ -200,6 +204,21 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
       return `${who} ended the game.`;
     case 'ATTACK_DECLARED':
       return `${who} declares an attack.`;
+    case 'DECLARE_ATTACK': {
+      const targetType = event.payload.targetType as string;
+      const targetWho = displayName(event.payload.targetSeat as number);
+      return targetType === 'player'
+        ? `${who} attacks ${targetWho}.`
+        : `${who} attacks one of ${targetWho}'s planeswalkers/battles.`;
+    }
+    case 'CANCEL_ATTACK':
+      return `${who} cancels an attack.`;
+    case 'DECLARE_BLOCK':
+      return `${who} declares a blocker.`;
+    case 'CANCEL_BLOCK':
+      return `${who} stops blocking.`;
+    case 'CLEAR_MY_COMBAT':
+      return `${who} cleared their combat declarations.`;
     case 'AI_REASONING':
       return `${who} (thinking): ${event.payload.text ?? ''}`;
     case 'AI_SKIPPED_NO_KEY':

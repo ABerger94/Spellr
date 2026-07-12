@@ -279,6 +279,87 @@ export function attachCard(zones: ZoneState, instanceId: string, targetInstanceI
   return next;
 }
 
+export interface AttackTarget {
+  targetType: 'player' | 'planeswalker';
+  targetSeat: number;
+  targetInstanceId?: string;
+}
+
+/** Combat helper — declares this card as attacking a target (a player's
+ * face or one of their planeswalkers/battles). Also taps the card, matching
+ * a normal attacker — unless the caller says it has vigilance, in which
+ * case its tapped state is left alone. Bookkeeping only — no damage math,
+ * same as the rest of the table. */
+export function declareAttack(
+  zones: ZoneState,
+  instanceId: string,
+  target: AttackTarget,
+  options?: { hasVigilance?: boolean },
+): ZoneState {
+  const idx = zones.battlefield.findIndex((c) => c.instanceId === instanceId);
+  if (idx === -1) throw new Error('Card not found on battlefield');
+
+  const next = cloneZones(zones);
+  const card = next.battlefield[idx];
+  next.battlefield[idx] = { ...card, attacking: target, tapped: options?.hasVigilance ? card.tapped : true };
+  return next;
+}
+
+export function cancelAttack(zones: ZoneState, instanceId: string): ZoneState {
+  const idx = zones.battlefield.findIndex((c) => c.instanceId === instanceId);
+  if (idx === -1) throw new Error('Card not found on battlefield');
+
+  const next = cloneZones(zones);
+  const card = { ...next.battlefield[idx] };
+  delete card.attacking;
+  next.battlefield[idx] = card;
+  return next;
+}
+
+/** Combat helper — declares this card as blocking an attacker (identified
+ * by instanceId, which may belong to another player's battlefield). Does
+ * not tap or otherwise touch the attacking card. */
+export function declareBlock(zones: ZoneState, instanceId: string, attackerInstanceId: string): ZoneState {
+  const idx = zones.battlefield.findIndex((c) => c.instanceId === instanceId);
+  if (idx === -1) throw new Error('Card not found on battlefield');
+
+  const next = cloneZones(zones);
+  const card = { ...next.battlefield[idx] };
+  const blocking = new Set(card.blocking ?? []);
+  blocking.add(attackerInstanceId);
+  card.blocking = [...blocking];
+  next.battlefield[idx] = card;
+  return next;
+}
+
+export function cancelBlock(zones: ZoneState, instanceId: string, attackerInstanceId: string): ZoneState {
+  const idx = zones.battlefield.findIndex((c) => c.instanceId === instanceId);
+  if (idx === -1) throw new Error('Card not found on battlefield');
+
+  const next = cloneZones(zones);
+  const card = { ...next.battlefield[idx] };
+  const remaining = (card.blocking ?? []).filter((id) => id !== attackerInstanceId);
+  if (remaining.length > 0) card.blocking = remaining;
+  else delete card.blocking;
+  next.battlefield[idx] = card;
+  return next;
+}
+
+/** Clears every attacking/blocking declaration on this player's battlefield
+ * — called automatically for every player when the active player's turn
+ * passes, and available as a manual "Clear My Combat" action too. */
+export function clearCombat(zones: ZoneState): ZoneState {
+  const next = cloneZones(zones);
+  next.battlefield = next.battlefield.map((c) => {
+    if (!c.attacking && !c.blocking) return c;
+    const copy = { ...c };
+    delete copy.attacking;
+    delete copy.blocking;
+    return copy;
+  });
+  return next;
+}
+
 /** Floats (or with a negative delta, spends/removes) mana of a given color
  * in the player's mana pool. Never goes below zero, and a zeroed-out color
  * is dropped entirely rather than left at 0. */
