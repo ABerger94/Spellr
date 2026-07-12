@@ -53,6 +53,13 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
       const delta = event.payload.delta as number;
       return `${who}'s life changed by ${delta > 0 ? '+' : ''}${delta}.`;
     }
+    case 'ADJUST_COMMANDER_DAMAGE': {
+      const targetWho = displayName(event.payload.seat as number);
+      const fromWho = displayName(event.payload.fromSeat as number);
+      const delta = event.payload.delta as number;
+      const total = event.payload.total as number;
+      return `${who} set commander damage on ${targetWho} from ${fromWho} to ${total} (${delta > 0 ? '+' : ''}${delta}).`;
+    }
     case 'TURN_PASSED':
       return `${who} passed the turn.`;
     case 'SHUFFLE_LIBRARY':
@@ -105,6 +112,14 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
       return event.payload.targetInstanceId ? `${who} attached a card to another card.` : `${who} detached a card.`;
     case 'EMPTY_MANA_POOL':
       return `${who} emptied their mana pool.`;
+    case 'CREATE_TOKEN': {
+      const name = event.payload.name as string | undefined;
+      return name ? `${who} created a ${name} token.` : `${who} created a token.`;
+    }
+    case 'REMOVE_TOKEN': {
+      const name = event.payload.name as string | undefined;
+      return name ? `${who} removed a ${name} token.` : `${who} removed a token.`;
+    }
     case 'GAME_ENDED':
       return `${who} ended the game.`;
     case 'ATTACK_DECLARED':

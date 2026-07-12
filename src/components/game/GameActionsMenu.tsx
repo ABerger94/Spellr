@@ -27,6 +27,7 @@ export function GameActionsMenu({
   onMulligan,
   onResetLife,
   onResetDeck,
+  onAddToken,
   voiceJoined,
   onVoiceLeave,
 }: {
@@ -50,6 +51,7 @@ export function GameActionsMenu({
   onMulligan: () => void;
   onResetLife: () => void;
   onResetDeck: () => void;
+  onAddToken: () => void;
   voiceJoined: boolean;
   onVoiceLeave: () => void;
 }) {
@@ -135,6 +137,8 @@ export function GameActionsMenu({
       <div className="my-1 border-t border-white/10" />
       <Row label="Shuffle" onClick={onShuffle} />
       <Row label="Mulligan" onClick={onMulligan} />
+      <div className="my-1 border-t border-white/10" />
+      <Row label="Add Token" onClick={onAddToken} />
       <div className="my-1 border-t border-white/10" />
       <Row label="Reset Life" onClick={onResetLife} />
       <Row label="Reset Deck" onClick={onResetDeck} />

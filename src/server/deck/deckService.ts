@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { DeckFormat } from '@prisma/client';
 import { parseDecklist } from './decklistParser';
+import { importFromExternalUrl } from './externalDeckImport';
 import { getCardById, getCardsByNames } from '@/server/scryfall/cardService';
 
 export async function listDecksForUser(userId: string) {
@@ -55,17 +56,12 @@ export interface ImportResult {
   warnings: string[];
 }
 
-export async function importDecklist(deckId: string, text: string): Promise<ImportResult> {
-  const lines = parseDecklist(text);
+/** Resolves each name to a cached/Scryfall card and upserts it into the deck
+ * at the given quantity — shared by the paste-text and import-from-URL
+ * paths, which only differ in how they produce the name→quantity map. */
+async function resolveAndUpsertCards(deckId: string, quantityByName: Map<string, number>): Promise<ImportResult> {
   const warnings: string[] = [];
   let imported = 0;
-
-  // Merge duplicate lines (e.g. the same card pasted twice) so the final
-  // quantity is their sum rather than the last line silently overwriting the rest.
-  const quantityByName = new Map<string, number>();
-  for (const line of lines) {
-    quantityByName.set(line.cardName, (quantityByName.get(line.cardName) ?? 0) + line.quantity);
-  }
 
   // Resolve every name in (at most a couple of) batched requests rather than
   // one Scryfall call per card — a 100-card decklist otherwise easily trips
@@ -99,4 +95,49 @@ export async function importDecklist(deckId: string, text: string): Promise<Impo
   }
 
   return { imported, warnings };
+}
+
+export async function importDecklist(deckId: string, text: string): Promise<ImportResult> {
+  const lines = parseDecklist(text);
+
+  // Merge duplicate lines (e.g. the same card pasted twice) so the final
+  // quantity is their sum rather than the last line silently overwriting the rest.
+  const quantityByName = new Map<string, number>();
+  for (const line of lines) {
+    quantityByName.set(line.cardName, (quantityByName.get(line.cardName) ?? 0) + line.quantity);
+  }
+
+  return resolveAndUpsertCards(deckId, quantityByName);
+}
+
+/** Imports a decklist from a Moxfield or Archidekt deck URL, and auto-sets
+ * the commander if the source site identified exactly one. Moxfield and
+ * Archidekt's APIs are unofficial and may block server-side requests
+ * outright — that surfaces as a single warning rather than a thrown error,
+ * same shape as a normal (if unproductive) paste import. */
+export async function importDecklistFromUrl(deckId: string, url: string): Promise<ImportResult & { commanderName: string | null }> {
+  let external;
+  try {
+    external = await importFromExternalUrl(url);
+  } catch (err) {
+    return { imported: 0, warnings: [err instanceof Error ? err.message : 'Import failed'], commanderName: null };
+  }
+
+  const quantityByName = new Map<string, number>();
+  let commanderName: string | null = null;
+  for (const card of external.cards) {
+    quantityByName.set(card.name, (quantityByName.get(card.name) ?? 0) + card.quantity);
+    if (card.isCommander) commanderName = card.name;
+  }
+
+  const result = await resolveAndUpsertCards(deckId, quantityByName);
+
+  // Only set the commander if it actually resolved and imported cleanly —
+  // a warning for its name means resolveAndUpsertCards already skipped it.
+  if (commanderName && !result.warnings.some((w) => w.includes(commanderName!))) {
+    const row = await prisma.cardCache.findFirst({ where: { name: { equals: commanderName, mode: 'insensitive' } } });
+    if (row) await setCommander(deckId, row.scryfallId);
+  }
+
+  return { ...result, commanderName };
 }

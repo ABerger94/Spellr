@@ -43,22 +43,25 @@ Note: Pusher's free tier caps concurrent connections and daily messages — fine
 ## What's implemented
 
 - Email/password auth, protected routes
-- Deck builder: Scryfall-backed search/autocomplete, paste-a-decklist import (`1 Sol Ring` format), commander selection
+- Deck builder: Scryfall-backed search/autocomplete, paste-a-decklist import (`1 Sol Ring` format), import from a Moxfield or Archidekt deck URL (auto-detects and sets the commander too), commander selection
 - Lobby: create a 1v1 or 2-4 player Commander game, invite-code join, and a host-only "fill remaining seats with AI" action while waiting for players (also happens automatically on Start if any seats are still empty)
 - Live multiplayer game table: battlefield/hand/library/graveyard/exile/command zone per seat, tap-to-tap, right-click "move to..." menu, life totals, turn tracker, realtime sync over Pusher, and hand privacy enforced server-side — each player has their own private channel carrying only their own redacted view, authorized per-request against who actually owns that seat, so opponents' hands are never sent to your browser (you only ever see their card count). A 5-second poll runs alongside the Pusher push as a backstop, so the table (and the "waiting for players" lobby) still catches up within a few seconds even if a push is dropped or the socket connection never comes up — no manual reload required either way
 - Game log and online/offline status delivered over a shared presence channel per game
 - Every player (human or AI) is dealt a fresh 7-card opening hand automatically when a game starts, and can mulligan (Actions ▾ → Mulligan / the AI's `mulligan` function) during their first turn — each one shuffles the hand back and deals a new 7. The first mulligan is free; the platform doesn't track or enforce bottoming cards for extra human mulligans (that's between the table), though the AI still self-regulates and bottoms a card per mulligan beyond its first, same as a considerate human player would
 - An AI seat powered by function-calling, with up to four free-tier providers stacked as automatic fallbacks (Gemini → Groq → Cerebras → OpenRouter, whichever have keys configured), which acts through the exact same action handler as human players (no special-cased "AI rules"), capped at 12 actions per turn, and degrades gracefully (logs why, then passes) if no provider key is configured or every configured provider fails. It's given each of its own cards' rules text so it can decide when to adjust life (shock lands, burn, lifegain, unblocked combat damage) and when to mulligan a bad opening hand; a couple of things are handled automatically for every player regardless of AI involvement — a card drawn at the start of every turn, and lands/permanents that unconditionally read "enters the battlefield tapped" actually entering tapped (conditional ones like shock lands are left as a real choice, not auto-tapped)
 - Each AI seat gets its own real, Scryfall-backed precon deck instead of a copy of the host's — a small library of four full 100-card mono-color Commander decks (99 cards + commander, like a real Commander decklist) and two 60-card 1v1 decks (`src/server/ai/aiPreconDecks.ts`), owned by a dedicated system account and built lazily on first use. Which precon lands on which AI seat is randomized per game (and, when there are enough for the format, no two AI seats in the same game share one)
+- Freeform drag-and-drop battlefield positioning, a mana pool (tap-to-float, spend, empty), +1/+1 and custom counters, card flipping (transform/MDFC) and attach/stacking (auras, equipment)
+- Peer-to-peer voice chat over WebRTC, signaled through the same Pusher presence channel as the game log — join/mute/leave from the game actions bar, no separate call app needed
+- Commander damage tracking — a per-opponent "damage taken from their commander" counter on every player panel, editable by anyone (same manual-tabletop philosophy as life totals)
+- Tokens — search Scryfall's real token card art (Treasure, Clue, 1/1 Soldier, ...) and drop it straight onto the battlefield; removing a token deletes it rather than moving it to another zone, since tokens cease to exist
+- In-game text chat and a live game log, both delivered over the shared presence channel
+- Mobile-friendly layout: touch-friendly tap targets, drag-and-drop, and a persistent actions bar
 
 ## Explicitly not in this first pass
 
-- Drag-and-drop battlefield positioning (cards auto-place; movement is via click + a "move to..." menu)
 - Spectator mode
-- In-game text chat (the game log is an action log, not chat)
-- Mobile-optimized layout
 - OAuth login providers
 - Deployment automation / CI
-- Real Magic rules enforcement: the stack, priority, mana pool, combat damage math, triggered/replacement effects, automatic commander damage tracking (the schema has a field for it, but nothing increments it yet), and tokens
+- Real Magic rules enforcement: the stack, priority, automatic mana-pool emptying at phase end, combat damage math, triggered/replacement effects
 
 These are natural next steps once the core tabletop experience has been used for a while — the code is structured (a single `actionHandler.execute()` entry point for all state changes, JSON-typed zone state) so rules can be layered in incrementally rather than requiring a rewrite.

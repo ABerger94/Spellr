@@ -5,6 +5,7 @@ import {
   adjustCounter,
   adjustMana,
   attachCard,
+  createToken,
   drawCards,
   emptyManaPool,
   flipCard,
@@ -12,6 +13,7 @@ import {
   moveCard,
   mulligan,
   randomDiscard,
+  removeToken,
   resolveLook,
   shuffleLibrary,
   startLook,
@@ -22,6 +24,7 @@ import { logEvent } from './gameEvents';
 import { broadcastGameState } from '@/server/realtime/pusherServer';
 import type { Action } from './actionTypes';
 import { endGame, resetPlayerBoard, restartGame, startingLifeFor } from './gameService';
+import { getCardById } from '@/server/scryfall/cardService';
 
 export interface ActionActor {
   userId?: string | null;
@@ -178,6 +181,29 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       const player = await getPlayer(gameId, action.seat);
       await prisma.gamePlayer.update({ where: { id: player.id }, data: { life: { increment: action.delta } } });
       event = await logEvent(gameId, 'ADJUST_LIFE', { seat: action.seat, delta: action.delta }, actor);
+      break;
+    }
+
+    // Tracked on the *defending* player's own record, keyed by which seat's
+    // commander dealt it — same simplification as everything else on this
+    // manual tabletop: a seat with two partner commanders shares one running
+    // total rather than tracking each commander card separately.
+    case 'ADJUST_COMMANDER_DAMAGE': {
+      const player = await getPlayer(gameId, action.seat);
+      const current = (player.commanderDamage as Record<string, number> | null) ?? {};
+      const key = String(action.fromSeat);
+      const total = Math.max(0, (current[key] ?? 0) + action.delta);
+      const nextCommanderDamage = { ...current, [key]: total };
+      await prisma.gamePlayer.update({
+        where: { id: player.id },
+        data: { commanderDamage: nextCommanderDamage as unknown as object },
+      });
+      event = await logEvent(
+        gameId,
+        'ADJUST_COMMANDER_DAMAGE',
+        { seat: action.seat, fromSeat: action.fromSeat, delta: action.delta, total },
+        actor,
+      );
       break;
     }
 
@@ -362,6 +388,27 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       const nextZones = emptyManaPool(zones);
       await updateZones(player.id, nextZones);
       event = await logEvent(gameId, 'EMPTY_MANA_POOL', {}, actor);
+      break;
+    }
+
+    case 'CREATE_TOKEN': {
+      const cardCache = await getCardById(action.scryfallId); // ensures CardCache row exists (FK requirement)
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const nextZones = createToken(zones, action.scryfallId, action.x, action.y);
+      await updateZones(player.id, nextZones);
+      event = await logEvent(gameId, 'CREATE_TOKEN', { scryfallId: action.scryfallId, name: cardCache.name }, actor);
+      break;
+    }
+
+    case 'REMOVE_TOKEN': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const removed = zones.battlefield.find((c) => c.instanceId === action.instanceId);
+      const nextZones = removeToken(zones, action.instanceId);
+      await updateZones(player.id, nextZones);
+      const cardCache = removed ? await prisma.cardCache.findUnique({ where: { scryfallId: removed.scryfallId }, select: { name: true } }) : null;
+      event = await logEvent(gameId, 'REMOVE_TOKEN', { scryfallId: removed?.scryfallId, name: cardCache?.name }, actor);
       break;
     }
 

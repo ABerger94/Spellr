@@ -11,6 +11,10 @@ export interface BattlefieldCard {
   /** instanceId of another battlefield card this one is attached to (e.g. an
    * aura/equipment on a creature) — rendered stacked underneath its host. */
   attachedTo?: string | null;
+  /** True for a token (Treasure, Clue, 1/1 Soldier, ...) created directly
+   * onto the battlefield rather than played from hand — tokens cease to
+   * exist when removed rather than moving to another zone. */
+  isToken?: boolean;
 }
 
 export type LookMode = 'scry' | 'surveil';
@@ -141,6 +145,7 @@ export type GameActionPayload =
       y?: number;
     }
   | { type: 'ADJUST_LIFE'; seat: number; delta: number }
+  | { type: 'ADJUST_COMMANDER_DAMAGE'; seat: number; fromSeat: number; delta: number }
   | { type: 'PASS_TURN' }
   | { type: 'SCRY'; count: number }
   | { type: 'SURVEIL'; count: number }
@@ -161,5 +166,7 @@ export type GameActionPayload =
   | { type: 'ATTACH_CARD'; instanceId: string; targetInstanceId: string | null }
   | { type: 'ADJUST_MANA'; color: ManaColor; delta: number }
   | { type: 'EMPTY_MANA_POOL' }
+  | { type: 'CREATE_TOKEN'; scryfallId: string; x?: number; y?: number }
+  | { type: 'REMOVE_TOKEN'; instanceId: string }
   | { type: 'END_GAME' }
   | { type: 'CHAT_MESSAGE'; text: string };

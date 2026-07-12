@@ -10,7 +10,16 @@ interface SearchResult {
   imageNormal: string | null;
 }
 
-export function CardSearchAutocomplete({ onAdd }: { onAdd: (scryfallId: string, name: string) => void }) {
+export function CardSearchAutocomplete({
+  onAdd,
+  queryPrefix,
+  placeholder,
+}: {
+  onAdd: (scryfallId: string, name: string) => void;
+  /** Prepended to the Scryfall search query (not autocomplete) — e.g. 't:token' to bias results toward tokens. */
+  queryPrefix?: string;
+  placeholder?: string;
+}) {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -45,7 +54,8 @@ export function CardSearchAutocomplete({ onAdd }: { onAdd: (scryfallId: string, 
     setError(null);
     setSuggestions([]);
     try {
-      const res = await fetch(`/api/cards/search?q=${encodeURIComponent(q)}`);
+      const fullQuery = queryPrefix ? `${queryPrefix} ${q}` : q;
+      const res = await fetch(`/api/cards/search?q=${encodeURIComponent(fullQuery)}`);
       const data = await res.json();
       if (data.error) {
         setError(data.error);
@@ -72,7 +82,7 @@ export function CardSearchAutocomplete({ onAdd }: { onAdd: (scryfallId: string, 
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search for a card…"
+          placeholder={placeholder ?? 'Search for a card…'}
           className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white outline-none focus:border-accent"
         />
         <button type="submit" className="rounded bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent/80">
