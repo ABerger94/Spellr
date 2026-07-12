@@ -42,12 +42,15 @@ export function FreeformBattlefield({
    * the available space. The canvas is unchanged and still scrolls to reach
    * every card. */
   compact?: boolean;
-  /** Scales the canvas (and everything on it) — the outer box still scrolls
-   * to reach whatever zooming pushes out of view. */
+  /** Scales card size only — the battlefield zone itself keeps its actual
+   * footprint, so zooming out fits more cards into the same space instead
+   * of shrinking (and wasting) the zone around them. */
   zoom?: number;
 }) {
   const { dragging } = useDragDrop();
   const isHover = interactive && dragging?.hoverZone === 'battlefield';
+  const cardWidth = CARD_WIDTH_PX * zoom;
+  const attachOffset = ATTACH_OFFSET_PX * zoom;
 
   const byInstance = new Map(battlefield.map((c) => [c.instanceId, c]));
   const attachedByHost = new Map<string, BattlefieldCard[]>();
@@ -99,8 +102,6 @@ export function FreeformBattlefield({
         style={{
           minWidth: compact ? undefined : CANVAS_MIN_WIDTH,
           minHeight: compact ? undefined : CANVAS_MIN_HEIGHT,
-          transform: `scale(${zoom})`,
-          transformOrigin: 'top left',
         }}
       >
         {battlefield.length === 0 && (
@@ -114,15 +115,15 @@ export function FreeformBattlefield({
             <div
               key={root.instanceId}
               className="absolute"
-              style={{ left: `${root.x}%`, top: `${root.y}%`, width: CARD_WIDTH_PX }}
+              style={{ left: `${root.x}%`, top: `${root.y}%`, width: cardWidth }}
             >
-              <div className="relative" style={{ width: CARD_WIDTH_PX }}>
+              <div className="relative" style={{ width: cardWidth }}>
                 {attachments.map((att, i) => (
                   <div
                     key={att.instanceId}
                     data-battlefield-card={interactive ? att.instanceId : undefined}
                     className="absolute"
-                    style={{ left: (i + 1) * ATTACH_OFFSET_PX, top: (i + 1) * ATTACH_OFFSET_PX, width: CARD_WIDTH_PX, zIndex: i + 1 }}
+                    style={{ left: (i + 1) * attachOffset, top: (i + 1) * attachOffset, width: cardWidth, zIndex: i + 1 }}
                   >
                     {renderCard(att)}
                   </div>
