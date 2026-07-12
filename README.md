@@ -57,6 +57,7 @@ Note: Pusher's free tier caps concurrent connections and daily messages — fine
 - Look at Top (Sensei's Divining Top-style): Game actions ▾ → Look at Top asks how many cards, pulls that many off your library into a reorder view with ▲/▼ arrows per card, and puts the whole batch back on top in whatever order you confirm — no shuffling, and nothing else in the library moves
 - In-game text chat and a live game log, both delivered over the shared presence channel
 - Mobile-friendly layout: touch-friendly tap targets, drag-and-drop, and a persistent actions bar
+- Lobby page has a faint fantasy-tabletop background image (fixed, 22% opacity) behind the panels for atmosphere without hurting readability
 
 ## Explicitly not in this first pass
 

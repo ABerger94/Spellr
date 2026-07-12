@@ -140,188 +140,194 @@ export default function LobbyPage() {
   }
 
   return (
-    <div>
-      <NavBar />
-      <main className="mx-auto max-w-5xl px-6 py-8">
-        <h1 className="mb-6 text-2xl font-semibold text-white">Lobby</h1>
+    <div className="relative min-h-screen">
+      <div
+        className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center opacity-[0.22]"
+        style={{ backgroundImage: "url('/images/lobby-bg.jpg')" }}
+      />
+      <div className="relative z-10">
+        <NavBar />
+        <main className="mx-auto max-w-5xl px-6 py-8">
+          <h1 className="mb-6 text-2xl font-semibold text-white">Lobby</h1>
 
-        {error && <p className="mb-4 rounded bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>}
+          {error && <p className="mb-4 rounded bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>}
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <section className="rounded-lg border border-white/10 bg-panel p-5">
-            <h2 className="mb-4 text-lg font-medium text-white">Create a game</h2>
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1 block text-sm text-slate-300">Format</label>
-                <select
-                  value={format}
-                  onChange={(e) => setFormat(e.target.value as 'COMMANDER' | 'ONE_V_ONE')}
-                  className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
-                >
-                  <option value="COMMANDER">Commander</option>
-                  <option value="ONE_V_ONE">1v1</option>
-                </select>
-              </div>
-              {format === 'COMMANDER' && (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <section className="rounded-lg border border-white/10 bg-panel p-5">
+              <h2 className="mb-4 text-lg font-medium text-white">Create a game</h2>
+              <div className="space-y-3">
                 <div>
-                  <label className="mb-1 block text-sm text-slate-300">Seats</label>
+                  <label className="mb-1 block text-sm text-slate-300">Format</label>
                   <select
-                    value={seatCount}
-                    onChange={(e) => setSeatCount(Number(e.target.value))}
+                    value={format}
+                    onChange={(e) => setFormat(e.target.value as 'COMMANDER' | 'ONE_V_ONE')}
                     className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
                   >
-                    {[2, 3, 4].map((n) => (
-                      <option key={n} value={n}>
-                        {n} players
+                    <option value="COMMANDER">Commander</option>
+                    <option value="ONE_V_ONE">1v1</option>
+                  </select>
+                </div>
+                {format === 'COMMANDER' && (
+                  <div>
+                    <label className="mb-1 block text-sm text-slate-300">Seats</label>
+                    <select
+                      value={seatCount}
+                      onChange={(e) => setSeatCount(Number(e.target.value))}
+                      className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
+                    >
+                      {[2, 3, 4].map((n) => (
+                        <option key={n} value={n}>
+                          {n} players
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <label className="mb-1 block text-sm text-slate-300">Bracket (power level)</label>
+                  <select
+                    value={bracket}
+                    onChange={(e) => setBracket(Number(e.target.value))}
+                    className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
+                  >
+                    {BRACKET_OPTIONS.map((b) => (
+                      <option key={b} value={b}>
+                        {bracketTagLabel(b)}
                       </option>
                     ))}
                   </select>
                 </div>
-              )}
-              <div>
-                <label className="mb-1 block text-sm text-slate-300">Bracket (power level)</label>
-                <select
-                  value={bracket}
-                  onChange={(e) => setBracket(Number(e.target.value))}
-                  className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
-                >
-                  {BRACKET_OPTIONS.map((b) => (
-                    <option key={b} value={b}>
-                      {bracketTagLabel(b)}
-                    </option>
-                  ))}
-                </select>
+                <div>
+                  <label className="mb-1 block text-sm text-slate-300">Your deck</label>
+                  <select
+                    value={deckId}
+                    onChange={(e) => setDeckId(e.target.value)}
+                    className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
+                  >
+                    <option value="">Select a deck…</option>
+                    {decksForFormat.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({cardCount(d)} cards)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-slate-300">
+                  <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
+                  Public — listed in Open games below for anyone to join (uncheck for invite-only)
+                </label>
+                <button onClick={handleCreate} className="w-full rounded bg-accent px-3 py-2 font-medium text-white hover:bg-accent/80">
+                  Create game
+                </button>
               </div>
-              <div>
-                <label className="mb-1 block text-sm text-slate-300">Your deck</label>
-                <select
-                  value={deckId}
-                  onChange={(e) => setDeckId(e.target.value)}
-                  className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
-                >
-                  <option value="">Select a deck…</option>
-                  {decksForFormat.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name} ({cardCount(d)} cards)
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <label className="flex items-center gap-2 text-sm text-slate-300">
-                <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
-                Public — listed in Open games below for anyone to join (uncheck for invite-only)
-              </label>
-              <button onClick={handleCreate} className="w-full rounded bg-accent px-3 py-2 font-medium text-white hover:bg-accent/80">
-                Create game
-              </button>
-            </div>
-          </section>
+            </section>
 
-          <section className="rounded-lg border border-white/10 bg-panel p-5">
-            <h2 className="mb-4 text-lg font-medium text-white">Join a game</h2>
-            <div className="space-y-3">
-              <div>
-                <label className="mb-1 block text-sm text-slate-300">Invite code</label>
-                <input
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value)}
-                  className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
-                />
+            <section className="rounded-lg border border-white/10 bg-panel p-5">
+              <h2 className="mb-4 text-lg font-medium text-white">Join a game</h2>
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-sm text-slate-300">Invite code</label>
+                  <input
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value)}
+                    className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm text-slate-300">Your deck</label>
+                  <select
+                    value={joinDeckId}
+                    onChange={(e) => setJoinDeckId(e.target.value)}
+                    className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
+                  >
+                    <option value="">Select a deck…</option>
+                    {decks.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({d.format === 'COMMANDER' ? 'Commander' : '1v1'}, {cardCount(d)} cards)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button onClick={handleJoin} className="w-full rounded bg-panelLight px-3 py-2 font-medium text-white hover:bg-white/10">
+                  Join game
+                </button>
               </div>
-              <div>
-                <label className="mb-1 block text-sm text-slate-300">Your deck</label>
-                <select
-                  value={joinDeckId}
-                  onChange={(e) => setJoinDeckId(e.target.value)}
-                  className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
-                >
-                  <option value="">Select a deck…</option>
-                  {decks.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name} ({d.format === 'COMMANDER' ? 'Commander' : '1v1'}, {cardCount(d)} cards)
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button onClick={handleJoin} className="w-full rounded bg-panelLight px-3 py-2 font-medium text-white hover:bg-white/10">
-                Join game
-              </button>
-            </div>
-          </section>
-        </div>
-
-        <section className="mt-8">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-medium text-white">Open games</h2>
-            <button onClick={load} className="text-xs text-slate-400 hover:text-white">
-              ↻ Refresh
-            </button>
+            </section>
           </div>
-          {openGames.length === 0 ? (
-            <p className="text-slate-400">
-              No public games waiting for players right now — create one above, or ask a friend for their invite code.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {openGames.map((g) => {
-                const host = g.players.find((p) => p.seat === 0);
-                const full = g.players.length >= g.maxSeats;
-                return (
+
+          <section className="mt-8">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-medium text-white">Open games</h2>
+              <button onClick={load} className="text-xs text-slate-400 hover:text-white">
+                ↻ Refresh
+              </button>
+            </div>
+            {openGames.length === 0 ? (
+              <p className="text-slate-400">
+                No public games waiting for players right now — create one above, or ask a friend for their invite code.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {openGames.map((g) => {
+                  const host = g.players.find((p) => p.seat === 0);
+                  const full = g.players.length >= g.maxSeats;
+                  return (
+                    <div
+                      key={g.id}
+                      className="flex items-center justify-between rounded border border-white/10 bg-panel px-4 py-3"
+                    >
+                      <div>
+                        <p className="flex items-center gap-2 text-white">
+                          {g.format === 'COMMANDER' ? 'Commander' : '1v1'} · {g.players.length}/{g.maxSeats} seats
+                          <BracketTag bracket={g.bracket} />
+                        </p>
+                        <p className="text-xs text-slate-500">Hosted by {host?.user?.displayName ?? 'Unknown'}</p>
+                      </div>
+                      <button
+                        onClick={() => handleJoinOpenGame(g.id)}
+                        disabled={full}
+                        className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {full ? 'Full' : 'Join'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="mt-8">
+            <h2 className="mb-4 text-lg font-medium text-white">Your games</h2>
+            {games.length === 0 ? (
+              <p className="text-slate-400">No games yet — create one above.</p>
+            ) : (
+              <div className="space-y-2">
+                {games.map((g) => (
                   <div
                     key={g.id}
                     className="flex items-center justify-between rounded border border-white/10 bg-panel px-4 py-3"
                   >
                     <div>
                       <p className="flex items-center gap-2 text-white">
-                        {g.format === 'COMMANDER' ? 'Commander' : '1v1'} · {g.players.length}/{g.maxSeats} seats
+                        {g.format === 'COMMANDER' ? 'Commander' : '1v1'} · {g.status} · {g.players.length}/{g.maxSeats} seats
                         <BracketTag bracket={g.bracket} />
                       </p>
-                      <p className="text-xs text-slate-500">Hosted by {host?.user?.displayName ?? 'Unknown'}</p>
+                      <p className="text-xs text-slate-500">Invite code: {g.inviteCode}</p>
                     </div>
                     <button
-                      onClick={() => handleJoinOpenGame(g.id)}
-                      disabled={full}
-                      className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-40"
+                      onClick={() => router.push(`/game/${g.id}`)}
+                      className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/80"
                     >
-                      {full ? 'Full' : 'Join'}
+                      {g.status === 'LOBBY' ? 'Enter lobby' : 'Resume'}
                     </button>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        <section className="mt-8">
-          <h2 className="mb-4 text-lg font-medium text-white">Your games</h2>
-          {games.length === 0 ? (
-            <p className="text-slate-400">No games yet — create one above.</p>
-          ) : (
-            <div className="space-y-2">
-              {games.map((g) => (
-                <div
-                  key={g.id}
-                  className="flex items-center justify-between rounded border border-white/10 bg-panel px-4 py-3"
-                >
-                  <div>
-                    <p className="flex items-center gap-2 text-white">
-                      {g.format === 'COMMANDER' ? 'Commander' : '1v1'} · {g.status} · {g.players.length}/{g.maxSeats} seats
-                      <BracketTag bracket={g.bracket} />
-                    </p>
-                    <p className="text-xs text-slate-500">Invite code: {g.inviteCode}</p>
-                  </div>
-                  <button
-                    onClick={() => router.push(`/game/${g.id}`)}
-                    className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/80"
-                  >
-                    {g.status === 'LOBBY' ? 'Enter lobby' : 'Resume'}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      </main>
+                ))}
+              </div>
+            )}
+          </section>
+        </main>
+      </div>
     </div>
   );
 }
