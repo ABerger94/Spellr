@@ -423,8 +423,8 @@ export default function GameTablePage() {
             <strong>Game actions bar:</strong> at the top — Untap All and Draw are one tap; the Actions ▾ menu adds
             Pass Turn, Draw X, Scry, Surveil, Mill, Exile Top, Look at Top, Random Discard, Reveal Hand, Shuffle,
             Mulligan, Reset Life, and Reset Deck (cards back to library, reshuffled, life reset). The +/− on the
-            right zooms the whole table in and out — handy for fitting more on screen or seeing a crowded board at
-            a glance.
+            right shrinks or grows card size on every battlefield — the battlefield zone itself stays put, so
+            zooming out just fits more cards into the same space, handy for a crowded board.
           </p>
           <p className="mb-1">
             <strong>Voice chat:</strong> tap 🎙️ Join Voice to talk with the other players in this game over your
