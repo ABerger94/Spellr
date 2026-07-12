@@ -13,7 +13,14 @@ interface DeckCardEntry {
   scryfallId: string;
   quantity: number;
   isCommander: boolean;
-  cardCache: { name: string; imageNormal: string | null; typeLine: string | null; manaCost: string | null; oracleText: string | null };
+  cardCache: {
+    name: string;
+    imageNormal: string | null;
+    typeLine: string | null;
+    manaCost: string | null;
+    oracleText: string | null;
+    colorIdentity: string[];
+  };
 }
 
 interface DeckData {
