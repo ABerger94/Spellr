@@ -267,6 +267,15 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       break;
     }
 
+    // No zone mutation — this exists purely so every player's library
+    // browse is visible in the shared log, since a private "look at your
+    // whole library in order" action would otherwise be unauditable by
+    // the other players at the table.
+    case 'SEARCH_LIBRARY': {
+      event = await logEvent(gameId, 'SEARCH_LIBRARY', {}, actor);
+      break;
+    }
+
     case 'UNTAP_ALL': {
       const player = await getPlayer(gameId, actor.seat);
       const zones = player.zones as unknown as ZoneState;

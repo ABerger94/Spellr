@@ -388,6 +388,11 @@ export default function GameTablePage() {
             screen lets you pick a number first — e.g. draw 7 for your opening hand.
           </p>
           <p className="mb-1">
+            <strong>Search your library:</strong> tap Search under your library to browse every card in it and send
+            one to your hand or the top — the rest of the library is shuffled afterward (even if you close without
+            picking anything), and opening the search is logged for everyone to see, same as a real tutor.
+          </p>
+          <p className="mb-1">
             <strong>Play a card:</strong> tap it in your hand to send it straight to the battlefield, or drag it there
             to drop it exactly where you want; the platform doesn&apos;t know mana costs or the stack, so anything
             playable just resolves immediately.
@@ -595,7 +600,18 @@ export default function GameTablePage() {
                     <LibraryStack
                       count={p.libraryCount}
                       onDraw={isViewer ? () => sendAction({ type: 'DRAW_CARD' }) : undefined}
-                      onSearch={isViewer ? () => setLibrarySearchOpen(true) : undefined}
+                      onSearch={
+                        isViewer
+                          ? () => {
+                              setLibrarySearchOpen(true);
+                              // Logged so opponents can see (and check) that this
+                              // player's library was opened for viewing/search —
+                              // a private "see the whole order" action would
+                              // otherwise be unauditable at the table.
+                              sendAction({ type: 'SEARCH_LIBRARY' });
+                            }
+                          : undefined
+                      }
                       onShuffle={isViewer ? () => sendAction({ type: 'SHUFFLE_LIBRARY' }) : undefined}
                       draggable={isViewer}
                       compact
@@ -765,9 +781,22 @@ export default function GameTablePage() {
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-white">Search your library</h3>
-                <p className="text-sm text-slate-400">Choose a card to move from your library to your hand or exile.</p>
+                <p className="text-sm text-slate-400">
+                  Choose a card to move from your library to your hand or the top — the rest of your library is then
+                  shuffled, same as a real tutor.
+                </p>
               </div>
-              <button type="button" onClick={() => setLibrarySearchOpen(false)} className="rounded bg-slate-700 px-3 py-2 text-sm text-white hover:bg-slate-600">
+              <button
+                type="button"
+                onClick={async () => {
+                  setLibrarySearchOpen(false);
+                  // You've now seen the whole library in order — shuffle it
+                  // even though nothing was picked, so closing without a
+                  // selection can't be used to memorize draw order.
+                  await sendAction({ type: 'SHUFFLE_LIBRARY' });
+                }}
+                className="rounded bg-slate-700 px-3 py-2 text-sm text-white hover:bg-slate-600"
+              >
                 Close
               </button>
             </div>
@@ -777,14 +806,19 @@ export default function GameTablePage() {
                 {me.library.map((scryfallId, index) => {
                   const facts = state.cards[scryfallId];
                   return (
-                    <div key={`${scryfallId}-${index}`} className="rounded border border-white/10 bg-panel p-2">
+                    <div
+                      key={`${scryfallId}-${index}`}
+                      data-scryfall-id={scryfallId}
+                      className="rounded border border-white/10 bg-panel p-2"
+                    >
                       <CardImage name={facts?.name ?? scryfallId} imageUrl={facts?.imageNormal} />
                       <div className="mt-2 flex flex-col gap-2">
                         <button
                           type="button"
-                          onClick={() => {
-                            sendAction({ type: 'MOVE_CARD', fromZone: 'library', toZone: 'hand', scryfallId });
+                          onClick={async () => {
                             setLibrarySearchOpen(false);
+                            await sendAction({ type: 'MOVE_CARD', fromZone: 'library', toZone: 'hand', scryfallId });
+                            await sendAction({ type: 'SHUFFLE_LIBRARY' });
                           }}
                           className="rounded bg-accent px-2 py-1 text-sm text-white hover:bg-accent/80"
                         >
@@ -792,9 +826,13 @@ export default function GameTablePage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            sendAction({ type: 'MOVE_CARD', fromZone: 'library', toZone: 'library', scryfallId, position: 'top' });
+                          onClick={async () => {
                             setLibrarySearchOpen(false);
+                            // Shuffle first, then move the found card to top —
+                            // otherwise shuffling after would just randomize
+                            // the card we specifically meant to put on top.
+                            await sendAction({ type: 'SHUFFLE_LIBRARY' });
+                            await sendAction({ type: 'MOVE_CARD', fromZone: 'library', toZone: 'library', scryfallId, position: 'top' });
                           }}
                           className="rounded bg-slate-700 px-2 py-1 text-sm text-white hover:bg-slate-600"
                         >
