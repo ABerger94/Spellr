@@ -16,6 +16,15 @@ const MANA_COLOR_NAMES: Record<string, string> = {
 
 const AI_PROVIDER_LABELS: Record<string, string> = { gemini: 'Gemini', groq: 'Groq', cerebras: 'Cerebras', openrouter: 'OpenRouter' };
 
+const ZONE_LABELS: Record<string, string> = {
+  library: 'library',
+  hand: 'hand',
+  battlefield: 'battlefield',
+  graveyard: 'graveyard',
+  exile: 'exile',
+  commandZone: 'command zone',
+};
+
 function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
@@ -35,11 +44,19 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
       return `${who} tapped a card.`;
     case 'UNTAP_CARD':
       return `${who} untapped a card.`;
-    case 'MOVE_CARD':
-      if (event.payload.fromZone === event.payload.toZone) {
-        return `${who} repositioned a card on the battlefield.`;
+    case 'MOVE_CARD': {
+      const fromZone = event.payload.fromZone as string;
+      const toZone = event.payload.toZone as string;
+      if (fromZone === toZone) {
+        if (fromZone === 'battlefield') return `${who} repositioned a card on the battlefield.`;
+        if (fromZone === 'library') {
+          const position = event.payload.position as string | undefined;
+          return `${who} moved a card to the ${position === 'bottom' ? 'bottom' : 'top'} of their library.`;
+        }
+        return `${who} repositioned a card in their ${ZONE_LABELS[fromZone] ?? fromZone}.`;
       }
-      return `${who} moved a card from ${event.payload.fromZone} to ${event.payload.toZone}.`;
+      return `${who} moved a card from ${ZONE_LABELS[fromZone] ?? fromZone} to ${ZONE_LABELS[toZone] ?? toZone}.`;
+    }
     case 'SCRY':
       return `${who} scries ${event.payload.count}.`;
     case 'SURVEIL':
