@@ -23,7 +23,7 @@ export function AddTokenModal({ onAdd, onClose }: { onAdd: (scryfallId: string) 
           </button>
         </div>
         <CardSearchAutocomplete
-          queryPrefix="t:token"
+          tokensOnly
           placeholder="e.g. treasure, clue, 1/1 soldier…"
           onAdd={(scryfallId) => {
             onAdd(scryfallId);

@@ -113,26 +113,49 @@ export async function getCardsByNames(names: string[]) {
   return result;
 }
 
+function toSummary(card: ScryfallCard): CardSummary {
+  const face = card.image_uris ? card : card.card_faces?.[0];
+  const imageUris = face?.image_uris ?? card.image_uris;
+  return {
+    scryfallId: card.id,
+    name: card.name,
+    manaCost: card.mana_cost ?? card.card_faces?.[0]?.mana_cost ?? null,
+    typeLine: card.type_line ?? card.card_faces?.[0]?.type_line ?? null,
+    imageNormal: imageUris?.normal ?? null,
+    imageArtCrop: imageUris?.art_crop ?? null,
+  };
+}
+
+function isTokenTypeLine(typeLine: string | undefined | null): boolean {
+  return !!typeLine && typeLine.toLowerCase().includes('token');
+}
+
 export async function searchCards(query: string, page = 1): Promise<{ cards: CardSummary[]; hasMore: boolean; totalCards: number }> {
   const { cards, hasMore, totalCards } = await scryfall.searchCards(query, page);
 
   // Warm the cache in the background so later getCardById calls are fast.
   void Promise.allSettled(cards.map((card) => upsertCard(card)));
 
-  const summaries: CardSummary[] = cards.map((card) => {
-    const face = card.image_uris ? card : card.card_faces?.[0];
-    const imageUris = face?.image_uris ?? card.image_uris;
-    return {
-      scryfallId: card.id,
-      name: card.name,
-      manaCost: card.mana_cost ?? card.card_faces?.[0]?.mana_cost ?? null,
-      typeLine: card.type_line ?? card.card_faces?.[0]?.type_line ?? null,
-      imageNormal: imageUris?.normal ?? null,
-      imageArtCrop: imageUris?.art_crop ?? null,
-    };
-  });
+  return { cards: cards.map(toSummary), hasMore, totalCards };
+}
 
-  return { cards: summaries, hasMore, totalCards };
+/**
+ * Searches specifically for token cards (Treasure, Clue, 1/1 Soldier, ...).
+ * `t:token` narrows the Scryfall-side query, but the actual correctness
+ * guarantee is the type_line filter below — real (non-token) cards never
+ * reach the caller even if the query-string filter turns out to behave
+ * differently than expected for some term.
+ */
+export async function searchTokenCards(query: string, page = 1): Promise<{ cards: CardSummary[]; hasMore: boolean; totalCards: number }> {
+  // include:extras: Scryfall excludes tokens (and other "extra" card types)
+  // from search results by default unless explicitly included.
+  const scryfallQuery = query.trim() ? `t:token include:extras ${query}` : 't:token include:extras';
+  const { cards, hasMore, totalCards } = await scryfall.searchCards(scryfallQuery, page);
+
+  const tokenCards = cards.filter((card) => isTokenTypeLine(card.type_line) || card.card_faces?.some((f) => isTokenTypeLine(f.type_line)));
+  void Promise.allSettled(tokenCards.map((card) => upsertCard(card)));
+
+  return { cards: tokenCards.map(toSummary), hasMore, totalCards: tokenCards.length };
 }
 
 export async function autocomplete(query: string): Promise<string[]> {
