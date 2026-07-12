@@ -444,9 +444,9 @@ export default function GameTablePage() {
             horizontally too; use the ‹ › arrows if it&apos;s hard to swipe, especially with lots of cards.
           </p>
           <p className="mb-1">
-            <strong>Layout:</strong> every player&apos;s board — including yours — sits in a grid so the whole table
-            is visible at once; your own board is highlighted, and your hand stays pinned at the bottom of the
-            screen so it&apos;s always visible no matter how the grid above scrolls.
+            <strong>Layout:</strong> every player&apos;s board — including yours — sits in a grid sized to fit the
+            whole table on screen at once, no scrolling needed; your own board is highlighted, and your hand floats
+            over the bottom of the grid in its own bar rather than taking up a permanent row of its own.
           </p>
           <p className="mb-1">
             <strong>Dice &amp; coins:</strong> below the game log — pick a die size and tap Roll, or tap Flip for a
@@ -543,19 +543,20 @@ export default function GameTablePage() {
       )}
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-2 lg:flex-row lg:gap-4 lg:p-4">
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {/* Turn indicator — outside the scrollable grid so it's always visible. */}
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+          {/* Turn indicator */}
           <div className="flex-shrink-0 pb-2 text-center text-xs text-slate-500">
             Turn {state.turnNumber} · {displayName(state.currentTurnSeat)}&apos;s turn
           </div>
 
-          {/* Every seat, including your own, in one grid so the whole table is
-              visible together (edhplay-style) instead of your board living in
-              a separate full-size section below everyone else's. */}
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          {/* Every seat, including your own, sized to exactly fill the space
+              below — a true edhplay-style grid, no scrolling needed to see
+              every board. */}
+          <div className="min-h-0 flex-1">
             <div
-              className={`grid gap-2 ${state.players.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
-              style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}
+              className={`grid h-full gap-2 ${state.players.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} ${
+                state.players.length > 2 ? 'grid-rows-2' : 'grid-rows-1'
+              }`}
             >
               {state.players.map((p, i) => {
                 const isViewer = !!me && p.seat === me.seat;
@@ -564,75 +565,79 @@ export default function GameTablePage() {
                 return (
                   <div
                     key={p.seat}
-                    className={`rounded-lg border bg-panel p-2 ${isLastOdd ? 'col-span-2' : ''} ${
-                      isActiveTurn ? 'border-accent2 ring-1 ring-accent2/50' : isViewer ? 'border-accent/40' : 'border-white/10'
-                    }`}
+                    className={`flex min-h-0 flex-col overflow-hidden rounded-lg border bg-panel p-2 ${
+                      isLastOdd ? 'col-span-2' : ''
+                    } ${isActiveTurn ? 'border-accent2 ring-1 ring-accent2/50' : isViewer ? 'border-accent/40' : 'border-white/10'}`}
                   >
-                    <PlayerPanel
-                      player={p}
-                      isViewer={isViewer}
-                      isActiveTurn={isActiveTurn}
-                      isOnline={isViewer || p.isAI || (p.userId !== null && onlineUserIds.has(p.userId))}
-                      aiKeyMissing={!state.aiEnabled}
-                      onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: p.seat, delta })}
-                      commanderDamageFrom={state.format === 'COMMANDER' ? otherSeatsFor(p.seat) : undefined}
-                      onCommanderDamageChange={(fromSeat, delta) =>
-                        sendAction({ type: 'ADJUST_COMMANDER_DAMAGE', seat: p.seat, fromSeat, delta })
-                      }
-                      compact
-                    />
-                    <ManaPool
-                      pool={p.manaPool}
-                      interactive={isViewer}
-                      onAdjust={
-                        isViewer ? (color, delta) => sendAction({ type: 'ADJUST_MANA', color: color as ManaColor, delta }) : undefined
-                      }
-                      onEmpty={isViewer ? () => sendAction({ type: 'EMPTY_MANA_POOL' }) : undefined}
-                      compact
-                    />
-                    <div className="mt-1 flex items-center gap-1">
-                      <LibraryStack
-                        count={p.libraryCount}
-                        onDraw={isViewer ? () => sendAction({ type: 'DRAW_CARD' }) : undefined}
-                        onSearch={isViewer ? () => setLibrarySearchOpen(true) : undefined}
-                        onShuffle={isViewer ? () => sendAction({ type: 'SHUFFLE_LIBRARY' }) : undefined}
-                        draggable={isViewer}
+                    <div className="flex-shrink-0">
+                      <PlayerPanel
+                        player={p}
+                        isViewer={isViewer}
+                        isActiveTurn={isActiveTurn}
+                        isOnline={isViewer || p.isAI || (p.userId !== null && onlineUserIds.has(p.userId))}
+                        aiKeyMissing={!state.aiEnabled}
+                        onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: p.seat, delta })}
+                        commanderDamageFrom={state.format === 'COMMANDER' ? otherSeatsFor(p.seat) : undefined}
+                        onCommanderDamageChange={(fromSeat, delta) =>
+                          sendAction({ type: 'ADJUST_COMMANDER_DAMAGE', seat: p.seat, fromSeat, delta })
+                        }
                         compact
                       />
-                      <PublicZoneStack
-                        label="Graveyard"
-                        zone="graveyard"
-                        scryfallIds={p.graveyard}
-                        cards={state.cards}
-                        draggable={isViewer}
-                        onCardAction={isViewer ? (e, scryfallId) => openPileMenu(e, 'graveyard', scryfallId) : undefined}
+                      <ManaPool
+                        pool={p.manaPool}
+                        interactive={isViewer}
+                        onAdjust={
+                          isViewer
+                            ? (color, delta) => sendAction({ type: 'ADJUST_MANA', color: color as ManaColor, delta })
+                            : undefined
+                        }
+                        onEmpty={isViewer ? () => sendAction({ type: 'EMPTY_MANA_POOL' }) : undefined}
                         compact
                       />
-                      <PublicZoneStack
-                        label="Exile"
-                        zone="exile"
-                        scryfallIds={p.exile}
-                        cards={state.cards}
-                        draggable={isViewer}
-                        onCardAction={isViewer ? (e, scryfallId) => openPileMenu(e, 'exile', scryfallId) : undefined}
-                        compact
-                      />
-                      {state.format === 'COMMANDER' && (
-                        <CommandZone
-                          scryfallIds={p.commandZone}
-                          cards={state.cards}
-                          onPlay={
-                            isViewer
-                              ? (scryfallId) => sendAction({ type: 'PLAY_CARD', scryfallId, fromZone: 'commandZone' })
-                              : undefined
-                          }
+                      <div className="mt-1 flex items-center gap-1">
+                        <LibraryStack
+                          count={p.libraryCount}
+                          onDraw={isViewer ? () => sendAction({ type: 'DRAW_CARD' }) : undefined}
+                          onSearch={isViewer ? () => setLibrarySearchOpen(true) : undefined}
+                          onShuffle={isViewer ? () => sendAction({ type: 'SHUFFLE_LIBRARY' }) : undefined}
                           draggable={isViewer}
                           compact
                         />
-                      )}
-                      <span className="text-[10px] text-slate-500">Hand: {p.handCount}</span>
+                        <PublicZoneStack
+                          label="Graveyard"
+                          zone="graveyard"
+                          scryfallIds={p.graveyard}
+                          cards={state.cards}
+                          draggable={isViewer}
+                          onCardAction={isViewer ? (e, scryfallId) => openPileMenu(e, 'graveyard', scryfallId) : undefined}
+                          compact
+                        />
+                        <PublicZoneStack
+                          label="Exile"
+                          zone="exile"
+                          scryfallIds={p.exile}
+                          cards={state.cards}
+                          draggable={isViewer}
+                          onCardAction={isViewer ? (e, scryfallId) => openPileMenu(e, 'exile', scryfallId) : undefined}
+                          compact
+                        />
+                        {state.format === 'COMMANDER' && (
+                          <CommandZone
+                            scryfallIds={p.commandZone}
+                            cards={state.cards}
+                            onPlay={
+                              isViewer
+                                ? (scryfallId) => sendAction({ type: 'PLAY_CARD', scryfallId, fromZone: 'commandZone' })
+                                : undefined
+                            }
+                            draggable={isViewer}
+                            compact
+                          />
+                        )}
+                        <span className="text-[10px] text-slate-500">Hand: {p.handCount}</span>
+                      </div>
                     </div>
-                    <div className="mt-1">
+                    <div className="mt-1 min-h-0 flex-1">
                       <FreeformBattlefield
                         battlefield={p.battlefield}
                         cards={state.cards}
@@ -645,6 +650,7 @@ export default function GameTablePage() {
                         }
                         onContextMenu={isViewer ? openBattlefieldCardMenu : undefined}
                         compact
+                        zoom={zoom}
                       />
                     </div>
                   </div>
@@ -653,11 +659,12 @@ export default function GameTablePage() {
             </div>
           </div>
 
-          {/* Your hand — pinned at the bottom of the screen, always visible,
-              regardless of how the grid above scrolls. */}
+          {/* Your hand floats over the grid instead of reserving its own
+              row — a translucent bar pinned to the bottom of the table
+              column so it never eats into the boards' visible space. */}
           {me && (
-            <div className="flex-shrink-0 border-t border-white/10 pt-2">
-              <div className="mx-auto max-w-3xl">
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center px-1 pb-1">
+              <div className="pointer-events-auto w-full max-w-3xl rounded-t-lg border border-white/10 bg-panel/95 p-1.5 shadow-2xl backdrop-blur">
                 <HandZone
                   hand={me.hand ?? []}
                   cards={state.cards}
