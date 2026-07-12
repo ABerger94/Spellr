@@ -53,6 +53,7 @@ Note: Pusher's free tier caps concurrent connections and daily messages — fine
 - Freeform drag-and-drop battlefield positioning, a mana pool (tap-to-float, spend, empty), +1/+1 and custom counters, card flipping (transform/MDFC) and attach/stacking (auras, equipment). Double-faced cards can also be flipped right in hand (a dedicated ⇄ button on the card) before playing them — useful for modal DFCs like Sink into Stupor // Sophoric Springs where you choose the face as you cast, not after
 - Peer-to-peer voice chat over WebRTC, signaled through the same Pusher presence channel as the game log — join/mute/leave from the game actions bar, no separate call app needed
 - Tokens — search Scryfall's real token card art (Treasure, Clue, 1/1 Soldier, ...) and drop it straight onto the battlefield; removing a token deletes it rather than moving it to another zone, since tokens cease to exist
+- Tutoring: Search under your library opens a grid of every card in it with buttons to send one to hand or the top — the rest of the library is shuffled afterward automatically (same as a real tutor card), including if you close the search without picking anything, so browsing your library can't be used to memorize draw order. Opening a search is itself logged to the shared game log (`X searched their library`) so every player at the table can see when someone looked
 - In-game text chat and a live game log, both delivered over the shared presence channel
 - Mobile-friendly layout: touch-friendly tap targets, drag-and-drop, and a persistent actions bar
 

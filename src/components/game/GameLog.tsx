@@ -71,6 +71,8 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
       return `${who} passed the turn.`;
     case 'SHUFFLE_LIBRARY':
       return `${who} shuffled their library.`;
+    case 'SEARCH_LIBRARY':
+      return `${who} searched their library.`;
     case 'UNTAP_ALL':
       return `${who} untapped all their permanents.`;
     case 'RESET_LIFE':

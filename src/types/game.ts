@@ -152,6 +152,7 @@ export type GameActionPayload =
   | { type: 'SURVEIL'; count: number }
   | { type: 'RESOLVE_LOOK'; scryfallId: string; destination: LookDestination }
   | { type: 'SHUFFLE_LIBRARY' }
+  | { type: 'SEARCH_LIBRARY' }
   | { type: 'UNTAP_ALL' }
   | { type: 'RESET_LIFE' }
   | { type: 'RESET_BOARD' }
