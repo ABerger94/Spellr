@@ -146,6 +146,7 @@ export type GameActionPayload =
     }
   | { type: 'ADJUST_LIFE'; seat: number; delta: number }
   | { type: 'ADJUST_COMMANDER_DAMAGE'; seat: number; fromSeat: number; delta: number }
+  | { type: 'ADJUST_PLAYER_COUNTER'; seat: number; counterType: string; delta: number }
   | { type: 'PASS_TURN' }
   | { type: 'SCRY'; count: number }
   | { type: 'SURVEIL'; count: number }

@@ -60,6 +60,13 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
       const total = event.payload.total as number;
       return `${who} set commander damage on ${targetWho} from ${fromWho} to ${total} (${delta > 0 ? '+' : ''}${delta}).`;
     }
+    case 'ADJUST_PLAYER_COUNTER': {
+      const targetWho = displayName(event.payload.seat as number);
+      const counterType = event.payload.counterType as string;
+      const total = event.payload.total as number;
+      const delta = event.payload.delta as number;
+      return `${who} set ${targetWho}'s ${counterType} counters to ${total} (${delta > 0 ? '+' : ''}${delta}).`;
+    }
     case 'TURN_PASSED':
       return `${who} passed the turn.`;
     case 'SHUFFLE_LIBRARY':

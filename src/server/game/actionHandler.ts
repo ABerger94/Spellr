@@ -208,6 +208,29 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       break;
     }
 
+    // Poison, experience, energy, or any other player-level counter — same
+    // "type it in and it just works" free-form approach as battlefield card
+    // counters, just scoped to a player instead of a permanent.
+    case 'ADJUST_PLAYER_COUNTER': {
+      const player = await getPlayer(gameId, action.seat);
+      const current = (player.counters as Record<string, number> | null) ?? {};
+      const total = Math.max(0, (current[action.counterType] ?? 0) + action.delta);
+      const nextCounters = { ...current };
+      if (total === 0) delete nextCounters[action.counterType];
+      else nextCounters[action.counterType] = total;
+      await prisma.gamePlayer.update({
+        where: { id: player.id },
+        data: { counters: nextCounters as unknown as object },
+      });
+      event = await logEvent(
+        gameId,
+        'ADJUST_PLAYER_COUNTER',
+        { seat: action.seat, counterType: action.counterType, delta: action.delta, total },
+        actor,
+      );
+      break;
+    }
+
     case 'PASS_TURN': {
       if (game.currentTurnSeat !== actor.seat) {
         throw new Error("It isn't your turn");
