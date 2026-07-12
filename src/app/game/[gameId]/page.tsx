@@ -467,7 +467,13 @@ export default function GameTablePage() {
             opponents&apos; life too — e.g. to deal combat damage — same as you would with paper life pads).
           </p>
           <p className="mb-1">
-            <strong>Counters:</strong> tap ⋯ (or right-click) a permanent on your battlefield and choose
+            <strong>Commander damage &amp; player counters:</strong> tap the ▾ button next to a player&apos;s life
+            total for a dropdown with commander damage taken from each opponent, poison/energy/experience/rad
+            counters, and a box to add any other custom counter — a red dot on ▾ means something there is at a
+            dangerous total.
+          </p>
+          <p className="mb-1">
+            <strong>Counters (on a card):</strong> tap ⋯ (or right-click) a permanent on your battlefield and choose
             &quot;Edit counters&quot; for +1/+1, -1/-1 (they cancel each other out automatically), or any custom
             counter you name — counts show as small badges on the card.
           </p>
@@ -564,14 +570,66 @@ export default function GameTablePage() {
                 const isViewer = !!me && p.seat === me.seat;
                 const isActiveTurn = state.currentTurnSeat === p.seat;
                 const isLastOdd = state.players.length % 2 === 1 && i === state.players.length - 1;
+                // Sidebar hugs the outer edge of the grid — left column boards
+                // keep it on the left, right column boards on the right — so
+                // the two boards sharing the middle of the screen don't both
+                // crowd toward the center, and the battlefield gets a clean
+                // rectangle next to it either way.
+                const sidebarOnLeft = i % 2 === 0;
+
+                const sidebar = (
+                  <div className="flex w-11 flex-shrink-0 flex-col items-center gap-1 overflow-y-auto">
+                    {state.format === 'COMMANDER' && (
+                      <CommandZone
+                        scryfallIds={p.commandZone}
+                        cards={state.cards}
+                        onPlay={
+                          isViewer
+                            ? (scryfallId) => sendAction({ type: 'PLAY_CARD', scryfallId, fromZone: 'commandZone' })
+                            : undefined
+                        }
+                        draggable={isViewer}
+                        compact
+                      />
+                    )}
+                    <LibraryStack
+                      count={p.libraryCount}
+                      onDraw={isViewer ? () => sendAction({ type: 'DRAW_CARD' }) : undefined}
+                      onSearch={isViewer ? () => setLibrarySearchOpen(true) : undefined}
+                      onShuffle={isViewer ? () => sendAction({ type: 'SHUFFLE_LIBRARY' }) : undefined}
+                      draggable={isViewer}
+                      compact
+                    />
+                    <PublicZoneStack
+                      label="Graveyard"
+                      zone="graveyard"
+                      scryfallIds={p.graveyard}
+                      cards={state.cards}
+                      draggable={isViewer}
+                      onCardAction={isViewer ? (e, scryfallId) => openPileMenu(e, 'graveyard', scryfallId) : undefined}
+                      compact
+                    />
+                    <PublicZoneStack
+                      label="Exile"
+                      zone="exile"
+                      scryfallIds={p.exile}
+                      cards={state.cards}
+                      draggable={isViewer}
+                      onCardAction={isViewer ? (e, scryfallId) => openPileMenu(e, 'exile', scryfallId) : undefined}
+                      compact
+                    />
+                    <span className="text-center text-[9px] leading-tight text-slate-500">Hand {p.handCount}</span>
+                  </div>
+                );
+
                 return (
                   <div
                     key={p.seat}
-                    className={`flex min-h-0 flex-col overflow-hidden rounded-lg border bg-panel p-2 ${
+                    className={`flex min-h-0 flex-col overflow-hidden rounded-lg border bg-panel p-1.5 ${
                       isLastOdd ? 'col-span-2' : ''
                     } ${isActiveTurn ? 'border-accent2 ring-1 ring-accent2/50' : isViewer ? 'border-accent/40' : 'border-white/10'}`}
                   >
-                    <div className="flex-shrink-0">
+                    <div className="flex flex-shrink-0 flex-wrap items-start gap-1">
                       <PlayerPanel
                         player={p}
                         isViewer={isViewer}
@@ -583,77 +641,40 @@ export default function GameTablePage() {
                         onCommanderDamageChange={(fromSeat, delta) =>
                           sendAction({ type: 'ADJUST_COMMANDER_DAMAGE', seat: p.seat, fromSeat, delta })
                         }
+                        onCounterChange={(counterType, delta) => sendAction({ type: 'ADJUST_PLAYER_COUNTER', seat: p.seat, counterType, delta })}
                         compact
                       />
-                      <div className="mt-1 flex flex-wrap items-center gap-1">
-                        <ManaPool
-                          pool={p.manaPool}
-                          interactive={isViewer}
-                          onAdjust={
-                            isViewer
-                              ? (color, delta) => sendAction({ type: 'ADJUST_MANA', color: color as ManaColor, delta })
-                              : undefined
-                          }
-                          onEmpty={isViewer ? () => sendAction({ type: 'EMPTY_MANA_POOL' }) : undefined}
-                          compact
-                        />
-                        <LibraryStack
-                          count={p.libraryCount}
-                          onDraw={isViewer ? () => sendAction({ type: 'DRAW_CARD' }) : undefined}
-                          onSearch={isViewer ? () => setLibrarySearchOpen(true) : undefined}
-                          onShuffle={isViewer ? () => sendAction({ type: 'SHUFFLE_LIBRARY' }) : undefined}
-                          draggable={isViewer}
-                          compact
-                        />
-                        <PublicZoneStack
-                          label="Graveyard"
-                          zone="graveyard"
-                          scryfallIds={p.graveyard}
-                          cards={state.cards}
-                          draggable={isViewer}
-                          onCardAction={isViewer ? (e, scryfallId) => openPileMenu(e, 'graveyard', scryfallId) : undefined}
-                          compact
-                        />
-                        <PublicZoneStack
-                          label="Exile"
-                          zone="exile"
-                          scryfallIds={p.exile}
-                          cards={state.cards}
-                          draggable={isViewer}
-                          onCardAction={isViewer ? (e, scryfallId) => openPileMenu(e, 'exile', scryfallId) : undefined}
-                          compact
-                        />
-                        {state.format === 'COMMANDER' && (
-                          <CommandZone
-                            scryfallIds={p.commandZone}
-                            cards={state.cards}
-                            onPlay={
-                              isViewer
-                                ? (scryfallId) => sendAction({ type: 'PLAY_CARD', scryfallId, fromZone: 'commandZone' })
-                                : undefined
-                            }
-                            draggable={isViewer}
-                            compact
-                          />
-                        )}
-                        <span className="text-[10px] text-slate-500">Hand: {p.handCount}</span>
-                      </div>
-                    </div>
-                    <div className="mt-1 min-h-0 flex-1">
-                      <FreeformBattlefield
-                        battlefield={p.battlefield}
-                        cards={state.cards}
+                      <ManaPool
+                        pool={p.manaPool}
                         interactive={isViewer}
-                        onTapToggle={
+                        onAdjust={
                           isViewer
-                            ? (instanceId, tapped) =>
-                                sendAction(tapped ? { type: 'UNTAP_CARD', instanceId } : { type: 'TAP_CARD', instanceId })
+                            ? (color, delta) => sendAction({ type: 'ADJUST_MANA', color: color as ManaColor, delta })
                             : undefined
                         }
-                        onContextMenu={isViewer ? openBattlefieldCardMenu : undefined}
+                        onEmpty={isViewer ? () => sendAction({ type: 'EMPTY_MANA_POOL' }) : undefined}
                         compact
-                        zoom={zoom}
                       />
+                    </div>
+                    <div className="mt-1 flex min-h-0 flex-1 gap-1">
+                      {sidebarOnLeft && sidebar}
+                      <div className="min-h-0 min-w-0 flex-1">
+                        <FreeformBattlefield
+                          battlefield={p.battlefield}
+                          cards={state.cards}
+                          interactive={isViewer}
+                          onTapToggle={
+                            isViewer
+                              ? (instanceId, tapped) =>
+                                  sendAction(tapped ? { type: 'UNTAP_CARD', instanceId } : { type: 'TAP_CARD', instanceId })
+                              : undefined
+                          }
+                          onContextMenu={isViewer ? openBattlefieldCardMenu : undefined}
+                          compact
+                          zoom={zoom}
+                        />
+                      </div>
+                      {!sidebarOnLeft && sidebar}
                     </div>
                   </div>
                 );
