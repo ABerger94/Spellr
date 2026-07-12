@@ -43,6 +43,7 @@ export default function GameTablePage() {
   const [showHelp, setShowHelp] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [showLog, setShowLog] = useState(true);
+  const [handCollapsed, setHandCollapsed] = useState(false);
   const [counterEditor, setCounterEditor] = useState<{ instanceId: string; name: string } | null>(null);
   const [attachPicker, setAttachPicker] = useState<{ instanceId: string; name: string } | null>(null);
   const [addTokenOpen, setAddTokenOpen] = useState(false);
@@ -446,7 +447,8 @@ export default function GameTablePage() {
           <p className="mb-1">
             <strong>Layout:</strong> every player&apos;s board — including yours — sits in a grid sized to fit the
             whole table on screen at once, no scrolling needed; your own board is highlighted, and your hand floats
-            over the bottom of the grid in its own bar rather than taking up a permanent row of its own.
+            over the bottom of the grid in its own bar rather than taking up a permanent row of its own. Tap ▼ Hide
+            hand / ▲ Show hand on that bar to collapse it entirely and see the full boards underneath.
           </p>
           <p className="mb-1">
             <strong>Dice &amp; coins:</strong> below the game log — pick a die size and tap Roll, or tap Flip for a
@@ -583,18 +585,18 @@ export default function GameTablePage() {
                         }
                         compact
                       />
-                      <ManaPool
-                        pool={p.manaPool}
-                        interactive={isViewer}
-                        onAdjust={
-                          isViewer
-                            ? (color, delta) => sendAction({ type: 'ADJUST_MANA', color: color as ManaColor, delta })
-                            : undefined
-                        }
-                        onEmpty={isViewer ? () => sendAction({ type: 'EMPTY_MANA_POOL' }) : undefined}
-                        compact
-                      />
-                      <div className="mt-1 flex items-center gap-1">
+                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                        <ManaPool
+                          pool={p.manaPool}
+                          interactive={isViewer}
+                          onAdjust={
+                            isViewer
+                              ? (color, delta) => sendAction({ type: 'ADJUST_MANA', color: color as ManaColor, delta })
+                              : undefined
+                          }
+                          onEmpty={isViewer ? () => sendAction({ type: 'EMPTY_MANA_POOL' }) : undefined}
+                          compact
+                        />
                         <LibraryStack
                           count={p.libraryCount}
                           onDraw={isViewer ? () => sendAction({ type: 'DRAW_CARD' }) : undefined}
@@ -661,41 +663,56 @@ export default function GameTablePage() {
 
           {/* Your hand floats over the grid instead of reserving its own
               row — a translucent bar pinned to the bottom of the table
-              column so it never eats into the boards' visible space. */}
+              column so it never eats into the boards' visible space.
+              Collapsible: hide it entirely to see the full boards
+              underneath, leaving just a handle to bring it back. */}
           {me && (
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center px-1 pb-1">
-              <div className="pointer-events-auto w-full max-w-3xl rounded-t-lg border border-white/10 bg-panel/95 p-1.5 shadow-2xl backdrop-blur">
-                <HandZone
-                  hand={me.hand ?? []}
-                  cards={state.cards}
-                  onPlay={(scryfallId, transformed) => sendAction({ type: 'PLAY_CARD', scryfallId, fromZone: 'hand', transformed })}
-                  onContextMenu={(e, scryfallId) =>
-                    setMenu({
-                      x: e.clientX,
-                      y: e.clientY,
-                      options: [
-                        {
-                          label: 'Discard',
-                          onClick: () => sendAction({ type: 'MOVE_CARD', fromZone: 'hand', toZone: 'graveyard', scryfallId }),
-                        },
-                        {
-                          label: 'Exile from hand',
-                          onClick: () => sendAction({ type: 'MOVE_CARD', fromZone: 'hand', toZone: 'exile', scryfallId }),
-                        },
-                        {
-                          label: 'Put on top of library',
-                          onClick: () =>
-                            sendAction({ type: 'MOVE_CARD', fromZone: 'hand', toZone: 'library', scryfallId, position: 'top' }),
-                        },
-                        {
-                          label: 'Put on bottom of library',
-                          onClick: () =>
-                            sendAction({ type: 'MOVE_CARD', fromZone: 'hand', toZone: 'library', scryfallId, position: 'bottom' }),
-                        },
-                      ],
-                    })
-                  }
-                />
+              <div className="pointer-events-auto w-full max-w-3xl rounded-t-lg border border-white/10 bg-panel/95 shadow-2xl backdrop-blur">
+                <button
+                  type="button"
+                  onClick={() => setHandCollapsed((v) => !v)}
+                  className="flex w-full items-center justify-center gap-1 rounded-t-lg px-2 py-1 text-[11px] text-slate-400 hover:bg-white/5"
+                >
+                  {handCollapsed ? `▲ Show hand (${me.hand?.length ?? 0})` : '▼ Hide hand'}
+                </button>
+                {!handCollapsed && (
+                  <div className="p-1.5 pt-0">
+                    <HandZone
+                      hand={me.hand ?? []}
+                      cards={state.cards}
+                      onPlay={(scryfallId, transformed) =>
+                        sendAction({ type: 'PLAY_CARD', scryfallId, fromZone: 'hand', transformed })
+                      }
+                      onContextMenu={(e, scryfallId) =>
+                        setMenu({
+                          x: e.clientX,
+                          y: e.clientY,
+                          options: [
+                            {
+                              label: 'Discard',
+                              onClick: () => sendAction({ type: 'MOVE_CARD', fromZone: 'hand', toZone: 'graveyard', scryfallId }),
+                            },
+                            {
+                              label: 'Exile from hand',
+                              onClick: () => sendAction({ type: 'MOVE_CARD', fromZone: 'hand', toZone: 'exile', scryfallId }),
+                            },
+                            {
+                              label: 'Put on top of library',
+                              onClick: () =>
+                                sendAction({ type: 'MOVE_CARD', fromZone: 'hand', toZone: 'library', scryfallId, position: 'top' }),
+                            },
+                            {
+                              label: 'Put on bottom of library',
+                              onClick: () =>
+                                sendAction({ type: 'MOVE_CARD', fromZone: 'hand', toZone: 'library', scryfallId, position: 'bottom' }),
+                            },
+                          ],
+                        })
+                      }
+                    />
+                  </div>
+                )}
               </div>
             </div>
           )}
