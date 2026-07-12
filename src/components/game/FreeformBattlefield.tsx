@@ -95,8 +95,13 @@ export function FreeformBattlefield({
       <div
         data-dropzone={interactive ? 'true' : undefined}
         data-zone="battlefield"
-        className={`relative w-full ${isHover ? 'bg-accent/10 ring-2 ring-inset ring-accent' : ''}`}
-        style={{ minWidth: CANVAS_MIN_WIDTH, minHeight: CANVAS_MIN_HEIGHT, transform: `scale(${zoom})`, transformOrigin: 'top left' }}
+        className={`relative ${compact ? 'h-full w-full' : 'w-full'} ${isHover ? 'bg-accent/10 ring-2 ring-inset ring-accent' : ''}`}
+        style={{
+          minWidth: compact ? undefined : CANVAS_MIN_WIDTH,
+          minHeight: compact ? undefined : CANVAS_MIN_HEIGHT,
+          transform: `scale(${zoom})`,
+          transformOrigin: 'top left',
+        }}
       >
         {battlefield.length === 0 && (
           <div className="flex h-full items-center justify-center text-xs text-slate-600">
