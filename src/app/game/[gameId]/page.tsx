@@ -570,35 +570,54 @@ export default function GameTablePage() {
             </div>
           )}
           <div className="flex flex-col gap-4" style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
-          {/* Opponents */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {opponents.map((p) => (
-              <div key={p.seat} className="rounded-lg border border-white/10 bg-panel p-3">
-                <PlayerPanel
-                  player={p}
-                  isViewer={false}
-                  isActiveTurn={state.currentTurnSeat === p.seat}
-                  isOnline={p.isAI || (p.userId !== null && onlineUserIds.has(p.userId))}
-                  aiKeyMissing={!state.aiEnabled}
-                  onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: p.seat, delta })}
-                  commanderDamageFrom={state.format === 'COMMANDER' ? otherSeatsFor(p.seat) : undefined}
-                  onCommanderDamageChange={(fromSeat, delta) =>
-                    sendAction({ type: 'ADJUST_COMMANDER_DAMAGE', seat: p.seat, fromSeat, delta })
-                  }
-                />
-                <ManaPool pool={p.manaPool} interactive={false} />
-                <div className="mt-2 flex items-center gap-2">
-                  <LibraryStack count={p.libraryCount} />
-                  <PublicZoneStack label="Graveyard" zone="graveyard" scryfallIds={p.graveyard} cards={state.cards} />
-                  <PublicZoneStack label="Exile" zone="exile" scryfallIds={p.exile} cards={state.cards} />
-                  {state.format === 'COMMANDER' && <CommandZone scryfallIds={p.commandZone} cards={state.cards} />}
-                  <span className="text-xs text-slate-500">Hand: {p.handCount}</span>
+          {/* Opponents — a compact grid so everyone's board is visible at once
+              instead of stacking one full-size panel per row (which used to
+              mean scrolling past each opponent individually, especially on
+              mobile portrait). */}
+          <div
+            className={`grid gap-3 ${opponents.length <= 1 ? 'grid-cols-1' : 'grid-cols-2'} ${
+              opponents.length >= 3 ? 'sm:grid-cols-3' : ''
+            }`}
+          >
+            {opponents.map((p, i) => {
+              const isActiveTurn = state.currentTurnSeat === p.seat;
+              const isLastOdd = opponents.length > 1 && opponents.length % 2 === 1 && i === opponents.length - 1;
+              return (
+                <div
+                  key={p.seat}
+                  className={`rounded-lg border bg-panel p-2 ${isLastOdd ? 'col-span-2 sm:col-span-1' : ''} ${
+                    isActiveTurn ? 'border-accent2 ring-1 ring-accent2/50' : 'border-white/10'
+                  }`}
+                >
+                  <PlayerPanel
+                    player={p}
+                    isViewer={false}
+                    isActiveTurn={isActiveTurn}
+                    isOnline={p.isAI || (p.userId !== null && onlineUserIds.has(p.userId))}
+                    aiKeyMissing={!state.aiEnabled}
+                    onLifeChange={(delta) => sendAction({ type: 'ADJUST_LIFE', seat: p.seat, delta })}
+                    commanderDamageFrom={state.format === 'COMMANDER' ? otherSeatsFor(p.seat) : undefined}
+                    onCommanderDamageChange={(fromSeat, delta) =>
+                      sendAction({ type: 'ADJUST_COMMANDER_DAMAGE', seat: p.seat, fromSeat, delta })
+                    }
+                    compact
+                  />
+                  <ManaPool pool={p.manaPool} interactive={false} compact />
+                  <div className="mt-1 flex items-center gap-1">
+                    <LibraryStack count={p.libraryCount} compact />
+                    <PublicZoneStack label="Graveyard" zone="graveyard" scryfallIds={p.graveyard} cards={state.cards} compact />
+                    <PublicZoneStack label="Exile" zone="exile" scryfallIds={p.exile} cards={state.cards} compact />
+                    {state.format === 'COMMANDER' && (
+                      <CommandZone scryfallIds={p.commandZone} cards={state.cards} compact />
+                    )}
+                    <span className="text-[10px] text-slate-500">Hand: {p.handCount}</span>
+                  </div>
+                  <div className="mt-1">
+                    <FreeformBattlefield battlefield={p.battlefield} cards={state.cards} interactive={false} compact />
+                  </div>
                 </div>
-                <div className="mt-2">
-                  <FreeformBattlefield battlefield={p.battlefield} cards={state.cards} interactive={false} />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Turn indicator */}
