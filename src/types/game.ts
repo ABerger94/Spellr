@@ -51,6 +51,11 @@ export interface ZoneState {
    * each time MULLIGAN is called. The first mulligan is free; see
    * mulliganCardsOwed for how many cards a kept hand owes on the bottom. */
   mulliganCount: number;
+  /** Whether this player has played a land this turn — bookkeeping only
+   * (nothing blocks a second land play), but surfaced to the AI so it
+   * reliably takes its land drop instead of skipping it. Reset to false for
+   * whoever's turn is starting whenever PASS_TURN fires. */
+  landPlayedThisTurn: boolean;
 }
 
 /** The first mulligan each game is free (fresh 7, nothing owed) — each one
@@ -71,6 +76,7 @@ export const EMPTY_ZONES: ZoneState = {
   pendingLookMode: null,
   manaPool: {},
   mulliganCount: 0,
+  landPlayedThisTurn: false,
 };
 
 export interface CardFace {
@@ -116,6 +122,7 @@ export interface PlayerStateView {
   pendingLookMode: LookMode | null;
   manaPool: Record<string, number>;
   mulliganCount: number;
+  landPlayedThisTurn: boolean;
 }
 
 export interface GameStateView {

@@ -86,6 +86,13 @@ async function resolveEnterTapped(scryfallId: string | undefined): Promise<boole
   return entersTappedUnconditionally(card?.oracleText ?? null);
 }
 
+/** Whether a played card is a land — used only to track landPlayedThisTurn
+ * (bookkeeping/guidance, not a hard block on playing a second one). */
+async function resolveIsLand(scryfallId: string): Promise<boolean> {
+  const card = await prisma.cardCache.findUnique({ where: { scryfallId }, select: { typeLine: true } });
+  return (card?.typeLine ?? '').includes('Land');
+}
+
 /** Whether a card has vigilance, so declaring it as an attacker shouldn't
  * tap it — keyword abilities are always printed as their own bare word
  * (e.g. "Vigilance" or "Flying, vigilance"), so a substring check is safe
@@ -135,7 +142,10 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
     case 'PLAY_CARD': {
       const player = await getPlayer(gameId, actor.seat);
       const zones = player.zones as unknown as ZoneState;
-      const enterTapped = await resolveEnterTapped(action.scryfallId);
+      const [enterTapped, isLand] = await Promise.all([
+        resolveEnterTapped(action.scryfallId),
+        resolveIsLand(action.scryfallId),
+      ]);
       const { zones: nextZones } = moveCard(zones, {
         fromZone: action.fromZone,
         toZone: 'battlefield',
@@ -145,6 +155,7 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
         enterTapped,
         enterTransformed: action.transformed,
       });
+      if (isLand) nextZones.landPlayedThisTurn = true;
       await updateZones(player.id, nextZones);
       event = await logEvent(gameId, 'PLAY_CARD', { scryfallId: action.scryfallId, fromZone: action.fromZone }, actor);
       break;
@@ -306,9 +317,15 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
 
       // Combat is over once the turn passes — clear every player's attack/
       // block declarations, not just the actor's own, since blockers live on
-      // the defending players' cards.
+      // the defending players' cards. The land drop resets only for whoever's
+      // turn is now starting; everyone else's flag is irrelevant until their
+      // own turn comes back around, when this same reset covers it again.
       await Promise.all(
-        players.map((p) => updateZones(p.id, clearCombat(p.zones as unknown as ZoneState))),
+        players.map((p) => {
+          const nextZones = clearCombat(p.zones as unknown as ZoneState);
+          if (p.seat === nextSeat) nextZones.landPlayedThisTurn = false;
+          return updateZones(p.id, nextZones);
+        }),
       );
 
       // Drawing for turn is left to the player (Draw button / D shortcut /
