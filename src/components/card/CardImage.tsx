@@ -41,6 +41,9 @@ interface CardImageProps {
    * this card is declared as attacking or blocking. Bookkeeping only, no
    * damage math. */
   combatBadge?: { text: string; variant: 'attacking' | 'blocking' };
+  /** Free-text note pinned to this card — shown as a small badge (hover/tap
+   * for the full text via its title attribute). */
+  annotation?: string;
 }
 
 function counterLabel(type: string, count: number): string {
@@ -74,6 +77,7 @@ export function CardImage({
   toughness,
   previewable = true,
   combatBadge,
+  annotation,
 }: CardImageProps) {
   const counterEntries = Object.entries(counters ?? {}).filter(([, count]) => count > 0);
   const { showPreviewNow, showPreviewOnHover, hidePreview } = useCardPreview();
@@ -164,6 +168,14 @@ export function CardImage({
           }`}
         >
           {combatBadge.text}
+        </div>
+      )}
+      {annotation && (
+        <div
+          title={annotation}
+          className="absolute right-0.5 top-0.5 z-10 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500/90 text-[9px] leading-none text-black"
+        >
+          📝
         </div>
       )}
       {onMore && (

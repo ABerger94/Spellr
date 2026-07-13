@@ -23,6 +23,8 @@ import { CardContextMenu, type ContextMenuOption } from '@/components/game/CardC
 import { CardImage } from '@/components/card/CardImage';
 import { CounterEditor } from '@/components/game/CounterEditor';
 import { AttachPicker } from '@/components/game/AttachPicker';
+import { AnnotationEditor } from '@/components/game/AnnotationEditor';
+import { GivePicker } from '@/components/game/GivePicker';
 import { AttackTargetPicker, type AttackTargetOption } from '@/components/game/AttackTargetPicker';
 import { BlockTargetPicker, type BlockAttackerOption } from '@/components/game/BlockTargetPicker';
 import { AddTokenModal } from '@/components/game/AddTokenModal';
@@ -108,6 +110,8 @@ export default function GameTablePage() {
   const [handPos, setHandPos] = useState<{ x: number; y: number } | null>(null);
   const [counterEditor, setCounterEditor] = useState<{ instanceId: string; name: string } | null>(null);
   const [attachPicker, setAttachPicker] = useState<{ instanceId: string; name: string } | null>(null);
+  const [annotationEditor, setAnnotationEditor] = useState<{ instanceId: string; name: string } | null>(null);
+  const [givePicker, setGivePicker] = useState<{ instanceId: string; name: string } | null>(null);
   const [attackPicker, setAttackPicker] = useState<{ instanceId: string; name: string } | null>(null);
   const [blockPicker, setBlockPicker] = useState<{ instanceId: string; name: string } | null>(null);
   const [addTokenOpen, setAddTokenOpen] = useState(false);
@@ -434,12 +438,19 @@ export default function GameTablePage() {
               name: cardName,
             }),
         },
+        {
+          label: card.annotation ? 'Edit note' : 'Annotate',
+          onClick: () => setAnnotationEditor({ instanceId: card.instanceId, name: cardName }),
+        },
         // A fresh token copy — same printed card, but its own instance with
         // no counters/tap state carried over, same as any other token.
         {
           label: 'Make copy (token)',
           onClick: () => sendAction({ type: 'CREATE_TOKEN', scryfallId: card.scryfallId, x: card.x + 3, y: card.y + 3 }),
         },
+        ...(me && otherSeatsFor(me.seat).length > 0
+          ? [{ label: 'Give to player…', onClick: () => setGivePicker({ instanceId: card.instanceId, name: cardName }) }]
+          : []),
         // Combat helper: bookkeeping only, no automatic damage — declares an
         // attack target or a blocked attacker and shows a badge, same spirit
         // as the rest of the table.
@@ -518,6 +529,25 @@ export default function GameTablePage() {
                   }),
               },
             ]),
+      ],
+    });
+  };
+
+  // A deliberately tiny menu for cards on someone else's battlefield — you
+  // don't control them, so the only thing on offer is copying the printed
+  // card as a fresh token onto your own board (CREATE_TOKEN always creates
+  // on the caller's own battlefield server-side, regardless of whose card
+  // this scryfallId came from).
+  const openOpponentCardMenu = (e: React.MouseEvent, card: BattlefieldCard) => {
+    const cardName = state.cards[card.scryfallId]?.name ?? card.scryfallId;
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      options: [
+        {
+          label: 'Copy to my board',
+          onClick: () => sendAction({ type: 'CREATE_TOKEN', scryfallId: card.scryfallId }),
+        },
       ],
     });
   };
@@ -1079,7 +1109,7 @@ export default function GameTablePage() {
                                 }
                               : undefined
                           }
-                          onContextMenu={isViewer ? openBattlefieldCardMenu : undefined}
+                          onContextMenu={isViewer ? openBattlefieldCardMenu : openOpponentCardMenu}
                           compact
                           zoom={zoom}
                           combatLabels={combatLabels}
@@ -1432,6 +1462,32 @@ export default function GameTablePage() {
             />
           );
         })()}
+
+      {annotationEditor &&
+        (() => {
+          const card = me?.battlefield.find((c) => c.instanceId === annotationEditor.instanceId);
+          if (!card) return null;
+          return (
+            <AnnotationEditor
+              cardName={annotationEditor.name}
+              initialText={card.annotation ?? ''}
+              onSave={(text) => sendAction({ type: 'SET_ANNOTATION', instanceId: annotationEditor.instanceId, text })}
+              onClose={() => setAnnotationEditor(null)}
+            />
+          );
+        })()}
+
+      {givePicker && me && (
+        <GivePicker
+          cardName={givePicker.name}
+          players={otherSeatsFor(me.seat)}
+          onPick={(toSeat) => {
+            sendAction({ type: 'GIVE_CARD', instanceId: givePicker.instanceId, toSeat });
+            setGivePicker(null);
+          }}
+          onClose={() => setGivePicker(null)}
+        />
+      )}
 
       {attachPicker && me && (
         <AttachPicker

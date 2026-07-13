@@ -77,6 +77,8 @@ export const actionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('EMPTY_MANA_POOL') }),
   z.object({ type: z.literal('CREATE_TOKEN'), scryfallId: z.string(), x: percent.optional(), y: percent.optional() }),
   z.object({ type: z.literal('REMOVE_TOKEN'), instanceId: z.string() }),
+  z.object({ type: z.literal('SET_ANNOTATION'), instanceId: z.string(), text: z.string().max(280) }),
+  z.object({ type: z.literal('GIVE_CARD'), instanceId: z.string(), toSeat: z.number().int() }),
   z.object({
     type: z.literal('DECLARE_ATTACK'),
     instanceId: z.string(),
