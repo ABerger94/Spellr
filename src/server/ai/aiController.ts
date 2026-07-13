@@ -93,15 +93,31 @@ async function forcePass(gameId: string, seat: number) {
  * text to know when a land enters tapped is its own business vs. already
  * handled automatically, when a spell gains/loses life, etc.) but omitted
  * for opponents' permanents to keep the prompt from ballooning — the AI
- * only ever acts on its own cards anyway. */
-function cardLabel(state: GameStateView, id: string, includeText: boolean): string {
+ * only ever acts on its own cards anyway. Battlefield counters (+1/+1,
+ * -1/-1, or anything custom) are folded into the shown power/toughness and
+ * listed separately, so the AI reasons about a creature's actual current
+ * stats rather than just its printed ones. */
+function cardLabel(state: GameStateView, id: string, includeText: boolean, counters?: Record<string, number>): string {
   const facts = state.cards[id];
   if (!facts) return id;
   const bits = [facts.typeLine ?? 'unknown type'];
   if (facts.manaCost) bits.push(facts.manaCost);
-  if (facts.power !== null && facts.toughness !== null) bits.push(`${facts.power}/${facts.toughness}`);
+  if (facts.power !== null && facts.toughness !== null) {
+    const basePower = Number(facts.power);
+    const baseToughness = Number(facts.toughness);
+    const boost = (counters?.['+1/+1'] ?? 0) - (counters?.['-1/-1'] ?? 0);
+    if (boost !== 0 && Number.isFinite(basePower) && Number.isFinite(baseToughness)) {
+      bits.push(`${basePower + boost}/${baseToughness + boost} (base ${facts.power}/${facts.toughness})`);
+    } else {
+      bits.push(`${facts.power}/${facts.toughness}`);
+    }
+  }
   let label = `${facts.name} [${bits.join(', ')}]`;
   if (includeText && facts.oracleText) label += ` {${facts.oracleText.replace(/\n/g, ' ')}}`;
+  const otherCounters = Object.entries(counters ?? {}).filter(([type, count]) => count > 0 && type !== '+1/+1' && type !== '-1/-1');
+  if (otherCounters.length > 0) {
+    label += ` (counters: ${otherCounters.map(([type, count]) => `${count} ${type}`).join(', ')})`;
+  }
   return label;
 }
 
@@ -116,6 +132,10 @@ function buildPrompt(state: GameStateView, seat: number): string {
     lines.push(
       `Seat ${p.seat} (${p.displayName})${isMe ? ' [you]' : ''}: life ${p.life}, library ${p.libraryCount}, hand ${p.handCount} card(s).`,
     );
+    const playerCounters = Object.entries(p.counters ?? {}).filter(([, count]) => count > 0);
+    if (playerCounters.length > 0) {
+      lines.push(`  Player counters: ${playerCounters.map(([type, count]) => `${count} ${type}`).join(', ')}`);
+    }
     if (p.commandZone.length > 0) {
       lines.push(`  Command zone: ${p.commandZone.map((id) => cardLabel(state, id, isMe)).join('; ')}`);
     }
@@ -123,12 +143,27 @@ function buildPrompt(state: GameStateView, seat: number): string {
       lines.push(
         '  Battlefield: ' +
           p.battlefield
-            .map((c) => `${cardLabel(state, c.scryfallId, isMe)} (instanceId=${c.instanceId}${c.tapped ? ', tapped' : ''})`)
+            .map((c) => {
+              const status = [`instanceId=${c.instanceId}`];
+              if (c.tapped) status.push('tapped');
+              if (c.attacking) {
+                status.push(
+                  c.attacking.targetType === 'player'
+                    ? `attacking seat ${c.attacking.targetSeat}`
+                    : `attacking a planeswalker (instanceId=${c.attacking.targetInstanceId}) of seat ${c.attacking.targetSeat}`,
+                );
+              }
+              if (c.blocking && c.blocking.length > 0) status.push(`blocking attacker(s) ${c.blocking.join(', ')}`);
+              return `${cardLabel(state, c.scryfallId, isMe, c.counters)} (${status.join(', ')})`;
+            })
             .join('; '),
       );
     }
     if (p.graveyard.length > 0) {
       lines.push(`  Graveyard: ${p.graveyard.map((id) => state.cards[id]?.name ?? id).join(', ')}`);
+    }
+    if (p.exile.length > 0) {
+      lines.push(`  Exile: ${p.exile.map((id) => state.cards[id]?.name ?? id).join(', ')}`);
     }
   }
 
@@ -141,6 +176,23 @@ function buildPrompt(state: GameStateView, seat: number): string {
   } else {
     lines.push('Your hand is empty.');
   }
+
+  if (me) {
+    const isLand = (c: (typeof me.battlefield)[number]) => (state.cards[c.scryfallId]?.typeLine ?? '').includes('Land');
+    const untappedLands = me.battlefield.filter((c) => isLand(c) && !c.tapped).length;
+    const tappedLands = me.battlefield.filter((c) => isLand(c) && c.tapped).length;
+    lines.push(`You have ${untappedLands} untapped land(s) and ${tappedLands} tapped land(s) — that's roughly how much mana you can make this turn.`);
+    lines.push(
+      me.landPlayedThisTurn
+        ? 'You have already played a land this turn.'
+        : 'You have NOT played a land this turn yet — play one now if you have any in hand.',
+    );
+    const floatingMana = Object.entries(me.manaPool ?? {}).filter(([, count]) => count > 0);
+    if (floatingMana.length > 0) {
+      lines.push(`Floating mana already in your pool: ${floatingMana.map(([color, count]) => `${count}${color}`).join(', ')}.`);
+    }
+  }
+
   const mulliganCount = me?.mulliganCount ?? 0;
   lines.push(`Mulligans taken: ${mulliganCount}. Cards owed on the bottom of your library if you keep now: ${mulliganCardsOwed(mulliganCount)}.`);
 
@@ -191,8 +243,10 @@ async function mapFunctionCallToAction(
     }
     case 'attack_with': {
       const instanceId = String(args.instanceId);
-      await logEvent(gameId, 'ATTACK_DECLARED', { instanceId }, { seat });
-      return { type: 'TAP_CARD', instanceId };
+      const targetType = args.targetType === 'planeswalker' ? 'planeswalker' : 'player';
+      const targetSeat = Number(args.targetSeat);
+      const targetInstanceId = args.targetInstanceId ? String(args.targetInstanceId) : undefined;
+      return { type: 'DECLARE_ATTACK', instanceId, targetType, targetSeat, targetInstanceId };
     }
     case 'move_card_zone':
       return {

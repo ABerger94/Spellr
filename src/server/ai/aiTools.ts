@@ -1,6 +1,6 @@
 /** Provider-agnostic description of the AI's action set — Gemini and Groq
  * each want this in a slightly different wire format, but there should only
- * ever be one place that decides what the seven actions and their
+ * ever be one place that decides what the eight actions and their
  * parameters are. */
 
 export const AI_SYSTEM_INSTRUCTION =
@@ -26,6 +26,20 @@ export const AI_SYSTEM_INSTRUCTION =
   'first, ignore the mulligan function entirely — it will fail since the mulligan window has passed. The ' +
   "mulligan function's result includes your actual new hand (newHand) — read it before deciding what to " +
   'bottom or play; do not ask for your hand or wait for it separately, it is given to you immediately.\n\n' +
+  'Play like a competent, attentive human, not a bot that shrugs and passes: before deciding on an action, ' +
+  "actually read the whole board — every player's battlefield, life totals, and (for your own permanents) " +
+  'their rules text — and your own hand, then decide what a good player would do. Prioritize, in rough order: ' +
+  '(1) if your prompt says you have NOT played a land this turn and you have any land in hand, play one — a ' +
+  "missed land drop is one of the biggest mistakes you can make and should be treated as mandatory whenever " +
+  'you have a land available; (2) cast the best spells you can reasonably afford with the untapped mana your ' +
+  'lands provide, prioritizing plays that develop your board, answer an opponent\'s threat, or advance your ' +
+  "game plan; (3) attack with creatures when it's favorable — compare each attacker's power against the " +
+  "defending player's likely blockers (their untapped creatures) and life total, and prefer attacking a " +
+  "player's face over a planeswalker unless the planeswalker is the more urgent threat to remove. Do not pass " +
+  'the turn while you still have a land you could play, an affordable and useful spell you could cast, or a ' +
+  'clearly favorable attack available — only pass once you have genuinely run out of good options, or after ' +
+  'a small number of reasonable actions. It is fine to hold back a card or decline a bad attack when that is ' +
+  'correct play, but that should be a deliberate judgment call, not the default.\n\n' +
   'Take a small number of sensible actions for your turn (play a land, cast spells you can reasonably ' +
   'afford, attack if favorable) using the provided functions, briefly explaining your reasoning in the text ' +
   'alongside each function call, then call pass_turn to end your turn.';
@@ -66,13 +80,26 @@ export const AI_ACTIONS: AIActionSpec[] = [
   {
     name: 'attack_with',
     description:
-      'Declare an attack with an untapped creature you control. There is no automatic combat damage or ' +
-      "blocking — this taps the creature and announces the attack in the game log. If you're confident the " +
-      "attack goes through unblocked, also call adjust_life on the defending player for the creature's power.",
+      'Declare an attack with an untapped creature you control, at a specific target. There is no automatic ' +
+      "combat damage or blocking — this taps the creature (unless it has vigilance) and records the attack " +
+      "and its target so everyone at the table can see it. If you're confident the attack goes through " +
+      "unblocked, also call adjust_life on the defending player for the creature's power.",
     parameters: {
       type: 'object',
-      properties: { instanceId: { type: 'string', description: 'The battlefield instanceId of the attacking creature.' } },
-      required: ['instanceId'],
+      properties: {
+        instanceId: { type: 'string', description: 'The battlefield instanceId of the attacking creature.' },
+        targetType: {
+          type: 'string',
+          enum: ['player', 'planeswalker'],
+          description: "'player' to attack an opponent's face, or 'planeswalker' to attack one of their planeswalkers/battles.",
+        },
+        targetSeat: { type: 'integer', description: "The seat number of the defending player (whose face, or whose planeswalker, you're attacking)." },
+        targetInstanceId: {
+          type: 'string',
+          description: "Required when targetType is 'planeswalker': the battlefield instanceId of that planeswalker/battle. Omit when targetType is 'player'.",
+        },
+      },
+      required: ['instanceId', 'targetType', 'targetSeat'],
     },
   },
   {
@@ -120,8 +147,9 @@ export const AI_ACTIONS: AIActionSpec[] = [
   {
     name: 'draw_card',
     description:
-      'Draw the top card of your library into your hand. You already automatically drew your card for the turn, ' +
-      'so only call this for an extra draw a card explicitly grants you.',
+      'Draw the top card of your library into your hand. Drawing for turn is never automatic on this platform — ' +
+      'call this yourself once near the start of your turn, the same way a human player would, and again for ' +
+      'any extra draw a card explicitly grants you.',
     parameters: { type: 'object', properties: {} },
   },
   {

@@ -94,6 +94,7 @@ export async function buildStateFor(gameId: string, viewerSeat: number | null): 
         pendingLookMode: isViewer ? zones.pendingLookMode ?? null : null,
         manaPool: zones.manaPool ?? {},
         mulliganCount: zones.mulliganCount ?? 0,
+        landPlayedThisTurn: zones.landPlayedThisTurn ?? false,
       };
     });
 

@@ -207,8 +207,6 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
     }
     case 'GAME_ENDED':
       return `${who} ended the game.`;
-    case 'ATTACK_DECLARED':
-      return `${who} declares an attack.`;
     case 'DECLARE_ATTACK': {
       const targetType = event.payload.targetType as string;
       const targetWho = displayName(event.payload.targetSeat as number);

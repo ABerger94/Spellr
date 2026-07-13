@@ -42,6 +42,7 @@ function cloneZones(zones: ZoneState): ZoneState {
     pendingLookMode: zones.pendingLookMode ?? null,
     manaPool: { ...(zones.manaPool ?? {}) },
     mulliganCount: zones.mulliganCount ?? 0,
+    landPlayedThisTurn: zones.landPlayedThisTurn ?? false,
   };
 }
 
