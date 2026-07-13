@@ -302,7 +302,9 @@ export function GameLog({
         {events.map((event) =>
           event.type === 'CHAT_MESSAGE' ? (
             <p key={event.id} className="text-white">
-              <strong className="text-accent2">{displayName(event.actorSeat)}:</strong>{' '}
+              <strong className="text-accent2">
+                {event.payload.spectatorName ? `${event.payload.spectatorName as string} (spectating)` : displayName(event.actorSeat)}:
+              </strong>{' '}
               {(event.payload.text as string) ?? ''}
             </p>
           ) : (

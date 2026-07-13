@@ -102,7 +102,7 @@ export default function GameTablePage() {
   const params = useParams<{ gameId: string }>();
   const router = useRouter();
   const { data: session } = useSession();
-  const { state, gameInfo, log, joinError, actionError, sendAction, onlineUserIds, refreshState } = useGameState(params.gameId);
+  const { state, gameInfo, log, joinError, actionError, sendAction, sendChat, onlineUserIds, refreshState } = useGameState(params.gameId);
   const viewerUserId = (session?.user as { id?: string } | undefined)?.id ?? null;
   const voiceChat = useVoiceChat(params.gameId, viewerUserId);
   const [menu, setMenu] = useState<{ x: number; y: number; options: ContextMenuOption[] } | null>(null);
@@ -722,10 +722,27 @@ export default function GameTablePage() {
 
       <div className="flex items-center justify-between border-b border-white/10 bg-panel px-4 py-1.5 text-xs text-slate-400 mobile-landscape:px-2 mobile-landscape:py-0.5">
         <span className="hidden truncate sm:inline mobile-landscape:hidden">
-          Tap or drag a card to play/move it · tap ⋯ on a card for more options · use the Game actions bar for
-          draw/scry/surveil/mill/pass/etc ·
-          keyboard: <kbd className="rounded bg-panelLight px-1">D</kbd> draw, <kbd className="rounded bg-panelLight px-1">Space</kbd> pass turn
+          {me ? (
+            <>
+              Tap or drag a card to play/move it · tap ⋯ on a card for more options · use the Game actions bar for
+              draw/scry/surveil/mill/pass/etc ·
+              keyboard: <kbd className="rounded bg-panelLight px-1">D</kbd> draw, <kbd className="rounded bg-panelLight px-1">Space</kbd> pass turn
+            </>
+          ) : (
+            <>
+              <strong className="text-accent2">Spectating</strong> — you can watch the table and use text chat, but can&apos;t play cards, take
+              actions, or use voice chat.
+            </>
+          )}
         </span>
+        {!me && (
+          <span
+            title="You're watching this game, not playing — chat still works, but you can't take actions or use voice chat."
+            className="whitespace-nowrap rounded bg-accent2/10 px-2 py-0.5 text-accent2 mobile-landscape:px-1.5 mobile-landscape:py-0"
+          >
+            👁 Spectating
+          </span>
+        )}
         {isHost && (
           <button
             onClick={handleRestartGame}
@@ -748,7 +765,7 @@ export default function GameTablePage() {
           onClick={() => setShowLog((v) => !v)}
           className={`mr-2 whitespace-nowrap rounded px-2 py-0.5 hover:bg-white/10 mobile-landscape:mr-1 mobile-landscape:px-1.5 mobile-landscape:py-0 ${
             showLog ? 'bg-accent/20 text-accent' : 'bg-panelLight'
-          } ${isHost ? '' : 'ml-auto sm:ml-0'}`}
+          } ${isHost || !me ? '' : 'ml-auto sm:ml-0'}`}
         >
           📜 {showLog ? 'Hide log' : 'Show log'}
         </button>
@@ -1327,17 +1344,14 @@ export default function GameTablePage() {
         {showLog && (
           <div className="flex h-40 flex-shrink-0 flex-col mobile-landscape:h-28 lg:h-auto lg:w-72">
             <div className="min-h-0 flex-1">
-              <GameLog
-                events={log}
-                displayName={displayName}
-                onClose={() => setShowLog(false)}
-                onSendChat={(text) => sendAction({ type: 'CHAT_MESSAGE', text })}
-              />
+              <GameLog events={log} displayName={displayName} onClose={() => setShowLog(false)} onSendChat={sendChat} />
             </div>
-            <DiceRoller
-              onRoll={(sides) => sendAction({ type: 'ROLL_DICE', sides })}
-              onFlip={() => sendAction({ type: 'FLIP_COIN' })}
-            />
+            {me && (
+              <DiceRoller
+                onRoll={(sides) => sendAction({ type: 'ROLL_DICE', sides })}
+                onFlip={() => sendAction({ type: 'FLIP_COIN' })}
+              />
+            )}
           </div>
         )}
       </div>

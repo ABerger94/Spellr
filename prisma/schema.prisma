@@ -12,15 +12,16 @@ datasource db {
 }
 
 model User {
-  id           String       @id @default(cuid())
-  email        String       @unique
+  id           String          @id @default(cuid())
+  email        String          @unique
   passwordHash String
   displayName  String
-  createdAt    DateTime     @default(now())
+  createdAt    DateTime        @default(now())
   decks        Deck[]
   gamePlayers  GamePlayer[]
   gameEvents   GameEvent[]
-  hostedGames  Game[]       @relation("HostedGames")
+  hostedGames  Game[]          @relation("HostedGames")
+  spectating   GameSpectator[]
 }
 
 enum DeckFormat {
@@ -29,14 +30,14 @@ enum DeckFormat {
 }
 
 model Deck {
-  id              String     @id @default(cuid())
+  id              String       @id @default(cuid())
   userId          String
-  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   name            String
-  format          DeckFormat @default(COMMANDER)
+  format          DeckFormat   @default(COMMANDER)
   commanderCardId String?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
   cards           DeckCard[]
   gamePlayers     GamePlayer[]
 
@@ -92,63 +93,81 @@ enum GameStatus {
 }
 
 model Game {
-  id              String       @id @default(cuid())
-  format          GameFormat
-  status          GameStatus   @default(LOBBY)
-  inviteCode      String       @unique @default(cuid())
+  id                 String          @id @default(cuid())
+  format             GameFormat
+  status             GameStatus      @default(LOBBY)
+  inviteCode         String          @unique @default(cuid())
   // Public lobbies are listed for anyone to browse and join without the
   // invite code; private ones are still joinable only by invite code.
-  isPublic        Boolean      @default(true)
+  isPublic           Boolean         @default(true)
   // Commander power-level bracket (1-5, per WOTC's Commander Brackets
   // system) the host sets when creating the game, shown as a tag so
   // players can gauge the room before joining.
-  bracket         Int          @default(3)
-  hostUserId      String
-  hostUser        User         @relation("HostedGames", fields: [hostUserId], references: [id])
-  maxSeats        Int
-  currentTurnSeat Int?
-  turnNumber      Int          @default(0)
+  bracket            Int             @default(3)
+  hostUserId         String
+  hostUser           User            @relation("HostedGames", fields: [hostUserId], references: [id])
+  maxSeats           Int
+  currentTurnSeat    Int?
+  turnNumber         Int             @default(0)
   // Custom (non +1/+1 / -1/-1) counter type names ever used on a card in
   // this game, table-wide rather than per-card — once someone types a new
   // counter name on any card it becomes a quick-pick option for every
   // other card too, and stays available even if every card's count of it
   // later drops back to zero.
-  customCounterTypes Json       @default("[]")
-  createdAt       DateTime     @default(now())
-  startedAt       DateTime?
-  endedAt         DateTime?
-  players         GamePlayer[]
-  events          GameEvent[]
+  customCounterTypes Json            @default("[]")
+  createdAt          DateTime        @default(now())
+  startedAt          DateTime?
+  endedAt            DateTime?
+  players            GamePlayer[]
+  events             GameEvent[]
+  spectators         GameSpectator[]
 
   @@index([status, isPublic])
 }
 
+// A user watching a game without taking a seat — read-only access to the
+// same redacted, no-hand-contents view any opponent would see, plus text
+// chat. Deliberately no relation to voice chat: spectators never appear in
+// the game's action bar (which is what exposes the Join Voice control), so
+// they can never open a mic connection through the normal UI.
+model GameSpectator {
+  id       String   @id @default(cuid())
+  gameId   String
+  game     Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt DateTime @default(now())
+
+  @@unique([gameId, userId])
+  @@index([userId])
+}
+
 model GamePlayer {
-  id               String   @id @default(cuid())
-  gameId           String
-  game             Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  userId           String?
-  user             User?    @relation(fields: [userId], references: [id])
-  deckId           String?
-  deck             Deck?    @relation(fields: [deckId], references: [id])
+  id              String   @id @default(cuid())
+  gameId          String
+  game            Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id])
+  deckId          String?
+  deck            Deck?    @relation(fields: [deckId], references: [id])
   // Picked and confirmed in the lobby waiting room after joining, not at
   // join time — lets the host gate "Start" on everyone actually being ready
   // rather than just present. AI seats are created already deck-assigned
   // and ready.
-  isReady          Boolean  @default(false)
-  seat             Int
-  isAI             Boolean  @default(false)
-  aiPersona        String?
-  life             Int      @default(40)
-  commanderDamage  Json     @default("{}")
-  zones            Json     @default("{\"library\":[],\"hand\":[],\"battlefield\":[],\"graveyard\":[],\"exile\":[],\"commandZone\":[]}")
-  counters         Json     @default("{}")
-  connected        Boolean  @default(false)
+  isReady         Boolean  @default(false)
+  seat            Int
+  isAI            Boolean  @default(false)
+  aiPersona       String?
+  life            Int      @default(40)
+  commanderDamage Json     @default("{}")
+  zones           Json     @default("{\"library\":[],\"hand\":[],\"battlefield\":[],\"graveyard\":[],\"exile\":[],\"commandZone\":[]}")
+  counters        Json     @default("{}")
+  connected       Boolean  @default(false)
   // A player who's lost (however the table decided that — 0 life, poison,
   // conceding, ...) can be marked eliminated so PASS_TURN skips their seat
   // from then on, without removing them from the game entirely.
-  eliminated       Boolean  @default(false)
-  joinedAt         DateTime @default(now())
+  eliminated      Boolean  @default(false)
+  joinedAt        DateTime @default(now())
 
   @@unique([gameId, seat])
   @@index([userId])

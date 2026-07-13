@@ -52,13 +52,15 @@ export async function listGamesForUser(userId: string) {
   });
 }
 
-/** Public lobbies anyone can browse and join without an invite code —
- * excludes games the user is already in (those already show under "Your
- * games") and anything the host marked invite-only. */
+/** Public games anyone can browse without an invite code — waiting-room
+ * games can be joined (or spectated); already-started ones can only be
+ * spectated, since a seat can't be taken mid-game. Excludes games the user
+ * is already a player in (those already show under "Your games") and
+ * anything the host marked invite-only. */
 export async function listOpenPublicGames(excludeUserId: string) {
   return prisma.game.findMany({
     where: {
-      status: 'LOBBY',
+      status: { in: ['LOBBY', 'ACTIVE'] },
       isPublic: true,
       players: { none: { userId: excludeUserId } },
     },
@@ -127,6 +129,39 @@ export async function joinGame(inviteCode: string, userId: string) {
   const game = await prisma.game.findUnique({ where: { inviteCode } });
   if (!game) throw new Error('Game not found');
   return joinGameById(game.id, userId);
+}
+
+/** Registers a user as a spectator of a game found by id — used for the
+ * "Spectate" button on a public open-lobby listing. Doesn't take a seat, so
+ * it works regardless of whether the game is full, and at any status
+ * (waiting room, in progress, or finished). A player spectating their own
+ * game is a harmless no-op rather than an error — the player row already
+ * grants them full access. */
+export async function spectateGameById(gameId: string, userId: string) {
+  const game = await prisma.game.findUnique({ where: { id: gameId } });
+  if (!game) throw new Error('Game not found');
+  if (!game.isPublic) throw new Error('This game is invite-only — ask the host for the invite code');
+
+  await prisma.gameSpectator.upsert({
+    where: { gameId_userId: { gameId, userId } },
+    update: {},
+    create: { gameId, userId },
+  });
+  return game;
+}
+
+/** Same as spectateGameById, but found by invite code — the spectate
+ * equivalent of joinGame, for watching a private game you were invited to. */
+export async function spectateGameByInviteCode(inviteCode: string, userId: string) {
+  const game = await prisma.game.findUnique({ where: { inviteCode } });
+  if (!game) throw new Error('Game not found');
+
+  await prisma.gameSpectator.upsert({
+    where: { gameId_userId: { gameId: game.id, userId } },
+    update: {},
+    create: { gameId: game.id, userId },
+  });
+  return game;
 }
 
 /** Picks (or changes) the calling player's deck while still in the lobby.
@@ -244,6 +279,19 @@ export async function fillRemainingSeatsWithAI(gameId: string, requestingUserId:
 export async function getGameForUser(gameId: string, userId: string) {
   return prisma.game.findFirst({
     where: { id: gameId, players: { some: { userId } } },
+    include: { players: { include: { user: true } } },
+  });
+}
+
+/** Same as getGameForUser, but also grants access to a registered spectator
+ * — used for the read-only state fetch, since watching a game shouldn't
+ * require a seat. `buildStateFor`'s existing redaction already treats any
+ * viewerSeat that doesn't match a real seat (spectators never have one) as
+ * "not this seat", so a spectator gets exactly the same no-hidden-info view
+ * as anyone else's opponent, with no extra branching needed there. */
+export async function getGameForViewer(gameId: string, userId: string) {
+  return prisma.game.findFirst({
+    where: { id: gameId, OR: [{ players: { some: { userId } } }, { spectators: { some: { userId } } }] },
     include: { players: { include: { user: true } } },
   });
 }

@@ -7,6 +7,7 @@ import { BRACKET_OPTIONS, bracketTagLabel } from '@/lib/bracket';
 
 interface GamePlayer {
   seat: number;
+  userId: string | null;
   isAI: boolean;
   aiPersona: string | null;
   user: { displayName: string } | null;
@@ -40,6 +41,7 @@ export default function LobbyPage() {
   const [isPublic, setIsPublic] = useState(true);
   const [bracket, setBracket] = useState(3);
   const [inviteCode, setInviteCode] = useState('');
+  const [spectateInviteCode, setSpectateInviteCode] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -99,6 +101,36 @@ export default function LobbyPage() {
     const data = await res.json();
     if (!res.ok) {
       setError(data.error ?? 'Failed to join game');
+      return;
+    }
+    router.push(`/game/${data.game.id}`);
+  }
+
+  async function handleSpectateOpenGame(gameId: string) {
+    setError(null);
+    const res = await fetch(`/api/games/${gameId}/spectate`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error ?? 'Failed to spectate game');
+      return;
+    }
+    router.push(`/game/${data.game.id}`);
+  }
+
+  async function handleSpectateByCode() {
+    setError(null);
+    if (!spectateInviteCode.trim()) {
+      setError('Enter an invite code');
+      return;
+    }
+    const res = await fetch('/api/games/spectate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inviteCode: spectateInviteCode.trim() }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error ?? 'Failed to spectate game');
       return;
     }
     router.push(`/game/${data.game.id}`);
@@ -192,6 +224,30 @@ export default function LobbyPage() {
                 </div>
               </section>
 
+              <section className="rounded-lg border border-white/10 bg-panel p-5">
+                <h2 className="mb-4 text-lg font-medium text-white">Spectate a game</h2>
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-1 block text-sm text-slate-300">Invite code</label>
+                    <input
+                      value={spectateInviteCode}
+                      onChange={(e) => setSpectateInviteCode(e.target.value)}
+                      className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
+                    />
+                  </div>
+                  <button
+                    onClick={handleSpectateByCode}
+                    className="w-full rounded bg-panelLight px-3 py-2 font-medium text-white hover:bg-white/10"
+                  >
+                    👁 Spectate game
+                  </button>
+                  <p className="text-xs text-slate-500">
+                    Watch without taking a seat — you can read text chat and the game log, but can&apos;t play cards, take
+                    actions, or use voice chat.
+                  </p>
+                </div>
+              </section>
+
               <section className="flex flex-1 flex-col rounded-lg border border-white/10 bg-panel p-5">
                 <h2 className="mb-4 text-lg font-medium text-white">Your games</h2>
                 {games.length === 0 ? (
@@ -238,7 +294,7 @@ export default function LobbyPage() {
             ) : (
               <div className="space-y-2">
                 {openGames.map((g) => {
-                  const host = g.players.find((p) => p.seat === 0);
+                  const host = g.players.find((p) => p.userId === g.hostUserId);
                   const full = g.players.length >= g.maxSeats;
                   return (
                     <div
@@ -247,18 +303,28 @@ export default function LobbyPage() {
                     >
                       <div>
                         <p className="flex items-center gap-2 text-white">
-                          {g.format === 'COMMANDER' ? 'Commander' : '1v1'} · {g.players.length}/{g.maxSeats} seats
+                          {g.format === 'COMMANDER' ? 'Commander' : '1v1'} · {g.status === 'ACTIVE' ? 'In progress' : `${g.players.length}/${g.maxSeats} seats`}
                           <BracketTag bracket={g.bracket} />
                         </p>
                         <p className="text-xs text-slate-500">Hosted by {host?.user?.displayName ?? 'Unknown'}</p>
                       </div>
-                      <button
-                        onClick={() => handleJoinOpenGame(g.id)}
-                        disabled={full}
-                        className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        {full ? 'Full' : 'Join'}
-                      </button>
+                      <div className="flex flex-shrink-0 gap-2">
+                        {g.status === 'LOBBY' && (
+                          <button
+                            onClick={() => handleJoinOpenGame(g.id)}
+                            disabled={full}
+                            className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/80 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {full ? 'Full' : 'Join'}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleSpectateOpenGame(g.id)}
+                          className="rounded bg-panelLight px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10"
+                        >
+                          👁 Spectate
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
