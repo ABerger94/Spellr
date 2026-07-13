@@ -62,7 +62,7 @@ export function useGameState(gameId: string) {
       const res = await fetch(`/api/games/${gameId}`);
       if (cancelled) return;
       if (!res.ok) {
-        setJoinError('You are not a player in this game');
+        setJoinError('You are not a player or spectator of this game');
         return;
       }
       const data = await res.json();
@@ -148,6 +148,36 @@ export function useGameState(gameId: string) {
       // Same issue as state: the game log otherwise only updates via the
       // realtime broadcast, so our own actions wouldn't show up in our own
       // log until some other refresh happened to fire.
+      if (data.event) {
+        setLog((prev) => mergeLogEntries(prev, [data.event]));
+      }
+    },
+    [gameId],
+  );
+
+  // Chat is the one thing a spectator (no seat, no GamePlayer row) can still
+  // do — routed to a dedicated endpoint that doesn't require one, since the
+  // normal actions route 403s anyone without a seat. Players keep using the
+  // regular action pipeline so their messages log the same way every other
+  // action does.
+  const sendChat = useCallback(
+    async (text: string) => {
+      const isSpectator = stateRef.current?.viewerSeat === null;
+      const res = await fetch(`/api/games/${gameId}/${isSpectator ? 'spectator-chat' : 'actions'}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(isSpectator ? { text } : { action: { type: 'CHAT_MESSAGE', text } }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setActionError(data.error ?? 'Failed to send message');
+        return;
+      }
+      setActionError(null);
+      if (data.state) {
+        setState(data.state);
+        stateRef.current = data.state;
+      }
       if (data.event) {
         setLog((prev) => mergeLogEntries(prev, [data.event]));
       }
@@ -259,5 +289,5 @@ export function useGameState(gameId: string) {
     }
   }, [state, gameId, refreshState]);
 
-  return { state, gameInfo, log, joinError, actionError, sendAction, onlineUserIds, refreshState };
+  return { state, gameInfo, log, joinError, actionError, sendAction, sendChat, onlineUserIds, refreshState };
 }

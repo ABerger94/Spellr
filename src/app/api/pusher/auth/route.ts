@@ -22,13 +22,27 @@ export async function POST(req: Request) {
   if (presenceMatch) {
     const gameId = presenceMatch[1];
     const player = await prisma.gamePlayer.findFirst({ where: { gameId, userId: auth.userId } });
-    if (!player) return NextResponse.json({ error: 'Not a player in this game' }, { status: 403 });
+    if (player) {
+      const authResponse = authorizeChannel(socketId, channelName, {
+        user_id: auth.userId,
+        user_info: { seat: player.seat },
+      });
+      return NextResponse.json(authResponse);
+    }
 
-    const authResponse = authorizeChannel(socketId, channelName, {
-      user_id: auth.userId,
-      user_info: { seat: player.seat },
-    });
-    return NextResponse.json(authResponse);
+    // Spectators get the same shared presence channel (game log + chat) as
+    // players — it never carries hand contents or anything else private —
+    // just never a private per-seat channel, which is what's checked below.
+    const spectator = await prisma.gameSpectator.findUnique({ where: { gameId_userId: { gameId, userId: auth.userId } } });
+    if (spectator) {
+      const authResponse = authorizeChannel(socketId, channelName, {
+        user_id: auth.userId,
+        user_info: { seat: null, spectator: true },
+      });
+      return NextResponse.json(authResponse);
+    }
+
+    return NextResponse.json({ error: 'Not authorized for this game' }, { status: 403 });
   }
 
   const privateMatch = channelName.match(PRIVATE_SEAT_RE);
