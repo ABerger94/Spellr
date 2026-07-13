@@ -248,6 +248,25 @@ export async function getGameForUser(gameId: string, userId: string) {
   });
 }
 
+/** Randomly reassigns every seat number at the table (host included) —
+ * turn order and each seat's spot in the table grid are both driven by
+ * seat number, so this randomizes both at once. Done in two passes: seats
+ * are first moved to distinct negative placeholders, then to their final
+ * shuffled positions, so the `[gameId, seat]` unique constraint never
+ * collides mid-update (a player keeping a seat number another player is
+ * also about to take would otherwise fail the constraint). Host privileges
+ * (Start/Restart/End) are tracked via `hostUserId`, not seat number, so
+ * reseating the host doesn't touch who can do what. */
+async function randomizeSeatOrder(gameId: string): Promise<void> {
+  const players = await prisma.gamePlayer.findMany({ where: { gameId }, select: { id: true, seat: true } });
+  const shuffledSeats = shuffle(players.map((p) => p.seat));
+
+  await prisma.$transaction(players.map((p, i) => prisma.gamePlayer.update({ where: { id: p.id }, data: { seat: -(i + 1) } })));
+  await prisma.$transaction(
+    players.map((p, i) => prisma.gamePlayer.update({ where: { id: p.id }, data: { seat: shuffledSeats[i] } })),
+  );
+}
+
 export async function startGame(gameId: string, requestingUserId: string) {
   const game = await prisma.game.findUnique({
     where: { id: gameId },
@@ -270,6 +289,13 @@ export async function startGame(gameId: string, requestingUserId: string) {
   // blocks on waiting for more humans to join, even if the host never used
   // the explicit "fill remaining seats with AI" action while waiting.
   await fillEmptySeats(gameId, game.maxSeats, game.format, game.players);
+
+  // Turn order (and each seat's spot around the table) follows seat number,
+  // and up to now seat number has just been join order — the host is always
+  // seat 0 and therefore always goes first. Shuffling it here, once, right
+  // as the game actually starts, matches how a real table decides seating
+  // and turn order instead of rewarding whoever happened to create the lobby.
+  await randomizeSeatOrder(gameId);
 
   const players = await prisma.gamePlayer.findMany({
     where: { gameId },

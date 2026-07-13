@@ -85,6 +85,19 @@ function panelDims(edge: HandEdge, collapsed: boolean, lengthPx: number, thickne
   return isVertical ? { width: thicknessExtent, height: lengthPx } : { width: lengthPx, height: thicknessExtent };
 }
 
+/** The seat grid fills row-major (top-left, top-right, bottom-left,
+ * bottom-right) when there are exactly 4 boards, but turn order always
+ * advances by ascending seat number — so rendered in raw seat order, turns
+ * would visually jump top-right -> bottom-left -> bottom-right instead of
+ * sweeping around the table. Swapping the last two entries turns that into
+ * top-left -> top-right -> bottom-right -> bottom-left, a proper clockwise
+ * loop. The 1/2/3-seat layouts (already read clockwise given how their grid
+ * cells are arranged) are left untouched. */
+function clockwiseDisplayOrder<T>(players: T[]): T[] {
+  if (players.length !== 4) return players;
+  return [players[0], players[1], players[3], players[2]];
+}
+
 export default function GameTablePage() {
   const params = useParams<{ gameId: string }>();
   const router = useRouter();
@@ -984,7 +997,7 @@ export default function GameTablePage() {
                       : 'mobile-landscape:grid-cols-1'
               }`}
             >
-              {state.players.map((p, i) => {
+              {clockwiseDisplayOrder(state.players).map((p, i) => {
                 const isViewer = !!me && p.seat === me.seat;
                 const isActiveTurn = state.currentTurnSeat === p.seat;
                 const isLastOdd = state.players.length % 2 === 1 && i === state.players.length - 1;
