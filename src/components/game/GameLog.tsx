@@ -220,6 +220,8 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
     }
     case 'GAME_ENDED':
       return `${who} ended the game.`;
+    case 'GAME_AUTO_CLOSED':
+      return 'This game was automatically closed after an hour with no activity.';
     case 'DECLARE_ATTACK': {
       const targetType = event.payload.targetType as string;
       const targetWho = displayName(event.payload.targetSeat as number);

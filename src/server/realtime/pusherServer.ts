@@ -60,10 +60,12 @@ export async function broadcastVoiceSignal(gameId: string, signal: unknown): Pro
   await getPusher().trigger(presenceGameChannel(gameId), 'voice:signal', signal);
 }
 
-/** Notifies everyone still waiting in a lobby that the host cancelled it,
- * since the game row (and their per-seat channel) is about to disappear. */
-export async function broadcastGameCancelled(gameId: string): Promise<void> {
-  await getPusher().trigger(presenceGameChannel(gameId), 'game:cancelled', {});
+/** Notifies everyone still waiting in a lobby that it's gone, since the game
+ * row (and their per-seat channel) is about to disappear — either the host
+ * cancelled it, or (reason: 'idle') the scheduled cleanup closed it after an
+ * hour with nobody taking any action. */
+export async function broadcastGameCancelled(gameId: string, reason: 'host' | 'idle' = 'host'): Promise<void> {
+  await getPusher().trigger(presenceGameChannel(gameId), 'game:cancelled', { reason });
 }
 
 export function authorizeChannel(

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireSession } from '@/server/auth/session';
 import { prisma } from '@/lib/prisma';
 import { logEvent } from '@/server/game/gameEvents';
+import { touchGameActivity } from '@/server/game/gameService';
 
 const chatSchema = z.object({ text: z.string().trim().min(1).max(500) });
 
@@ -33,6 +34,7 @@ export async function POST(req: Request, { params }: { params: { gameId: string 
     { text: parsed.data.text, spectatorName: user?.displayName ?? 'Spectator' },
     { userId: auth.userId, seat: null },
   );
+  await touchGameActivity(params.gameId);
 
   return NextResponse.json({ ok: true, event });
 }
