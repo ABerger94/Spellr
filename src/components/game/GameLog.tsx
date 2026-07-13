@@ -60,7 +60,7 @@ const MANA_COLOR_NAMES: Record<string, string> = {
   C: 'Colorless',
 };
 
-const AI_PROVIDER_LABELS: Record<string, string> = { gemini: 'Gemini', groq: 'Groq', cerebras: 'Cerebras', openrouter: 'OpenRouter' };
+const AI_PROVIDER_LABELS: Record<string, string> = { gemini: 'Gemini', groq: 'Groq', cerebras: 'Cerebras', openrouter: 'OpenRouter', base44: 'Base44' };
 
 const ZONE_LABELS: Record<string, string> = {
   library: 'library',
