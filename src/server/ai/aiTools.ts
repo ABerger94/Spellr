@@ -1,6 +1,6 @@
 /** Provider-agnostic description of the AI's action set — Gemini and Groq
  * each want this in a slightly different wire format, but there should only
- * ever be one place that decides what the eight actions and their
+ * ever be one place that decides what the nine actions and their
  * parameters are. */
 
 export const AI_SYSTEM_INSTRUCTION =
@@ -28,7 +28,11 @@ export const AI_SYSTEM_INSTRUCTION =
   'bottom or play; do not ask for your hand or wait for it separately, it is given to you immediately.\n\n' +
   'Play like a competent, attentive human, not a bot that shrugs and passes: before deciding on an action, ' +
   "actually read the whole board — every player's battlefield, life totals, and (for your own permanents) " +
-  'their rules text — and your own hand, then decide what a good player would do. Prioritize, in rough order: ' +
+  "their rules text — and your own hand, then decide what a good player would do. The prompt clearly marks " +
+  'which seat is yours ("THIS IS YOU") versus which are opponents ("an OPPONENT") — every permanent, creature, ' +
+  "and instanceId listed under an opponent's seat belongs to them, not you, and can never be the target of " +
+  "attack_with, move_card_zone, or any other action that acts on your own cards; only use instanceIds from " +
+  'your own seat\'s battlefield for those. Prioritize, in rough order: ' +
   '(1) if your prompt says you have NOT played a land this turn and you have any land in hand, play one — a ' +
   "missed land drop is one of the biggest mistakes you can make and should be treated as mandatory whenever " +
   'you have a land available; (2) cast the best spells you can reasonably afford with the untapped mana your ' +
@@ -40,6 +44,25 @@ export const AI_SYSTEM_INSTRUCTION =
   'clearly favorable attack available — only pass once you have genuinely run out of good options, or after ' +
   'a small number of reasonable actions. It is fine to hold back a card or decline a bad attack when that is ' +
   'correct play, but that should be a deliberate judgment call, not the default.\n\n' +
+  'Blocking: your prompt lists "Creatures currently attacking you" whenever an opponent has declared an ' +
+  'attack against your face or one of your planeswalkers this turn. When that list is non-empty, decide ' +
+  'whether to block each attacker with an untapped creature you control (call block_with) — compare your ' +
+  "blocker's power/toughness against the attacker's (and any relevant rules text) to judge the trade. Block " +
+  "when it kills or meaningfully trades with the attacker, or when you can't afford the life loss; it's " +
+  "correct to decline a block that would lose you a valuable creature for nothing (e.g. a small blocker " +
+  "chump-blocking a much bigger attacker with no upside), unless the life loss itself is the more urgent " +
+  "problem. Don't just ignore incoming attacks — always check this list before ending your turn's combat " +
+  "decisions.\n\n" +
+  "Multiplayer target selection: when you have more than one opponent, each opponent's block includes a " +
+  '"Threat read" line (their total creature power on board, permanent count, and how many times they\'ve ' +
+  "attacked you this game) — use it to judge who's actually dangerous instead of picking a target arbitrarily " +
+  'or splitting your attacks evenly. Lean your attacks and removal toward whichever opponent has the biggest ' +
+  "board, the most mana/cards to threaten you with, or has been repeatedly attacking you — and correspondingly, " +
+  "it's reasonable (a normal part of multiplayer politics, not a rules requirement) to go easier on an " +
+  'opponent who has a weak board and has left you alone, favoring the bigger threat instead — unless a weaker ' +
+  'opponent is at low enough life that attacking them is a clean kill or near-kill, which is always worth ' +
+  'taking. Never let this diplomacy instinct stop you from playing a card, developing your board, or making an ' +
+  'attack that is otherwise clearly correct.\n\n' +
   'Take a small number of sensible actions for your turn (play a land, cast spells you can reasonably ' +
   'afford, attack if favorable) using the provided functions, briefly explaining your reasoning in the text ' +
   'alongside each function call, then call pass_turn to end your turn.';
@@ -80,14 +103,16 @@ export const AI_ACTIONS: AIActionSpec[] = [
   {
     name: 'attack_with',
     description:
-      'Declare an attack with an untapped creature you control, at a specific target. There is no automatic ' +
-      "combat damage or blocking — this taps the creature (unless it has vigilance) and records the attack " +
-      "and its target so everyone at the table can see it. If you're confident the attack goes through " +
-      "unblocked, also call adjust_life on the defending player for the creature's power.",
+      'Declare an attack with an untapped creature YOU CONTROL, at a specific target. instanceId must be taken ' +
+      "from your own seat's battlefield in the prompt (marked \"THIS IS YOU\") — never from an opponent's " +
+      "battlefield; you cannot attack with a creature you don't control. There is no automatic combat damage " +
+      "or blocking — this taps the creature (unless it has vigilance) and records the attack and its target " +
+      "so everyone at the table can see it. If you're confident the attack goes through unblocked, also call " +
+      "adjust_life on the defending player for the creature's power.",
     parameters: {
       type: 'object',
       properties: {
-        instanceId: { type: 'string', description: 'The battlefield instanceId of the attacking creature.' },
+        instanceId: { type: 'string', description: "The battlefield instanceId of the attacking creature — must be one of YOUR OWN creatures, never an opponent's." },
         targetType: {
           type: 'string',
           enum: ['player', 'planeswalker'],
@@ -100,6 +125,25 @@ export const AI_ACTIONS: AIActionSpec[] = [
         },
       },
       required: ['instanceId', 'targetType', 'targetSeat'],
+    },
+  },
+  {
+    name: 'block_with',
+    description:
+      "Declare one of YOUR untapped creatures as blocking an attacker aimed at you, when your prompt's " +
+      '"Creatures currently attacking you" list is non-empty. instanceId is your blocker (must be one of YOUR ' +
+      "OWN creatures); attackerInstanceId is the attacker's instanceId from that list (it belongs to an " +
+      "opponent — you're only referencing it, not acting on it). Blocking prevents that attacker's damage to " +
+      "you unless its rules text says otherwise (e.g. trample); you don't have to block everything — declining " +
+      'a bad block (e.g. losing a valuable creature to a bigger attacker for no benefit) is often correct. You ' +
+      'can call this multiple times in one turn to assign multiple blockers.',
+    parameters: {
+      type: 'object',
+      properties: {
+        instanceId: { type: 'string', description: "The battlefield instanceId of YOUR blocking creature — never an opponent's." },
+        attackerInstanceId: { type: 'string', description: 'The instanceId of the attacking creature to block, from "Creatures currently attacking you".' },
+      },
+      required: ['instanceId', 'attackerInstanceId'],
     },
   },
   {
