@@ -5,17 +5,6 @@ import { useRouter } from 'next/navigation';
 import { NavBar } from '@/components/layout/NavBar';
 import { BRACKET_OPTIONS, bracketTagLabel } from '@/lib/bracket';
 
-interface Deck {
-  id: string;
-  name: string;
-  format: 'COMMANDER' | 'STANDARD_1V1';
-  cards: { quantity: number }[];
-}
-
-function cardCount(deck: Deck): number {
-  return deck.cards.reduce((sum, c) => sum + c.quantity, 0);
-}
-
 interface GamePlayer {
   seat: number;
   isAI: boolean;
@@ -44,28 +33,19 @@ function BracketTag({ bracket }: { bracket: number }) {
 
 export default function LobbyPage() {
   const router = useRouter();
-  const [decks, setDecks] = useState<Deck[]>([]);
   const [games, setGames] = useState<GameSummary[]>([]);
   const [openGames, setOpenGames] = useState<GameSummary[]>([]);
   const [format, setFormat] = useState<'COMMANDER' | 'ONE_V_ONE'>('COMMANDER');
-  const [deckId, setDeckId] = useState('');
   const [seatCount, setSeatCount] = useState(4);
   const [isPublic, setIsPublic] = useState(true);
   const [bracket, setBracket] = useState(3);
   const [inviteCode, setInviteCode] = useState('');
-  const [joinDeckId, setJoinDeckId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [decksRes, gamesRes, openGamesRes] = await Promise.all([
-      fetch('/api/decks'),
-      fetch('/api/games'),
-      fetch('/api/games/open'),
-    ]);
-    const decksData = await decksRes.json();
+    const [gamesRes, openGamesRes] = await Promise.all([fetch('/api/games'), fetch('/api/games/open')]);
     const gamesData = await gamesRes.json();
     const openGamesData = await openGamesRes.json();
-    setDecks(decksData.decks ?? []);
     setGames(gamesData.games ?? []);
     setOpenGames(openGamesData.games ?? []);
   }, []);
@@ -74,20 +54,13 @@ export default function LobbyPage() {
     load();
   }, [load]);
 
-  const decksForFormat = decks.filter((d) => d.format === (format === 'COMMANDER' ? 'COMMANDER' : 'STANDARD_1V1'));
-
   async function handleCreate() {
     setError(null);
-    if (!deckId) {
-      setError('Pick a deck first');
-      return;
-    }
     const res = await fetch('/api/games', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         format,
-        deckId,
         seatCount: format === 'COMMANDER' ? seatCount : undefined,
         isPublic,
         bracket,
@@ -103,14 +76,14 @@ export default function LobbyPage() {
 
   async function handleJoin() {
     setError(null);
-    if (!inviteCode.trim() || !joinDeckId) {
-      setError('Enter an invite code and pick a deck');
+    if (!inviteCode.trim()) {
+      setError('Enter an invite code');
       return;
     }
     const res = await fetch('/api/games/join', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inviteCode: inviteCode.trim(), deckId: joinDeckId }),
+      body: JSON.stringify({ inviteCode: inviteCode.trim() }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -122,15 +95,7 @@ export default function LobbyPage() {
 
   async function handleJoinOpenGame(gameId: string) {
     setError(null);
-    if (!joinDeckId) {
-      setError('Pick a deck in "Join a game" first, then tap Join on an open game below');
-      return;
-    }
-    const res = await fetch(`/api/games/${gameId}/join`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ deckId: joinDeckId }),
-    });
+    const res = await fetch(`/api/games/${gameId}/join`, { method: 'POST' });
     const data = await res.json();
     if (!res.ok) {
       setError(data.error ?? 'Failed to join game');
@@ -197,21 +162,6 @@ export default function LobbyPage() {
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="mb-1 block text-sm text-slate-300">Your deck</label>
-                  <select
-                    value={deckId}
-                    onChange={(e) => setDeckId(e.target.value)}
-                    className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
-                  >
-                    <option value="">Select a deck…</option>
-                    {decksForFormat.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name} ({cardCount(d)} cards)
-                      </option>
-                    ))}
-                  </select>
-                </div>
                 <label className="flex items-center gap-2 text-sm text-slate-300">
                   <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} />
                   Public — listed in Open games below for anyone to join (uncheck for invite-only)
@@ -219,6 +169,7 @@ export default function LobbyPage() {
                 <button onClick={handleCreate} className="w-full rounded bg-accent px-3 py-2 font-medium text-white hover:bg-accent/80">
                   Create game
                 </button>
+                <p className="text-xs text-slate-500">You&apos;ll pick your deck in the lobby waiting room after creating.</p>
               </div>
             </section>
 
@@ -233,24 +184,10 @@ export default function LobbyPage() {
                     className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
                   />
                 </div>
-                <div>
-                  <label className="mb-1 block text-sm text-slate-300">Your deck</label>
-                  <select
-                    value={joinDeckId}
-                    onChange={(e) => setJoinDeckId(e.target.value)}
-                    className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
-                  >
-                    <option value="">Select a deck…</option>
-                    {decks.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name} ({d.format === 'COMMANDER' ? 'Commander' : '1v1'}, {cardCount(d)} cards)
-                      </option>
-                    ))}
-                  </select>
-                </div>
                 <button onClick={handleJoin} className="w-full rounded bg-panelLight px-3 py-2 font-medium text-white hover:bg-white/10">
                   Join game
                 </button>
+                <p className="text-xs text-slate-500">You&apos;ll pick your deck in the lobby waiting room after joining.</p>
               </div>
             </section>
           </div>

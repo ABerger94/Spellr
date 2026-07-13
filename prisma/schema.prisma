@@ -131,6 +131,11 @@ model GamePlayer {
   user             User?    @relation(fields: [userId], references: [id])
   deckId           String?
   deck             Deck?    @relation(fields: [deckId], references: [id])
+  // Picked and confirmed in the lobby waiting room after joining, not at
+  // join time — lets the host gate "Start" on everyone actually being ready
+  // rather than just present. AI seats are created already deck-assigned
+  // and ready.
+  isReady          Boolean  @default(false)
   seat             Int
   isAI             Boolean  @default(false)
   aiPersona        String?

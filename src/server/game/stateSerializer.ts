@@ -79,6 +79,8 @@ export async function buildStateFor(gameId: string, viewerSeat: number | null): 
         displayName: p.isAI ? p.aiPersona ?? `AI Seat ${p.seat}` : p.user?.displayName ?? 'Player',
         isAI: p.isAI,
         connected: p.connected,
+        deckId: p.deckId,
+        isReady: p.isReady,
         life: p.life,
         counters: (p.counters as Record<string, number>) ?? {},
         commanderDamage: (p.commanderDamage as Record<string, number>) ?? {},

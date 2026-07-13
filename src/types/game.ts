@@ -107,6 +107,10 @@ export interface PlayerStateView {
   displayName: string;
   isAI: boolean;
   connected: boolean;
+  // Lobby-only: which deck this seat has picked (if any) and whether
+  // they've confirmed ready — meaningless once the game is ACTIVE.
+  deckId: string | null;
+  isReady: boolean;
   life: number;
   counters: Record<string, number>;
   commanderDamage: Record<string, number>;
