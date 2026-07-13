@@ -4,7 +4,7 @@ import { execute } from '@/server/game/actionHandler';
 import { actionSchema } from '@/server/game/actionTypes';
 import { logEvent } from '@/server/game/gameEvents';
 import { buildStateFor } from '@/server/game/stateSerializer';
-import { mulliganCardsOwed, type ZoneState, type GameStateView } from '@/types/game';
+import { mulliganCardsOwed, type ZoneState, type GameStateView, type PlayerStateView } from '@/types/game';
 import { createGeminiDriver } from './geminiClient';
 import { createGroqDriver } from './groqClient';
 import { createCerebrasDriver } from './cerebrasClient';
@@ -124,7 +124,44 @@ function cardLabel(state: GameStateView, id: string, includeText: boolean, count
   return label;
 }
 
-function buildPrompt(state: GameStateView, seat: number): string {
+/** Rough board-power heuristic for multiplayer threat assessment — sums the
+ * current (counter-adjusted) power of every creature a player controls. Not
+ * meant to be precise (it ignores keywords, removal in hand, etc.), just
+ * enough for the AI to tell "this opponent has a big board" from "this
+ * opponent has nothing" when deciding who to attack or worry about. */
+function computeBoardPower(state: GameStateView, p: PlayerStateView): number {
+  let total = 0;
+  for (const c of p.battlefield) {
+    const facts = state.cards[c.scryfallId];
+    if (!facts?.typeLine?.includes('Creature') || facts.power === null) continue;
+    const basePower = Number(facts.power);
+    if (!Number.isFinite(basePower)) continue;
+    const boost = (c.counters?.['+1/+1'] ?? 0) - (c.counters?.['-1/-1'] ?? 0);
+    total += basePower + boost;
+  }
+  return total;
+}
+
+/** Tallies, per opponent seat, how many times they've declared an attack
+ * against this AI seat (its face or one of its planeswalkers) so far this
+ * game — a simple stand-in for "who's been hostile to me" that the prompt
+ * uses to lean the AI's own attacks toward the more aggressive/threatening
+ * opponents in a multiplayer pod, rather than picking a target arbitrarily. */
+async function fetchAggressionAgainst(gameId: string, seat: number): Promise<Record<number, number>> {
+  const events = await prisma.gameEvent.findMany({
+    where: { gameId, type: 'DECLARE_ATTACK', actorSeat: { not: seat } },
+    select: { actorSeat: true, payload: true },
+  });
+  const counts: Record<number, number> = {};
+  for (const event of events) {
+    const payload = event.payload as { targetSeat?: number };
+    if (event.actorSeat === null || payload.targetSeat !== seat) continue;
+    counts[event.actorSeat] = (counts[event.actorSeat] ?? 0) + 1;
+  }
+  return counts;
+}
+
+function buildPrompt(state: GameStateView, seat: number, aggressionAgainstMe: Record<number, number>): string {
   const me = state.players.find((p) => p.seat === seat);
   const lines: string[] = [];
   lines.push(`Format: ${state.format}. Turn ${state.turnNumber}. You are seat ${seat} (${me?.displayName ?? 'AI'}).`);
@@ -135,6 +172,14 @@ function buildPrompt(state: GameStateView, seat: number): string {
     lines.push(
       `Seat ${p.seat} (${p.displayName})${isMe ? ' — THIS IS YOU. Every card below is one YOU control.' : ` — an OPPONENT. Every card below belongs to THEM, not you — never target these instanceIds with attack_with, move_card_zone, or any other action that acts on your own cards.`}: life ${p.life}, library ${p.libraryCount}, hand ${p.handCount} card(s).`,
     );
+    if (!isMe) {
+      const boardPower = computeBoardPower(state, p);
+      const timesAttackedYou = aggressionAgainstMe[p.seat] ?? 0;
+      lines.push(
+        `  Threat read: ${boardPower} total creature power on board, ${p.battlefield.length} permanent(s)` +
+          (timesAttackedYou > 0 ? `, has attacked you ${timesAttackedYou} time(s) this game.` : ', has not attacked you this game.'),
+      );
+    }
     const playerCounters = Object.entries(p.counters ?? {}).filter(([, count]) => count > 0);
     if (playerCounters.length > 0) {
       lines.push(`  Player counters: ${playerCounters.map(([type, count]) => `${count} ${type}`).join(', ')}`);
@@ -282,7 +327,8 @@ async function mapFunctionCallToAction(
 // means a fresh driver picks up from whatever the live game state now is.
 async function takeTurn(gameId: string, seat: number, driver: AITurnDriver): Promise<void> {
   const state = await buildStateFor(gameId, seat);
-  let step = await driver.sendInitial(buildPrompt(state, seat));
+  const aggressionAgainstMe = await fetchAggressionAgainst(gameId, seat);
+  let step = await driver.sendInitial(buildPrompt(state, seat, aggressionAgainstMe));
   let actionsTaken = 0;
 
   while (actionsTaken < MAX_ACTIONS_PER_TURN) {

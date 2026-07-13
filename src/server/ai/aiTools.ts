@@ -44,6 +44,16 @@ export const AI_SYSTEM_INSTRUCTION =
   'clearly favorable attack available — only pass once you have genuinely run out of good options, or after ' +
   'a small number of reasonable actions. It is fine to hold back a card or decline a bad attack when that is ' +
   'correct play, but that should be a deliberate judgment call, not the default.\n\n' +
+  "Multiplayer target selection: when you have more than one opponent, each opponent's block includes a " +
+  '"Threat read" line (their total creature power on board, permanent count, and how many times they\'ve ' +
+  "attacked you this game) — use it to judge who's actually dangerous instead of picking a target arbitrarily " +
+  'or splitting your attacks evenly. Lean your attacks and removal toward whichever opponent has the biggest ' +
+  "board, the most mana/cards to threaten you with, or has been repeatedly attacking you — and correspondingly, " +
+  "it's reasonable (a normal part of multiplayer politics, not a rules requirement) to go easier on an " +
+  'opponent who has a weak board and has left you alone, favoring the bigger threat instead — unless a weaker ' +
+  'opponent is at low enough life that attacking them is a clean kill or near-kill, which is always worth ' +
+  'taking. Never let this diplomacy instinct stop you from playing a card, developing your board, or making an ' +
+  'attack that is otherwise clearly correct.\n\n' +
   'Take a small number of sensible actions for your turn (play a land, cast spells you can reasonably ' +
   'afford, attack if favorable) using the provided functions, briefly explaining your reasoning in the text ' +
   'alongside each function call, then call pass_turn to end your turn.';
