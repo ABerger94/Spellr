@@ -9,17 +9,19 @@ import { createGeminiDriver } from './geminiClient';
 import { createGroqDriver } from './groqClient';
 import { createCerebrasDriver } from './cerebrasClient';
 import { createOpenRouterDriver } from './openRouterClient';
+import { createBase44Driver } from './base44Client';
 import type { AITurnDriver } from './aiDriver';
 
 const MAX_ACTIONS_PER_TURN = 12;
 
-type ProviderName = 'gemini' | 'groq' | 'cerebras' | 'openrouter';
+type ProviderName = 'gemini' | 'groq' | 'cerebras' | 'openrouter' | 'base44';
 
 const DRIVER_FACTORIES: Record<ProviderName, () => AITurnDriver> = {
   gemini: createGeminiDriver,
   groq: createGroqDriver,
   cerebras: createCerebrasDriver,
   openrouter: createOpenRouterDriver,
+  base44: createBase44Driver,
 };
 
 function createDriver(provider: ProviderName): AITurnDriver {
@@ -54,6 +56,7 @@ async function maybeTakeAITurn(gameId: string, seat: number): Promise<void> {
   if (env.groqApiKey) providers.push('groq');
   if (env.cerebrasApiKey) providers.push('cerebras');
   if (env.openRouterApiKey) providers.push('openrouter');
+  if (env.base44AppId) providers.push('base44');
 
   if (providers.length === 0) {
     await logEvent(gameId, 'AI_SKIPPED_NO_KEY', {}, { seat });

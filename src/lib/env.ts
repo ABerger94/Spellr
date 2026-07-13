@@ -40,6 +40,9 @@ export const env = {
     // free model lineup changes.
     return process.env.OPENROUTER_MODEL || 'openrouter/free';
   },
+  get base44AppId(): string | undefined {
+    return process.env.BASE44_APP_ID || undefined;
+  },
   get pusherAppId() {
     return required('PUSHER_APP_ID');
   },
