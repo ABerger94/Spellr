@@ -111,6 +111,10 @@ export interface PlayerStateView {
   // they've confirmed ready — meaningless once the game is ACTIVE.
   deckId: string | null;
   isReady: boolean;
+  // The scryfallId of this seat's designated commander (Commander format
+  // only), regardless of which zone it's currently in — null for 1v1 or a
+  // deck with no commander set.
+  commanderCardId: string | null;
   life: number;
   counters: Record<string, number>;
   commanderDamage: Record<string, number>;

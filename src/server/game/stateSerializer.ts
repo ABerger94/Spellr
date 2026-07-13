@@ -33,7 +33,7 @@ function extractBackFace(raw: unknown): CardFace | null {
 export async function buildStateFor(gameId: string, viewerSeat: number | null): Promise<GameStateView> {
   const game = await prisma.game.findUniqueOrThrow({
     where: { id: gameId },
-    include: { players: { include: { user: true } } },
+    include: { players: { include: { user: true, deck: { select: { commanderCardId: true } } } } },
   });
 
   // Batch-fetch card facts for every scryfallId visible anywhere in this
@@ -45,6 +45,10 @@ export async function buildStateFor(gameId: string, viewerSeat: number | null): 
     zones.graveyard.forEach((id) => allIds.add(id));
     zones.exile.forEach((id) => allIds.add(id));
     zones.commandZone.forEach((id) => allIds.add(id));
+    // Fetched regardless of the commander's current zone (battlefield,
+    // graveyard, exile...) so its name is always available for display —
+    // e.g. commander-damage labels — even once it's left the command zone.
+    if (p.deck?.commanderCardId) allIds.add(p.deck.commanderCardId);
     if (p.seat === viewerSeat) {
       zones.library.forEach((id) => allIds.add(id));
       zones.hand.forEach((id) => allIds.add(id));
@@ -80,6 +84,7 @@ export async function buildStateFor(gameId: string, viewerSeat: number | null): 
         isAI: p.isAI,
         connected: p.connected,
         deckId: p.deckId,
+        commanderCardId: p.deck?.commanderCardId ?? null,
         isReady: p.isReady,
         life: p.life,
         counters: (p.counters as Record<string, number>) ?? {},
