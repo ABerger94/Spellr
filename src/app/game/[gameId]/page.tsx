@@ -229,9 +229,12 @@ export default function GameTablePage() {
           state={state}
           gameInfo={gameInfo}
           isHost={userId === gameInfo.hostUserId}
+          log={log}
           onStarted={refreshState}
           onCancelled={() => router.push('/lobby')}
+          onLeft={() => router.push('/lobby')}
           onSeatsChanged={refreshState}
+          onSendChat={sendChat}
         />
       </div>
     );
