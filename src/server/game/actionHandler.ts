@@ -530,6 +530,9 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       const player = await getPlayer(gameId, actor.seat);
       const zones = player.zones as unknown as ZoneState;
       const attackingCard = zones.battlefield.find((c) => c.instanceId === action.instanceId);
+      if (!attackingCard) {
+        throw new Error('That creature is not on your own battlefield — you can only declare attacks with creatures you control.');
+      }
       const vigilant = await resolveHasVigilance(attackingCard?.scryfallId);
       const nextZones = declareAttack(
         zones,

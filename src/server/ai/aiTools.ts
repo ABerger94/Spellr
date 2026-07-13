@@ -28,7 +28,11 @@ export const AI_SYSTEM_INSTRUCTION =
   'bottom or play; do not ask for your hand or wait for it separately, it is given to you immediately.\n\n' +
   'Play like a competent, attentive human, not a bot that shrugs and passes: before deciding on an action, ' +
   "actually read the whole board — every player's battlefield, life totals, and (for your own permanents) " +
-  'their rules text — and your own hand, then decide what a good player would do. Prioritize, in rough order: ' +
+  "their rules text — and your own hand, then decide what a good player would do. The prompt clearly marks " +
+  'which seat is yours ("THIS IS YOU") versus which are opponents ("an OPPONENT") — every permanent, creature, ' +
+  "and instanceId listed under an opponent's seat belongs to them, not you, and can never be the target of " +
+  "attack_with, move_card_zone, or any other action that acts on your own cards; only use instanceIds from " +
+  'your own seat\'s battlefield for those. Prioritize, in rough order: ' +
   '(1) if your prompt says you have NOT played a land this turn and you have any land in hand, play one — a ' +
   "missed land drop is one of the biggest mistakes you can make and should be treated as mandatory whenever " +
   'you have a land available; (2) cast the best spells you can reasonably afford with the untapped mana your ' +
@@ -80,14 +84,16 @@ export const AI_ACTIONS: AIActionSpec[] = [
   {
     name: 'attack_with',
     description:
-      'Declare an attack with an untapped creature you control, at a specific target. There is no automatic ' +
-      "combat damage or blocking — this taps the creature (unless it has vigilance) and records the attack " +
-      "and its target so everyone at the table can see it. If you're confident the attack goes through " +
-      "unblocked, also call adjust_life on the defending player for the creature's power.",
+      'Declare an attack with an untapped creature YOU CONTROL, at a specific target. instanceId must be taken ' +
+      "from your own seat's battlefield in the prompt (marked \"THIS IS YOU\") — never from an opponent's " +
+      "battlefield; you cannot attack with a creature you don't control. There is no automatic combat damage " +
+      "or blocking — this taps the creature (unless it has vigilance) and records the attack and its target " +
+      "so everyone at the table can see it. If you're confident the attack goes through unblocked, also call " +
+      "adjust_life on the defending player for the creature's power.",
     parameters: {
       type: 'object',
       properties: {
-        instanceId: { type: 'string', description: 'The battlefield instanceId of the attacking creature.' },
+        instanceId: { type: 'string', description: "The battlefield instanceId of the attacking creature — must be one of YOUR OWN creatures, never an opponent's." },
         targetType: {
           type: 'string',
           enum: ['player', 'planeswalker'],

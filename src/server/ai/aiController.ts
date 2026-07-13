@@ -133,7 +133,7 @@ function buildPrompt(state: GameStateView, seat: number): string {
   for (const p of state.players) {
     const isMe = p.seat === seat;
     lines.push(
-      `Seat ${p.seat} (${p.displayName})${isMe ? ' [you]' : ''}: life ${p.life}, library ${p.libraryCount}, hand ${p.handCount} card(s).`,
+      `Seat ${p.seat} (${p.displayName})${isMe ? ' — THIS IS YOU. Every card below is one YOU control.' : ` — an OPPONENT. Every card below belongs to THEM, not you — never target these instanceIds with attack_with, move_card_zone, or any other action that acts on your own cards.`}: life ${p.life}, library ${p.libraryCount}, hand ${p.handCount} card(s).`,
     );
     const playerCounters = Object.entries(p.counters ?? {}).filter(([, count]) => count > 0);
     if (playerCounters.length > 0) {
@@ -170,6 +170,10 @@ function buildPrompt(state: GameStateView, seat: number): string {
     }
   }
 
+  lines.push('');
+  lines.push(
+    `Reminder: only your own seat (${seat}, marked "THIS IS YOU" above) is under your control. When choosing an instanceId for attack_with or move_card_zone, it must come from YOUR OWN battlefield listed above — never from an opponent's battlefield. You cannot attack with, tap, or otherwise act on a creature or permanent you do not control.`,
+  );
   lines.push('');
   if (me?.hand && me.hand.length > 0) {
     lines.push(
