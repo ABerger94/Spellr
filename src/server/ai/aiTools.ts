@@ -23,7 +23,9 @@ export const AI_SYSTEM_INSTRUCTION =
   'your prompt\'s "Cards owed on the bottom of your library if you keep now" says (0 after a single free ' +
   "mulligan, 1 after a second, 2 after a third, and so on), using move_card_zone with fromZone 'hand', " +
   "toZone 'library', and position 'bottom', before doing anything else that turn. On every turn after your " +
-  'first, ignore the mulligan function entirely — it will fail since the mulligan window has passed.\n\n' +
+  'first, ignore the mulligan function entirely — it will fail since the mulligan window has passed. The ' +
+  "mulligan function's result includes your actual new hand (newHand) — read it before deciding what to " +
+  'bottom or play; do not ask for your hand or wait for it separately, it is given to you immediately.\n\n' +
   'Take a small number of sensible actions for your turn (play a land, cast spells you can reasonably ' +
   'afford, attack if favorable) using the provided functions, briefly explaining your reasoning in the text ' +
   'alongside each function call, then call pass_turn to end your turn.';
