@@ -8,6 +8,11 @@ interface ChatMessage {
   tool_call_id?: string;
 }
 
+interface FallbackCall {
+  name: string;
+  args: Record<string, unknown>;
+}
+
 const AI_TOOLS = AI_ACTIONS.map((action) => ({
   type: 'function' as const,
   function: { name: action.name, description: action.description, parameters: action.parameters },
@@ -19,25 +24,26 @@ const AI_TOOLS = AI_ACTIONS.map((action) => ({
 const FALLBACK_TOOL_CALL_ID = 'fallback-text-call';
 
 /** Some weaker/less-instruction-following models occasionally answer with
- * the function call spelled out as fenced JSON in the message text instead
- * of a real structured tool_calls entry (observed in practice on Cerebras) —
- * this pulls the first one out so the turn doesn't just silently stall with
- * the model "describing" actions that never happen. */
-function extractFallbackToolCall(content: string): { name: string; args: Record<string, unknown> } | null {
+ * its whole turn plan spelled out as several fenced JSON function calls in
+ * the message text instead of real structured tool_calls entries (observed
+ * in practice on Cerebras) — this pulls every one of them out, in order, so
+ * the turn doesn't stall after only the first ever actually executes. */
+function extractAllFallbackToolCalls(content: string): FallbackCall[] {
   const fenceRegex = /```(?:json)?\s*([\s\S]*?)```/g;
+  const calls: FallbackCall[] = [];
   let match: RegExpExecArray | null;
   while ((match = fenceRegex.exec(content))) {
     try {
       const parsed = JSON.parse(match[1].trim());
       if (parsed && typeof parsed.function === 'string') {
         const args = parsed.arguments && typeof parsed.arguments === 'object' ? parsed.arguments : {};
-        return { name: parsed.function, args };
+        calls.push({ name: parsed.function, args });
       }
     } catch {
-      // Not a JSON fence (e.g. plain commentary) — keep looking at the next one.
+      // Not a JSON fence (e.g. plain commentary) — skip it and keep looking.
     }
   }
-  return null;
+  return calls;
 }
 
 /** A minimal OpenAI-compatible chat-completions client, good enough for the
@@ -51,10 +57,19 @@ function extractFallbackToolCall(content: string): { name: string; args: Record<
 export function createOpenAICompatDriver(opts: { apiKey: string; baseURL: string; model: string }): AITurnDriver {
   const endpoint = `${opts.baseURL.replace(/\/$/, '')}/chat/completions`;
   const messages: ChatMessage[] = [{ role: 'system', content: AI_SYSTEM_INSTRUCTION }];
-  // True when the most recently returned toolCall was recovered from text
-  // rather than a real tool_calls entry — sendToolResult reads this to pick
-  // the right reply shape for whichever one just happened.
+  // True while we're still working through a batch of fallback calls
+  // recovered from one text response — sendToolResult reads this to decide
+  // whether to reply for real or just hand out the next queued call.
   let lastToolCallWasFallback = false;
+  // Extra calls recovered from the same text dump as the one just returned,
+  // still waiting to be handed out — dispensed locally, with no network
+  // round-trip, so the model doesn't get a chance to "forget" the rest of
+  // its own stated plan once it moves on to a later action.
+  let fallbackQueue: FallbackCall[] = [];
+  // Results collected for calls served out of fallbackQueue, flushed into
+  // the conversation as one message once the queue drains and we go back
+  // to asking the model for real.
+  let queuedResults: { name: string; result: Record<string, unknown> }[] = [];
 
   async function step(): Promise<AITurnStep> {
     const res = await fetch(endpoint, {
@@ -101,12 +116,18 @@ export function createOpenAICompatDriver(opts: { apiKey: string; baseURL: string
       };
     }
 
-    const fallback = message.content ? extractFallbackToolCall(message.content) : null;
-    lastToolCallWasFallback = !!fallback;
-    return {
-      reasoningText: (message.content ?? '').trim(),
-      toolCall: fallback ? { id: FALLBACK_TOOL_CALL_ID, name: fallback.name, args: fallback.args } : null,
-    };
+    const fallbackCalls = message.content ? extractAllFallbackToolCalls(message.content) : [];
+    lastToolCallWasFallback = fallbackCalls.length > 0;
+    if (fallbackCalls.length > 0) {
+      const [first, ...rest] = fallbackCalls;
+      fallbackQueue = rest;
+      return {
+        reasoningText: (message.content ?? '').trim(),
+        toolCall: { id: FALLBACK_TOOL_CALL_ID, name: first.name, args: first.args },
+      };
+    }
+
+    return { reasoningText: (message.content ?? '').trim(), toolCall: null };
   }
 
   return {
@@ -115,14 +136,29 @@ export function createOpenAICompatDriver(opts: { apiKey: string; baseURL: string
       return step();
     },
     async sendToolResult(toolCallId, toolName, result) {
-      if (lastToolCallWasFallback) {
-        // No real tool_calls entry exists on the preceding assistant message
-        // to attach a role:'tool' reply to — describe the result in plain
-        // text instead so the conversation stays well-formed.
-        messages.push({ role: 'user', content: `Result of ${toolName}: ${JSON.stringify(result)}` });
-      } else {
+      if (!lastToolCallWasFallback) {
         messages.push({ role: 'tool', tool_call_id: toolCallId, content: JSON.stringify(result) });
+        return step();
       }
+
+      queuedResults.push({ name: toolName, result });
+
+      if (fallbackQueue.length > 0) {
+        const next = fallbackQueue.shift()!;
+        return { reasoningText: '', toolCall: { id: FALLBACK_TOOL_CALL_ID, name: next.name, args: next.args } };
+      }
+
+      // The whole batch from that one text dump has now actually run — tell
+      // the model everything that happened (not just the last call) and
+      // let it decide for real whether anything is still left to do. No
+      // real tool_calls entry ever existed for these, so this goes back as
+      // a plain user message rather than a role:'tool' reply.
+      const summary = queuedResults.map((r) => `${r.name} -> ${JSON.stringify(r.result)}`).join('; ');
+      queuedResults = [];
+      messages.push({
+        role: 'user',
+        content: `Results of your planned actions, in order: ${summary}. Continue your turn if anything is still left to do, otherwise call pass_turn.`,
+      });
       return step();
     },
   };
