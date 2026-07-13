@@ -68,6 +68,7 @@ function StatsMenu({
   commanderDamageFrom,
   onCommanderDamageChange,
   onCounterChange,
+  onEliminateChange,
 }: {
   anchorRect: DOMRect;
   onClose: () => void;
@@ -75,6 +76,7 @@ function StatsMenu({
   commanderDamageFrom?: { seat: number; name: string }[];
   onCommanderDamageChange?: (fromSeat: number, delta: number) => void;
   onCounterChange?: (counterType: string, delta: number) => void;
+  onEliminateChange?: (eliminated: boolean) => void;
 }) {
   const [customType, setCustomType] = useState('');
   const ref = useRef<HTMLDivElement>(null);
@@ -94,6 +96,23 @@ function StatsMenu({
         className="z-[200] max-h-[70vh] overflow-y-auto rounded-lg border border-white/10 bg-panel p-3 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
+        {onEliminateChange && (
+          <button
+            type="button"
+            onClick={() => {
+              onEliminateChange(!player.eliminated);
+              onClose();
+            }}
+            className={`mb-2 w-full rounded px-2 py-1.5 text-xs font-medium ${
+              player.eliminated
+                ? 'bg-panelLight text-slate-300 hover:bg-white/10'
+                : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+            }`}
+          >
+            {player.eliminated ? 'Un-eliminate' : '💀 Mark eliminated'}
+          </button>
+        )}
+
         {commanderDamageFrom && commanderDamageFrom.length > 0 && (
           <div className="mb-2">
             <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Commander damage taken</p>
@@ -187,6 +206,7 @@ export function PlayerPanel({
   commanderDamageFrom,
   onCommanderDamageChange,
   onCounterChange,
+  onEliminateChange,
 }: {
   player: PlayerStateView;
   isViewer: boolean;
@@ -203,6 +223,7 @@ export function PlayerPanel({
   onCommanderDamageChange?: (fromSeat: number, delta: number) => void;
   /** Poison and any other player-level counter (experience, energy, custom). */
   onCounterChange?: (counterType: string, delta: number) => void;
+  onEliminateChange?: (eliminated: boolean) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
@@ -219,7 +240,15 @@ export function PlayerPanel({
   }
 
   return (
-    <div className={`inline-block rounded-lg border ${isActiveTurn ? 'border-accent2 bg-accent2/10' : 'border-white/10 bg-panel'}`}>
+    <div
+      className={`inline-block rounded-lg border ${
+        player.eliminated
+          ? 'border-red-500 bg-red-500/10'
+          : isActiveTurn
+            ? 'border-accent2 bg-accent2/10'
+            : 'border-white/10 bg-panel'
+      }`}
+    >
       <div className={`flex flex-col ${compact ? 'px-2 py-1' : 'px-3 py-2'}`}>
         <p className={`truncate font-medium text-white ${compact ? 'text-xs' : 'text-sm'}`}>
           {player.displayName}
@@ -233,6 +262,9 @@ export function PlayerPanel({
               no AI key
             </span>
           )}
+          {player.eliminated && (
+            <span className="ml-1 whitespace-nowrap rounded bg-red-500/20 px-1 text-[10px] text-red-400">eliminated</span>
+          )}
         </p>
         {!compact && (
           <p className="text-xs text-slate-500">
@@ -241,22 +273,33 @@ export function PlayerPanel({
           </p>
         )}
         <div className="mt-0.5 flex items-center gap-1">
-          {onLifeChange && (
-            <button
-              onClick={() => onLifeChange(-1)}
-              className={`rounded bg-panelLight text-red-400 hover:bg-white/10 ${compact ? 'h-5 w-5 text-xs' : 'h-6 w-6 text-sm'}`}
+          {player.eliminated ? (
+            <span
+              title="Eliminated"
+              className={`text-center ${compact ? 'w-7 text-sm' : 'w-10 text-lg'}`}
             >
-              −
-            </button>
-          )}
-          <span className={`text-center font-semibold text-white ${compact ? 'w-7 text-sm' : 'w-10 text-lg'}`}>{player.life}</span>
-          {onLifeChange && (
-            <button
-              onClick={() => onLifeChange(1)}
-              className={`rounded bg-panelLight text-emerald-400 hover:bg-white/10 ${compact ? 'h-5 w-5 text-xs' : 'h-6 w-6 text-sm'}`}
-            >
-              +
-            </button>
+              💀
+            </span>
+          ) : (
+            <>
+              {onLifeChange && (
+                <button
+                  onClick={() => onLifeChange(-1)}
+                  className={`rounded bg-panelLight text-red-400 hover:bg-white/10 ${compact ? 'h-5 w-5 text-xs' : 'h-6 w-6 text-sm'}`}
+                >
+                  −
+                </button>
+              )}
+              <span className={`text-center font-semibold text-white ${compact ? 'w-7 text-sm' : 'w-10 text-lg'}`}>{player.life}</span>
+              {onLifeChange && (
+                <button
+                  onClick={() => onLifeChange(1)}
+                  className={`rounded bg-panelLight text-emerald-400 hover:bg-white/10 ${compact ? 'h-5 w-5 text-xs' : 'h-6 w-6 text-sm'}`}
+                >
+                  +
+                </button>
+              )}
+            </>
           )}
           <button
             ref={btnRef}
@@ -278,6 +321,7 @@ export function PlayerPanel({
           commanderDamageFrom={commanderDamageFrom}
           onCommanderDamageChange={onCommanderDamageChange}
           onCounterChange={onCounterChange}
+          onEliminateChange={onEliminateChange}
         />
       )}
     </div>

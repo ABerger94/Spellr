@@ -110,6 +110,25 @@ async function resolveHasVigilance(scryfallId: string | undefined): Promise<bool
   return hasVigilance(card?.oracleText ?? null);
 }
 
+/** Finds the next seat after `fromSeat` in turn order, skipping any
+ * eliminated seats — wraps around the full table if needed (e.g. everyone
+ * else at the table is eliminated, so play just continues with the one
+ * remaining seat). `wrapped` is true whenever the search crosses back past
+ * the start of the seat order, same meaning PASS_TURN uses it for to decide
+ * whether the turn counter increments. */
+function nextActiveSeat(seats: number[], eliminatedSeats: Set<number>, fromSeat: number): { nextSeat: number; wrapped: boolean } {
+  const fromIndex = seats.indexOf(fromSeat);
+  let idx = fromIndex;
+  let wrapped = false;
+  for (let step = 0; step < seats.length; step++) {
+    const prevIdx = idx;
+    idx = (idx + 1) % seats.length;
+    if (idx <= prevIdx) wrapped = true;
+    if (!eliminatedSeats.has(seats[idx])) break;
+  }
+  return { nextSeat: seats[idx], wrapped };
+}
+
 async function broadcastState(gameId: string) {
   try {
     await broadcastGameState(gameId);
@@ -300,16 +319,49 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       break;
     }
 
+    // Any player can mark any seat eliminated (same table-trust model as
+    // life/counters) — PASS_TURN skips their seat in turn order from then
+    // on. Un-eliminating puts them back in the rotation.
+    case 'ELIMINATE_PLAYER': {
+      const player = await getPlayer(gameId, action.seat);
+      await prisma.gamePlayer.update({ where: { id: player.id }, data: { eliminated: action.eliminated } });
+
+      // If the seat being eliminated currently holds the active turn, don't
+      // leave the game stuck waiting on them to pass it themselves — advance
+      // immediately to the next non-eliminated seat, same logic PASS_TURN uses.
+      if (action.eliminated && game.currentTurnSeat === action.seat) {
+        const players = await prisma.gamePlayer.findMany({ where: { gameId }, orderBy: { seat: 'asc' } });
+        const seats = players.map((p) => p.seat);
+        const eliminatedSeats = new Set(players.filter((p) => p.eliminated).map((p) => p.seat));
+        eliminatedSeats.add(action.seat);
+        const { nextSeat, wrapped } = nextActiveSeat(seats, eliminatedSeats, action.seat);
+        if (nextSeat !== action.seat) {
+          await prisma.game.update({
+            where: { id: gameId },
+            data: { currentTurnSeat: nextSeat, turnNumber: wrapped ? game.turnNumber + 1 : game.turnNumber },
+          });
+          await Promise.all(
+            players.map((p) => {
+              const nextZones = clearCombat(p.zones as unknown as ZoneState);
+              if (p.seat === nextSeat) nextZones.landPlayedThisTurn = false;
+              return updateZones(p.id, nextZones);
+            }),
+          );
+        }
+      }
+
+      event = await logEvent(gameId, 'ELIMINATE_PLAYER', { seat: action.seat, eliminated: action.eliminated }, actor);
+      break;
+    }
+
     case 'PASS_TURN': {
       if (game.currentTurnSeat !== actor.seat) {
         throw new Error("It isn't your turn");
       }
       const players = await prisma.gamePlayer.findMany({ where: { gameId }, orderBy: { seat: 'asc' } });
       const seats = players.map((p) => p.seat);
-      const currentIndex = seats.indexOf(actor.seat);
-      const nextIndex = (currentIndex + 1) % seats.length;
-      const nextSeat = seats[nextIndex];
-      const wrapped = nextIndex <= currentIndex;
+      const eliminatedSeats = new Set(players.filter((p) => p.eliminated).map((p) => p.seat));
+      const { nextSeat, wrapped } = nextActiveSeat(seats, eliminatedSeats, actor.seat);
 
       await prisma.game.update({
         where: { id: gameId },

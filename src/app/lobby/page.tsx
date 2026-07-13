@@ -173,23 +173,55 @@ export default function LobbyPage() {
               </div>
             </section>
 
-            <section className="rounded-lg border border-white/10 bg-panel p-5">
-              <h2 className="mb-4 text-lg font-medium text-white">Join a game</h2>
-              <div className="space-y-3">
-                <div>
-                  <label className="mb-1 block text-sm text-slate-300">Invite code</label>
-                  <input
-                    value={inviteCode}
-                    onChange={(e) => setInviteCode(e.target.value)}
-                    className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
-                  />
+            <div className="flex flex-col gap-6">
+              <section className="rounded-lg border border-white/10 bg-panel p-5">
+                <h2 className="mb-4 text-lg font-medium text-white">Join a game</h2>
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-1 block text-sm text-slate-300">Invite code</label>
+                    <input
+                      value={inviteCode}
+                      onChange={(e) => setInviteCode(e.target.value)}
+                      className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
+                    />
+                  </div>
+                  <button onClick={handleJoin} className="w-full rounded bg-panelLight px-3 py-2 font-medium text-white hover:bg-white/10">
+                    Join game
+                  </button>
+                  <p className="text-xs text-slate-500">You&apos;ll pick your deck in the lobby waiting room after joining.</p>
                 </div>
-                <button onClick={handleJoin} className="w-full rounded bg-panelLight px-3 py-2 font-medium text-white hover:bg-white/10">
-                  Join game
-                </button>
-                <p className="text-xs text-slate-500">You&apos;ll pick your deck in the lobby waiting room after joining.</p>
-              </div>
-            </section>
+              </section>
+
+              <section className="flex flex-1 flex-col rounded-lg border border-white/10 bg-panel p-5">
+                <h2 className="mb-4 text-lg font-medium text-white">Your games</h2>
+                {games.length === 0 ? (
+                  <p className="text-slate-400">No games yet — create one on the left.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {games.map((g) => (
+                      <div
+                        key={g.id}
+                        className="flex items-center justify-between rounded border border-white/10 bg-panelLight px-4 py-3"
+                      >
+                        <div>
+                          <p className="flex items-center gap-2 text-white">
+                            {g.format === 'COMMANDER' ? 'Commander' : '1v1'} · {g.status} · {g.players.length}/{g.maxSeats} seats
+                            <BracketTag bracket={g.bracket} />
+                          </p>
+                          <p className="text-xs text-slate-500">Invite code: {g.inviteCode}</p>
+                        </div>
+                        <button
+                          onClick={() => router.push(`/game/${g.id}`)}
+                          className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/80"
+                        >
+                          {g.status === 'LOBBY' ? 'Enter lobby' : 'Resume'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
           </div>
 
           <section className="mt-8">
@@ -230,36 +262,6 @@ export default function LobbyPage() {
                     </div>
                   );
                 })}
-              </div>
-            )}
-          </section>
-
-          <section className="mt-8">
-            <h2 className="mb-4 text-lg font-medium text-white">Your games</h2>
-            {games.length === 0 ? (
-              <p className="text-slate-400">No games yet — create one above.</p>
-            ) : (
-              <div className="space-y-2">
-                {games.map((g) => (
-                  <div
-                    key={g.id}
-                    className="flex items-center justify-between rounded border border-white/10 bg-panel px-4 py-3"
-                  >
-                    <div>
-                      <p className="flex items-center gap-2 text-white">
-                        {g.format === 'COMMANDER' ? 'Commander' : '1v1'} · {g.status} · {g.players.length}/{g.maxSeats} seats
-                        <BracketTag bracket={g.bracket} />
-                      </p>
-                      <p className="text-xs text-slate-500">Invite code: {g.inviteCode}</p>
-                    </div>
-                    <button
-                      onClick={() => router.push(`/game/${g.id}`)}
-                      className="rounded bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent/80"
-                    >
-                      {g.status === 'LOBBY' ? 'Enter lobby' : 'Resume'}
-                    </button>
-                  </div>
-                ))}
               </div>
             )}
           </section>

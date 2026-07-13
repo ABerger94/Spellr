@@ -114,6 +114,9 @@ export interface PlayerStateView {
   // they've confirmed ready — meaningless once the game is ACTIVE.
   deckId: string | null;
   isReady: boolean;
+  // Marked by any player once this seat is out (0 life, conceded, ...) —
+  // PASS_TURN skips over eliminated seats from then on.
+  eliminated: boolean;
   // The scryfallId of this seat's designated commander (Commander format
   // only), regardless of which zone it's currently in — null for 1v1 or a
   // deck with no commander set.
@@ -188,6 +191,7 @@ export type GameActionPayload =
   | { type: 'ADJUST_LIFE'; seat: number; delta: number }
   | { type: 'ADJUST_COMMANDER_DAMAGE'; seat: number; fromSeat: number; delta: number }
   | { type: 'ADJUST_PLAYER_COUNTER'; seat: number; counterType: string; delta: number }
+  | { type: 'ELIMINATE_PLAYER'; seat: number; eliminated: boolean }
   | { type: 'PASS_TURN' }
   | { type: 'SCRY'; count: number }
   | { type: 'SURVEIL'; count: number }

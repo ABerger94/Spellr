@@ -48,6 +48,7 @@ export const actionSchema = z.discriminatedUnion('type', [
     counterType: z.string().min(1).max(20),
     delta: z.number().int().min(-99).max(99),
   }),
+  z.object({ type: z.literal('ELIMINATE_PLAYER'), seat: z.number().int(), eliminated: z.boolean() }),
   z.object({ type: z.literal('PASS_TURN') }),
   z.object({ type: z.literal('SCRY'), count: z.number().int().min(1).max(20) }),
   z.object({ type: z.literal('SURVEIL'), count: z.number().int().min(1).max(20) }),

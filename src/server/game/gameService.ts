@@ -319,6 +319,7 @@ export async function resetPlayerBoard(gameId: string, seat: number) {
       zones: zones as unknown as object,
       counters: {},
       commanderDamage: {},
+      eliminated: false,
     },
   });
 }
@@ -339,7 +340,7 @@ export async function restartGame(gameId: string, requestingUserId: string) {
     const zones = buildFreshZones(player.deck, game.format);
     await prisma.gamePlayer.update({
       where: { id: player.id },
-      data: { life: startingLife, zones: zones as unknown as object, counters: {}, commanderDamage: {} },
+      data: { life: startingLife, zones: zones as unknown as object, counters: {}, commanderDamage: {}, eliminated: false },
     });
   }
 
