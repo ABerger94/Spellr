@@ -147,6 +147,15 @@ function buildPrompt(state: GameStateView, seat: number): string {
   return lines.join('\n');
 }
 
+/** Used to hand the AI its actual new hand right after a mulligan — the
+ * generic `{ ok: true }` tool result otherwise leaves it unable to say what
+ * changed, since its prompt was only built once at the start of the turn. */
+async function currentHandLabels(gameId: string, seat: number): Promise<string[]> {
+  const state = await buildStateFor(gameId, seat);
+  const me = state.players.find((p) => p.seat === seat);
+  return (me?.hand ?? []).map((id) => `${cardLabel(state, id, true)} (scryfallId=${id})`);
+}
+
 async function resolveHandOrCommandZone(gameId: string, seat: number, scryfallId: string): Promise<'hand' | 'commandZone'> {
   const player = await prisma.gamePlayer.findFirstOrThrow({ where: { gameId, seat } });
   const zones = player.zones as unknown as ZoneState;
@@ -238,6 +247,9 @@ async function takeTurn(gameId: string, seat: number, driver: AITurnDriver): Pro
       await execute(gameId, { seat }, action);
       actionsTaken += 1;
       resultPayload = { ok: true };
+      if (name === 'mulligan') {
+        resultPayload.newHand = await currentHandLabels(gameId, seat);
+      }
     } catch (err) {
       resultPayload = { ok: false, error: err instanceof Error ? err.message : 'Action failed' };
     }

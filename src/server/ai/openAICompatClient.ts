@@ -13,6 +13,33 @@ const AI_TOOLS = AI_ACTIONS.map((action) => ({
   function: { name: action.name, description: action.description, parameters: action.parameters },
 }));
 
+/** Sentinel id for a tool call recovered from free-form text (see below) —
+ * there's no real tool_calls entry backing it, so sendToolResult knows not
+ * to attach a role:'tool' reply to a call the provider never actually made. */
+const FALLBACK_TOOL_CALL_ID = 'fallback-text-call';
+
+/** Some weaker/less-instruction-following models occasionally answer with
+ * the function call spelled out as fenced JSON in the message text instead
+ * of a real structured tool_calls entry (observed in practice on Cerebras) —
+ * this pulls the first one out so the turn doesn't just silently stall with
+ * the model "describing" actions that never happen. */
+function extractFallbackToolCall(content: string): { name: string; args: Record<string, unknown> } | null {
+  const fenceRegex = /```(?:json)?\s*([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+  while ((match = fenceRegex.exec(content))) {
+    try {
+      const parsed = JSON.parse(match[1].trim());
+      if (parsed && typeof parsed.function === 'string') {
+        const args = parsed.arguments && typeof parsed.arguments === 'object' ? parsed.arguments : {};
+        return { name: parsed.function, args };
+      }
+    } catch {
+      // Not a JSON fence (e.g. plain commentary) — keep looking at the next one.
+    }
+  }
+  return null;
+}
+
 /** A minimal OpenAI-compatible chat-completions client, good enough for the
  * handful of providers (Groq, Cerebras, OpenRouter, ...) that all speak the
  * same request/response shape at POST {baseURL}/chat/completions. Deliberately
@@ -24,6 +51,10 @@ const AI_TOOLS = AI_ACTIONS.map((action) => ({
 export function createOpenAICompatDriver(opts: { apiKey: string; baseURL: string; model: string }): AITurnDriver {
   const endpoint = `${opts.baseURL.replace(/\/$/, '')}/chat/completions`;
   const messages: ChatMessage[] = [{ role: 'system', content: AI_SYSTEM_INSTRUCTION }];
+  // True when the most recently returned toolCall was recovered from text
+  // rather than a real tool_calls entry — sendToolResult reads this to pick
+  // the right reply shape for whichever one just happened.
+  let lastToolCallWasFallback = false;
 
   async function step(): Promise<AITurnStep> {
     const res = await fetch(endpoint, {
@@ -57,12 +88,24 @@ export function createOpenAICompatDriver(opts: { apiKey: string; baseURL: string
     }
     messages.push(message);
 
-    const toolCall = message.tool_calls?.[0];
+    const realToolCall = message.tool_calls?.[0];
+    if (realToolCall) {
+      lastToolCallWasFallback = false;
+      return {
+        reasoningText: (message.content ?? '').trim(),
+        toolCall: {
+          id: realToolCall.id,
+          name: realToolCall.function.name,
+          args: JSON.parse(realToolCall.function.arguments || '{}'),
+        },
+      };
+    }
+
+    const fallback = message.content ? extractFallbackToolCall(message.content) : null;
+    lastToolCallWasFallback = !!fallback;
     return {
       reasoningText: (message.content ?? '').trim(),
-      toolCall: toolCall
-        ? { id: toolCall.id, name: toolCall.function.name, args: JSON.parse(toolCall.function.arguments || '{}') }
-        : null,
+      toolCall: fallback ? { id: FALLBACK_TOOL_CALL_ID, name: fallback.name, args: fallback.args } : null,
     };
   }
 
@@ -71,8 +114,15 @@ export function createOpenAICompatDriver(opts: { apiKey: string; baseURL: string
       messages.push({ role: 'user', content: prompt });
       return step();
     },
-    async sendToolResult(toolCallId, _toolName, result) {
-      messages.push({ role: 'tool', tool_call_id: toolCallId, content: JSON.stringify(result) });
+    async sendToolResult(toolCallId, toolName, result) {
+      if (lastToolCallWasFallback) {
+        // No real tool_calls entry exists on the preceding assistant message
+        // to attach a role:'tool' reply to — describe the result in plain
+        // text instead so the conversation stays well-formed.
+        messages.push({ role: 'user', content: `Result of ${toolName}: ${JSON.stringify(result)}` });
+      } else {
+        messages.push({ role: 'tool', tool_call_id: toolCallId, content: JSON.stringify(result) });
+      }
       return step();
     },
   };
