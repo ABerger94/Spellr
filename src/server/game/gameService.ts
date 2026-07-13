@@ -19,6 +19,20 @@ export function startingLifeFor(format: GameFormat): number {
   return format === 'COMMANDER' ? 40 : 20;
 }
 
+/** Marks a game as not-idle — called from every place that represents a real
+ * person doing something (joining, picking a deck, readying up, taking a
+ * game action, chatting), never from a read-only fetch/poll. The scheduled
+ * cleanup sweep (closeIdleGames) uses this to find rooms nobody has touched
+ * in a while. Swallows errors since a failed timestamp bump should never
+ * block the actual action that triggered it. */
+export async function touchGameActivity(gameId: string): Promise<void> {
+  try {
+    await prisma.game.update({ where: { id: gameId }, data: { lastActivityAt: new Date() } });
+  } catch (err) {
+    console.error('[touchGameActivity]', err);
+  }
+}
+
 /** Builds a freshly-shuffled library (+ command zone, for Commander) from a
  * player's deck — the "deal a new hand" logic shared by starting and
  * restarting a game. */
@@ -112,6 +126,7 @@ export async function joinGameById(gameId: string, userId: string) {
   if (seat >= game.maxSeats) throw new Error('That game is full');
 
   await prisma.gamePlayer.create({ data: { gameId: game.id, userId, seat, isAI: false } });
+  await touchGameActivity(gameId);
 
   // Without this, the host (and anyone else already waiting) never finds out
   // a new player joined until they manually reload — nothing else broadcasts
@@ -179,6 +194,7 @@ export async function setPlayerDeck(gameId: string, userId: string, deckId: stri
   if (!player) throw new Error('You are not in this game');
 
   await prisma.gamePlayer.update({ where: { id: player.id }, data: { deckId, isReady: false } });
+  await touchGameActivity(gameId);
 
   try {
     await broadcastGameState(gameId);
@@ -198,6 +214,7 @@ export async function setPlayerReady(gameId: string, userId: string, ready: bool
   if (ready && !player.deckId) throw new Error('Pick a deck before marking yourself ready');
 
   await prisma.gamePlayer.update({ where: { id: player.id }, data: { isReady: ready } });
+  await touchGameActivity(gameId);
 
   try {
     await broadcastGameState(gameId);
@@ -268,6 +285,7 @@ export async function fillRemainingSeatsWithAI(gameId: string, requestingUserId:
   if (game.status !== 'LOBBY') throw new Error('That game has already started');
 
   await fillEmptySeats(gameId, game.maxSeats, game.format, game.players);
+  await touchGameActivity(gameId);
 
   try {
     await broadcastGameState(gameId);
@@ -362,7 +380,7 @@ export async function startGame(gameId: string, requestingUserId: string) {
 
   await prisma.game.update({
     where: { id: gameId },
-    data: { status: 'ACTIVE', startedAt: new Date(), currentTurnSeat: 0, turnNumber: 1 },
+    data: { status: 'ACTIVE', startedAt: new Date(), currentTurnSeat: 0, turnNumber: 1, lastActivityAt: new Date() },
   });
 
   await logEvent(gameId, 'GAME_STARTED', { seatCount: players.length });
@@ -431,4 +449,52 @@ export async function endGame(gameId: string, requestingUserId: string) {
   if (game.status !== 'ACTIVE') throw new Error('Game is not active');
 
   await prisma.game.update({ where: { id: gameId }, data: { status: 'FINISHED', endedAt: new Date() } });
+}
+
+const IDLE_TIMEOUT_MS = 60 * 60 * 1000;
+
+/** Scheduled cleanup (see the cron route at /api/cron/close-idle-games):
+ * closes any LOBBY or ACTIVE game nobody has touched — joined, readied up,
+ * played a card, chatted, anything logEvent-worthy — in over an hour.
+ * Waiting rooms are deleted outright, same as a host cancelling; in-progress
+ * games are just marked FINISHED, same as a host ending one, so the board
+ * and log stay around to look at. Returns counts for the route to report. */
+export async function closeIdleGames(): Promise<{ cancelledLobbies: number; endedActiveGames: number }> {
+  const cutoff = new Date(Date.now() - IDLE_TIMEOUT_MS);
+
+  const idleLobbies = await prisma.game.findMany({
+    where: { status: 'LOBBY', lastActivityAt: { lt: cutoff } },
+    select: { id: true },
+  });
+  for (const { id } of idleLobbies) {
+    try {
+      await broadcastGameCancelled(id, 'idle');
+    } catch (err) {
+      console.error('[broadcastGameCancelled]', err);
+    }
+  }
+  if (idleLobbies.length > 0) {
+    await prisma.game.deleteMany({ where: { id: { in: idleLobbies.map((g) => g.id) } } });
+  }
+
+  const idleActiveGames = await prisma.game.findMany({
+    where: { status: 'ACTIVE', lastActivityAt: { lt: cutoff } },
+    select: { id: true },
+  });
+  if (idleActiveGames.length > 0) {
+    await prisma.game.updateMany({
+      where: { id: { in: idleActiveGames.map((g) => g.id) } },
+      data: { status: 'FINISHED', endedAt: new Date() },
+    });
+  }
+  for (const { id } of idleActiveGames) {
+    await logEvent(id, 'GAME_AUTO_CLOSED', {});
+    try {
+      await broadcastGameState(id);
+    } catch (err) {
+      console.error('[broadcastGameState]', err);
+    }
+  }
+
+  return { cancelledLobbies: idleLobbies.length, endedActiveGames: idleActiveGames.length };
 }

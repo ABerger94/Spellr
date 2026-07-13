@@ -91,8 +91,12 @@ export function useGameState(gameId: string) {
       presenceChannel.bind('game:log', (event: GameLogEntry) => {
         setLog((prev) => mergeLogEntries(prev, [event]));
       });
-      presenceChannel.bind('game:cancelled', () => {
-        setJoinError('The host cancelled this game.');
+      presenceChannel.bind('game:cancelled', (data: { reason?: string }) => {
+        setJoinError(
+          data?.reason === 'idle'
+            ? 'This lobby was automatically closed after an hour with no activity.'
+            : 'The host cancelled this game.',
+        );
       });
 
       const viewerSeat: number | null = data.state.viewerSeat;
@@ -199,6 +203,13 @@ export function useGameState(gameId: string) {
       setState(data.state);
       stateRef.current = data.state;
       setGameInfo(data.game);
+    } else if (stateRes.status === 404) {
+      // The game (most likely a LOBBY nobody ever started) is gone — a
+      // cancelled/auto-closed lobby's game:cancelled push covers this
+      // instantly when it arrives, but this poll is what catches it if that
+      // push was dropped or never configured, same backstop role as the
+      // rest of this function.
+      setJoinError('This lobby is no longer available — it may have been cancelled or closed for inactivity.');
     }
     if (eventsRes.ok) {
       const eventsData = await eventsRes.json().catch(() => ({}));

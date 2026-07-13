@@ -55,4 +55,10 @@ export const env = {
   get pusherCluster() {
     return required('NEXT_PUBLIC_PUSHER_CLUSTER');
   },
+  // Authorizes the idle-game cleanup cron endpoint — optional (unlike the
+  // secrets above) so a deployment that hasn't set up Vercel Cron yet still
+  // builds and runs; the route just always rejects requests until it's set.
+  get cronSecret(): string | undefined {
+    return process.env.CRON_SECRET || undefined;
+  },
 };

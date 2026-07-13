@@ -32,7 +32,7 @@ import {
 import { logEvent } from './gameEvents';
 import { broadcastGameState } from '@/server/realtime/pusherServer';
 import type { Action } from './actionTypes';
-import { endGame, resetPlayerBoard, restartGame, startingLifeFor } from './gameService';
+import { endGame, resetPlayerBoard, restartGame, startingLifeFor, touchGameActivity } from './gameService';
 import { getCardById } from '@/server/scryfall/cardService';
 
 export interface ActionActor {
@@ -705,6 +705,7 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
     throw new Error('Unhandled action type');
   }
 
+  await touchGameActivity(gameId);
   await broadcastState(gameId);
   return event;
 }

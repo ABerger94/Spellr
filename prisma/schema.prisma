@@ -118,11 +118,17 @@ model Game {
   createdAt          DateTime        @default(now())
   startedAt          DateTime?
   endedAt            DateTime?
+  // Bumped on every action taken in the game (join, deck pick, ready-up,
+  // any in-game action, chat — including spectator chat), so a scheduled
+  // sweep can find and auto-close rooms nobody has touched in a while.
+  // Never bumped by read-only polling/viewing.
+  lastActivityAt     DateTime        @default(now())
   players            GamePlayer[]
   events             GameEvent[]
   spectators         GameSpectator[]
 
   @@index([status, isPublic])
+  @@index([status, lastActivityAt])
 }
 
 // A user watching a game without taking a seat — read-only access to the
