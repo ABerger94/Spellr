@@ -205,8 +205,13 @@ export default function GameTablePage() {
   const displayName = (seat: number | null) =>
     seat === null ? 'System' : state.players.find((p) => p.seat === seat)?.displayName ?? `Seat ${seat}`;
 
+  // Commander damage is tracked per source commander, so the picker shows
+  // each opponent's commander name rather than the player's own name —
+  // falls back to the player name if no commander is set (e.g. an empty deck).
   const otherSeatsFor = (seat: number) =>
-    state.players.filter((p) => p.seat !== seat).map((p) => ({ seat: p.seat, name: p.displayName }));
+    state.players
+      .filter((p) => p.seat !== seat)
+      .map((p) => ({ seat: p.seat, name: (p.commanderCardId && state.cards[p.commanderCardId]?.name) || p.displayName }));
 
   // Combat helper (bookkeeping only — no damage math): looks up a card's name
   // by instanceId across every player's battlefield, since an attack target
