@@ -144,6 +144,10 @@ model GamePlayer {
   zones            Json     @default("{\"library\":[],\"hand\":[],\"battlefield\":[],\"graveyard\":[],\"exile\":[],\"commandZone\":[]}")
   counters         Json     @default("{}")
   connected        Boolean  @default(false)
+  // A player who's lost (however the table decided that — 0 life, poison,
+  // conceding, ...) can be marked eliminated so PASS_TURN skips their seat
+  // from then on, without removing them from the game entirely.
+  eliminated       Boolean  @default(false)
   joinedAt         DateTime @default(now())
 
   @@unique([gameId, seat])

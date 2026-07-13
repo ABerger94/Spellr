@@ -86,6 +86,7 @@ export async function buildStateFor(gameId: string, viewerSeat: number | null): 
         deckId: p.deckId,
         commanderCardId: p.deck?.commanderCardId ?? null,
         isReady: p.isReady,
+        eliminated: p.eliminated,
         life: p.life,
         counters: (p.counters as Record<string, number>) ?? {},
         commanderDamage: (p.commanderDamage as Record<string, number>) ?? {},

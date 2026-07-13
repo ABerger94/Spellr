@@ -1072,6 +1072,7 @@ export default function GameTablePage() {
                           sendAction({ type: 'ADJUST_COMMANDER_DAMAGE', seat: p.seat, fromSeat, delta })
                         }
                         onCounterChange={(counterType, delta) => sendAction({ type: 'ADJUST_PLAYER_COUNTER', seat: p.seat, counterType, delta })}
+                        onEliminateChange={(eliminated) => sendAction({ type: 'ELIMINATE_PLAYER', seat: p.seat, eliminated })}
                         compact
                       />
                       <ManaPool
@@ -1149,11 +1150,16 @@ export default function GameTablePage() {
               left: 'flex-row',
               right: 'flex-row-reverse',
             }[handEdge];
+            // Padding on the three "free" sides (everything but the header
+            // side) has to be at least as wide as the invisible resize
+            // handles rendered below, or those handles overlap real card
+            // content — stealing hover/click from whatever card happens to
+            // sit at that edge (most noticeably the last, rightmost card).
             const contentPaddingClass = {
-              bottom: 'p-1.5 pb-0',
-              top: 'p-1.5 pt-0',
-              left: 'p-1.5 pl-0',
-              right: 'p-1.5 pr-0',
+              bottom: 'p-2.5 pb-0',
+              top: 'p-2.5 pt-0',
+              left: 'p-2.5 pl-0',
+              right: 'p-2.5 pr-0',
             }[handEdge];
             const arrow = {
               bottom: handCollapsed ? '▲' : '▼',
@@ -1196,42 +1202,42 @@ export default function GameTablePage() {
                     <div
                       onPointerDown={(e) => handleHandResizeStart(e, { top: true })}
                       title="Drag to resize height"
-                      className="absolute inset-x-3 top-0 h-2 cursor-ns-resize hover:bg-white/10"
+                      className="absolute inset-x-2 top-0 h-2 cursor-ns-resize hover:bg-white/10"
                     />
                     <div
                       onPointerDown={(e) => handleHandResizeStart(e, { bottom: true })}
                       title="Drag to resize height"
-                      className="absolute inset-x-3 bottom-0 h-2 cursor-ns-resize hover:bg-white/10"
+                      className="absolute inset-x-2 bottom-0 h-2 cursor-ns-resize hover:bg-white/10"
                     />
                     <div
                       onPointerDown={(e) => handleHandResizeStart(e, { left: true })}
                       title="Drag to resize width"
-                      className="absolute inset-y-3 left-0 w-2 cursor-ew-resize hover:bg-white/10"
+                      className="absolute inset-y-2 left-0 w-2 cursor-ew-resize hover:bg-white/10"
                     />
                     <div
                       onPointerDown={(e) => handleHandResizeStart(e, { right: true })}
                       title="Drag to resize width"
-                      className="absolute inset-y-3 right-0 w-2 cursor-ew-resize hover:bg-white/10"
+                      className="absolute inset-y-2 right-0 w-2 cursor-ew-resize hover:bg-white/10"
                     />
                     <div
                       onPointerDown={(e) => handleHandResizeStart(e, { top: true, left: true })}
                       title="Drag to resize"
-                      className="absolute left-0 top-0 h-3.5 w-3.5 cursor-nwse-resize rounded-tl-lg hover:bg-white/10"
+                      className="absolute left-0 top-0 h-2 w-2 cursor-nwse-resize rounded-tl-lg hover:bg-white/10"
                     />
                     <div
                       onPointerDown={(e) => handleHandResizeStart(e, { top: true, right: true })}
                       title="Drag to resize"
-                      className="absolute right-0 top-0 h-3.5 w-3.5 cursor-nesw-resize rounded-tr-lg hover:bg-white/10"
+                      className="absolute right-0 top-0 h-2 w-2 cursor-nesw-resize rounded-tr-lg hover:bg-white/10"
                     />
                     <div
                       onPointerDown={(e) => handleHandResizeStart(e, { bottom: true, left: true })}
                       title="Drag to resize"
-                      className="absolute bottom-0 left-0 h-3.5 w-3.5 cursor-nesw-resize rounded-bl-lg hover:bg-white/10"
+                      className="absolute bottom-0 left-0 h-2 w-2 cursor-nesw-resize rounded-bl-lg hover:bg-white/10"
                     />
                     <div
                       onPointerDown={(e) => handleHandResizeStart(e, { bottom: true, right: true })}
                       title="Drag to resize"
-                      className="absolute bottom-0 right-0 h-3.5 w-3.5 cursor-nwse-resize rounded-br-lg hover:bg-white/10"
+                      className="absolute bottom-0 right-0 h-2 w-2 cursor-nwse-resize rounded-br-lg hover:bg-white/10"
                     />
                   </>
                 )}

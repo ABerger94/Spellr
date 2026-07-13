@@ -39,6 +39,7 @@ const LIFE_EVENT_TYPES = new Set([
   'ADJUST_COUNTER',
   'ADJUST_MANA',
   'EMPTY_MANA_POOL',
+  'ELIMINATE_PLAYER',
 ]);
 const ATTACK_EVENT_TYPES = new Set(['DECLARE_ATTACK', 'CANCEL_ATTACK']);
 const BLOCK_EVENT_TYPES = new Set(['DECLARE_BLOCK', 'CANCEL_BLOCK']);
@@ -144,6 +145,10 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
       const total = event.payload.total as number;
       const delta = event.payload.delta as number;
       return `${who} set ${targetWho}'s ${counterType} counters to ${total} (${delta > 0 ? '+' : ''}${delta}).`;
+    }
+    case 'ELIMINATE_PLAYER': {
+      const targetWho = displayName(event.payload.seat as number);
+      return event.payload.eliminated ? `${targetWho} was marked eliminated.` : `${targetWho} was un-eliminated.`;
     }
     case 'TURN_PASSED':
       return `${who} passed the turn.`;
