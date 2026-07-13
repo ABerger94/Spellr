@@ -1057,24 +1057,8 @@ export default function GameTablePage() {
                   />
                 </>
               )}
-              <div className="flex items-stretch rounded-t-lg">
-                <div
-                  onPointerDown={handleHandDragStart}
-                  title="Drag to move your hand"
-                  className="flex h-6 flex-1 cursor-move items-center justify-center gap-1 rounded-tl-lg hover:bg-white/5"
-                >
-                  <span className="select-none text-[10px] tracking-widest text-slate-500">• • •</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setHandCollapsed((v) => !v)}
-                  className="flex h-6 items-center gap-1 rounded-tr-lg px-2 text-[11px] text-slate-400 hover:bg-white/5"
-                >
-                  {handCollapsed ? `▲ Show hand (${me.hand?.length ?? 0})` : '▼ Hide'}
-                </button>
-              </div>
               {!handCollapsed && (
-                <div className="p-1.5 pt-0" style={{ height: handHeightPx }}>
+                <div className="p-1.5 pb-0" style={{ height: handHeightPx }}>
                   <HandZone
                       hand={me.hand ?? []}
                       cards={state.cards}
@@ -1110,7 +1094,36 @@ export default function GameTablePage() {
                     />
                   </div>
                 )}
+              {/* Header sits at the bottom of the panel (not the top) so
+                  that showing the hand grows the panel upward — lets you
+                  park the collapsed bar at the very bottom of the screen
+                  and still have it open on-screen instead of off the
+                  bottom edge. */}
+              <div className="flex items-stretch rounded-b-lg">
+                <div
+                  onPointerDown={handleHandDragStart}
+                  title="Drag to move your hand"
+                  className="flex h-6 flex-1 cursor-move items-center justify-center gap-1 rounded-bl-lg hover:bg-white/5"
+                >
+                  <span className="select-none text-[10px] tracking-widest text-slate-500">• • •</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const expanding = handCollapsed;
+                    setHandCollapsed(!expanding);
+                    setHandPos((prev) => {
+                      if (!prev) return prev;
+                      const delta = expanding ? -handHeightPx : handHeightPx;
+                      return clampHandPos({ x: prev.x, y: prev.y + delta }, handWidthPx, handHeightPx);
+                    });
+                  }}
+                  className="flex h-6 items-center gap-1 rounded-br-lg px-2 text-[11px] text-slate-400 hover:bg-white/5"
+                >
+                  {handCollapsed ? `▲ Show hand (${me.hand?.length ?? 0})` : '▼ Hide'}
+                </button>
               </div>
+            </div>
           )}
         </div>
 
