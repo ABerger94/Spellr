@@ -28,6 +28,8 @@ const MOVE_EVENT_TYPES = new Set([
   'REMOVE_TOKEN',
   'FLIP_CARD',
   'ATTACH_CARD',
+  'SET_ANNOTATION',
+  'GIVE_CARD',
 ]);
 const TAP_EVENT_TYPES = new Set(['TAP_CARD', 'UNTAP_CARD', 'UNTAP_ALL', 'SET_GROUP_TAPPED']);
 const LIFE_EVENT_TYPES = new Set([
@@ -204,6 +206,12 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
     case 'REMOVE_TOKEN': {
       const name = event.payload.name as string | undefined;
       return name ? `${who} removed a ${name} token.` : `${who} removed a token.`;
+    }
+    case 'SET_ANNOTATION':
+      return `${who} annotated a card.`;
+    case 'GIVE_CARD': {
+      const toWho = displayName(event.payload.toSeat as number);
+      return `${who} gave a card to ${toWho}.`;
     }
     case 'GAME_ENDED':
       return `${who} ended the game.`;

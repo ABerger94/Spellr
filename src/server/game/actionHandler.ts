@@ -15,11 +15,13 @@ import {
   drawCards,
   emptyManaPool,
   flipCard,
+  giveCard,
   millCards,
   moveCard,
   mulligan,
   randomDiscard,
   removeToken,
+  setAnnotation,
   setGroupTapped,
   resolveLook,
   shuffleLibrary,
@@ -523,6 +525,33 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       await updateZones(player.id, nextZones);
       const cardCache = removed ? await prisma.cardCache.findUnique({ where: { scryfallId: removed.scryfallId }, select: { name: true } }) : null;
       event = await logEvent(gameId, 'REMOVE_TOKEN', { scryfallId: removed?.scryfallId, name: cardCache?.name }, actor);
+      break;
+    }
+
+    case 'SET_ANNOTATION': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const nextZones = setAnnotation(zones, action.instanceId, action.text);
+      await updateZones(player.id, nextZones);
+      event = await logEvent(gameId, 'SET_ANNOTATION', { instanceId: action.instanceId }, actor);
+      break;
+    }
+
+    case 'GIVE_CARD': {
+      if (action.toSeat === actor.seat) throw new Error('Cannot give a card to yourself');
+      const giver = await getPlayer(gameId, actor.seat);
+      const receiver = await getPlayer(gameId, action.toSeat);
+      const giverZones = giver.zones as unknown as ZoneState;
+      const receiverZones = receiver.zones as unknown as ZoneState;
+      const result = giveCard(giverZones, receiverZones, action.instanceId);
+      await updateZones(giver.id, result.giverZones);
+      await updateZones(receiver.id, result.receiverZones);
+      event = await logEvent(
+        gameId,
+        'GIVE_CARD',
+        { instanceId: action.instanceId, scryfallId: result.scryfallId, toSeat: action.toSeat },
+        actor,
+      );
       break;
     }
 

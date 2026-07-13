@@ -170,15 +170,16 @@ export function FreeformBattlefield({
         manaCost={c.transformed ? undefined : facts?.manaCost}
         onClick={interactive && onTapToggle ? () => onTapToggle(c.instanceId, c.tapped) : undefined}
         onContextMenu={
-          interactive && onContextMenu
+          onContextMenu
             ? (e) => {
                 e.preventDefault();
                 onContextMenu(e, c);
               }
             : undefined
         }
-        onMore={interactive && onContextMenu ? (e) => onContextMenu(e, c) : undefined}
+        onMore={onContextMenu ? (e) => onContextMenu(e, c) : undefined}
         combatBadge={combatLabels?.[c.instanceId]}
+        annotation={c.annotation}
       />
     );
   }

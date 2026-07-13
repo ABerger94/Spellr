@@ -25,6 +25,9 @@ export interface BattlefieldCard {
    * this card is declared as blocking. An array since multiple attackers
    * could theoretically be blocked by one creature with the right ability. */
   blocking?: string[];
+  /** Free-text note pinned to this card (reminders, "this is enchanted by X
+   * on the stack", etc.) — purely a player convenience, no game meaning. */
+  annotation?: string;
 }
 
 /** 'reorder' is a Sensei's Divining Top-style look: no destination choice per
@@ -210,6 +213,8 @@ export type GameActionPayload =
   | { type: 'EMPTY_MANA_POOL' }
   | { type: 'CREATE_TOKEN'; scryfallId: string; x?: number; y?: number }
   | { type: 'REMOVE_TOKEN'; instanceId: string }
+  | { type: 'SET_ANNOTATION'; instanceId: string; text: string }
+  | { type: 'GIVE_CARD'; instanceId: string; toSeat: number }
   | {
       type: 'DECLARE_ATTACK';
       instanceId: string;

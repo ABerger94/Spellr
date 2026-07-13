@@ -260,6 +260,55 @@ export function adjustCounter(zones: ZoneState, instanceId: string, counterType:
   return next;
 }
 
+/** Sets (or with an empty string, clears) the free-text note pinned to a
+ * battlefield card. Purely cosmetic bookkeeping — no game meaning. */
+export function setAnnotation(zones: ZoneState, instanceId: string, text: string): ZoneState {
+  const idx = zones.battlefield.findIndex((c) => c.instanceId === instanceId);
+  if (idx === -1) throw new Error('Card not found on battlefield');
+
+  const next = cloneZones(zones);
+  const card = { ...next.battlefield[idx] };
+  const trimmed = text.trim();
+  if (trimmed) card.annotation = trimmed;
+  else delete card.annotation;
+  next.battlefield[idx] = card;
+  return next;
+}
+
+export interface GiveCardResult {
+  giverZones: ZoneState;
+  receiverZones: ZoneState;
+  scryfallId: string;
+}
+
+/** Transfers control of a battlefield permanent from one player's board to
+ * another's — the same instanceId/tapped state/counters carry over (it's
+ * still the same permanent, just under new control), but attachments and
+ * combat declarations don't make sense pointing at a board it's no longer
+ * on, so both are cleared, same as any other way of leaving the battlefield. */
+export function giveCard(giverZones: ZoneState, receiverZones: ZoneState, instanceId: string): GiveCardResult {
+  const idx = giverZones.battlefield.findIndex((c) => c.instanceId === instanceId);
+  if (idx === -1) throw new Error('Card not found on your battlefield');
+
+  const nextGiver = cloneZones(giverZones);
+  const [card] = nextGiver.battlefield.splice(idx, 1);
+  // Anything that was attached to the given card comes loose rather than
+  // pointing at a card that just left this battlefield.
+  nextGiver.battlefield = nextGiver.battlefield.map((c) =>
+    c.attachedTo === instanceId ? { ...c, attachedTo: undefined } : c,
+  );
+
+  const nextReceiver = cloneZones(receiverZones);
+  const pos = nextBattlefieldSlot(nextReceiver.battlefield);
+  const given: BattlefieldCard = { ...card, x: pos.x, y: pos.y };
+  delete given.attachedTo;
+  delete given.attacking;
+  delete given.blocking;
+  nextReceiver.battlefield.push(given);
+
+  return { giverZones: nextGiver, receiverZones: nextReceiver, scryfallId: card.scryfallId };
+}
+
 /** Flips a two-sided (transform/MDFC) card on the battlefield to its other face. */
 export function flipCard(zones: ZoneState, instanceId: string): ZoneState {
   const idx = zones.battlefield.findIndex((c) => c.instanceId === instanceId);

@@ -26,6 +26,7 @@ export function DraggableCard({
   power,
   toughness,
   combatBadge,
+  annotation,
 }: {
   /** Pass null to disable dragging (e.g. opponents' cards, read-only views). */
   source: DragSource | null;
@@ -53,6 +54,8 @@ export function DraggableCard({
   toughness?: string | null;
   /** Combat helper badge (attacking/blocking) — see CardImage. */
   combatBadge?: { text: string; variant: 'attacking' | 'blocking' };
+  /** Free-text note pinned to this card — see CardImage. */
+  annotation?: string;
 }) {
   const { startDrag, updateDrag, endDrag, cancelDrag } = useDragDrop();
   const elRef = useRef<HTMLDivElement>(null);
@@ -125,6 +128,7 @@ export function DraggableCard({
         power={power}
         toughness={toughness}
         combatBadge={combatBadge}
+        annotation={annotation}
       />
     </div>
   );
