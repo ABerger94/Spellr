@@ -50,6 +50,7 @@ export default function GameTablePage() {
   const voiceChat = useVoiceChat(params.gameId, viewerUserId);
   const [menu, setMenu] = useState<{ x: number; y: number; options: ContextMenuOption[] } | null>(null);
   const [librarySearchOpen, setLibrarySearchOpen] = useState(false);
+  const [librarySearchQuery, setLibrarySearchQuery] = useState('');
   const [showHelp, setShowHelp] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [showLog, setShowLog] = useState(true);
@@ -61,8 +62,25 @@ export default function GameTablePage() {
   const [attackPicker, setAttackPicker] = useState<{ instanceId: string; name: string } | null>(null);
   const [blockPicker, setBlockPicker] = useState<{ instanceId: string; name: string } | null>(null);
   const [addTokenOpen, setAddTokenOpen] = useState(false);
+  // Battlefield multi-select: instanceIds drag-selected on your own board,
+  // shown with a gold ring — tapping any one of them while 2+ are selected
+  // taps/untaps the whole group together instead of just that card.
+  const [selectedInstanceIds, setSelectedInstanceIds] = useState<Set<string>>(new Set());
 
   const isMyTurn = state?.status === 'ACTIVE' && state.currentTurnSeat === state.viewerSeat;
+
+  // A short landscape phone has so little height to begin with that the
+  // default hand bar and the always-on log panel can together eat most of
+  // the screen — start the hand collapsed to its minimum and the log
+  // hidden, same viewport check as the mobile-landscape Tailwind variant
+  // used throughout this page. Only runs once at mount so a mid-game
+  // rotation doesn't yank settings the player already changed themselves.
+  useEffect(() => {
+    if (window.matchMedia('(orientation: landscape) and (max-height: 500px)').matches) {
+      setHandHeightPx(MIN_HAND_HEIGHT_PX);
+      setShowLog(false);
+    }
+  }, []);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -336,6 +354,12 @@ export default function GameTablePage() {
               name: cardName,
             }),
         },
+        // A fresh token copy — same printed card, but its own instance with
+        // no counters/tap state carried over, same as any other token.
+        {
+          label: 'Make copy (token)',
+          onClick: () => sendAction({ type: 'CREATE_TOKEN', scryfallId: card.scryfallId, x: card.x + 3, y: card.y + 3 }),
+        },
         // Combat helper: bookkeeping only, no automatic damage — declares an
         // attack target or a blocked attacker and shows a badge, same spirit
         // as the rest of the table.
@@ -477,8 +501,8 @@ export default function GameTablePage() {
     <div className="flex h-screen flex-col">
       <NavBar />
 
-      <div className="flex items-center justify-between border-b border-white/10 bg-panel px-4 py-1.5 text-xs text-slate-400">
-        <span className="hidden truncate sm:inline">
+      <div className="flex items-center justify-between border-b border-white/10 bg-panel px-4 py-1.5 text-xs text-slate-400 mobile-landscape:px-2 mobile-landscape:py-0.5">
+        <span className="hidden truncate sm:inline mobile-landscape:hidden">
           Tap or drag a card to play/move it · tap ⋯ on a card for more options · use the Game actions bar for
           draw/scry/surveil/mill/pass/etc ·
           keyboard: <kbd className="rounded bg-panelLight px-1">D</kbd> draw, <kbd className="rounded bg-panelLight px-1">Space</kbd> pass turn
@@ -487,7 +511,7 @@ export default function GameTablePage() {
           <button
             onClick={handleRestartGame}
             title="Restart the game for everyone"
-            className="ml-auto mr-2 rounded bg-red-500/10 px-2 py-0.5 text-red-400 hover:bg-red-500/20 sm:ml-2"
+            className="ml-auto mr-2 whitespace-nowrap rounded bg-red-500/10 px-2 py-0.5 text-red-400 hover:bg-red-500/20 sm:ml-2 mobile-landscape:mr-1 mobile-landscape:px-1.5 mobile-landscape:py-0"
           >
             ⟲ Restart game
           </button>
@@ -496,14 +520,14 @@ export default function GameTablePage() {
           <button
             onClick={handleEndGame}
             title="End the game for everyone"
-            className="mr-2 rounded bg-red-500/10 px-2 py-0.5 text-red-400 hover:bg-red-500/20"
+            className="mr-2 whitespace-nowrap rounded bg-red-500/10 px-2 py-0.5 text-red-400 hover:bg-red-500/20 mobile-landscape:mr-1 mobile-landscape:px-1.5 mobile-landscape:py-0"
           >
             ✕ End game
           </button>
         )}
         <button
           onClick={() => setShowLog((v) => !v)}
-          className={`mr-2 rounded px-2 py-0.5 hover:bg-white/10 ${
+          className={`mr-2 whitespace-nowrap rounded px-2 py-0.5 hover:bg-white/10 mobile-landscape:mr-1 mobile-landscape:px-1.5 mobile-landscape:py-0 ${
             showLog ? 'bg-accent/20 text-accent' : 'bg-panelLight'
           } ${isHost ? '' : 'ml-auto sm:ml-0'}`}
         >
@@ -511,7 +535,7 @@ export default function GameTablePage() {
         </button>
         <button
           onClick={() => setShowHelp((v) => !v)}
-          className="rounded bg-panelLight px-2 py-0.5 hover:bg-white/10"
+          className="whitespace-nowrap rounded bg-panelLight px-2 py-0.5 hover:bg-white/10 mobile-landscape:px-1.5 mobile-landscape:py-0"
         >
           {showHelp ? 'Hide help' : '? Help'}
         </button>
@@ -526,8 +550,9 @@ export default function GameTablePage() {
           </p>
           <p className="mb-1">
             <strong>Search your library:</strong> tap Search under your library to browse every card in it and send
-            one to your hand or the top — the rest of the library is shuffled afterward (even if you close without
-            picking anything), and opening the search is logged for everyone to see, same as a real tutor.
+            one to your hand or the top — type in the filter box to narrow the grid down by name instead of
+            scrolling to find it. The rest of the library is shuffled afterward (even if you close without picking
+            anything), and opening the search is logged for everyone to see, same as a real tutor.
           </p>
           <p className="mb-1">
             <strong>Play a card:</strong> tap it in your hand to send it straight to the battlefield, or drag it there
@@ -538,12 +563,23 @@ export default function GameTablePage() {
             <strong>Tap/untap:</strong> tap a permanent on your battlefield.
           </p>
           <p className="mb-1">
+            <strong>Select and tap multiple at once:</strong> on a computer, drag on empty battlefield space (not on
+            a card) to draw a selection box around several permanents — they highlight with a gold ring. Tap any one
+            of the highlighted cards to tap/untap the whole group together; tap empty space again to clear the
+            selection. Mouse only for now, so it doesn&apos;t fight with scrolling the battlefield by touch.
+          </p>
+          <p className="mb-1">
             <strong>Rearrange the battlefield:</strong> drag a permanent to any spot — positions are freeform, not a grid.
           </p>
           <p className="mb-1">
             <strong>Attach equipment/auras:</strong> drag a permanent onto another one on your battlefield to attach
             it — it renders stacked underneath, peeking out. Tap ⋯ → &quot;Detach&quot; to unattach, or use ⋯ →
             &quot;Attach to…&quot; instead of dragging.
+          </p>
+          <p className="mb-1">
+            <strong>Make a token copy:</strong> tap ⋯ on any permanent and choose &quot;Make copy (token)&quot; to
+            drop a fresh token copy of it right next to the original — same printed card, but its own tap state and
+            counters starting fresh, same as any other token.
           </p>
           <p className="mb-1">
             <strong>Two-sided cards:</strong> transform/modal-DFC permanents get a &quot;Flip card&quot; option in
@@ -715,17 +751,30 @@ export default function GameTablePage() {
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-2 lg:flex-row lg:gap-4 lg:p-4">
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
           {/* Turn indicator */}
-          <div className="flex-shrink-0 pb-2 text-center text-xs text-slate-500">
+          <div className="flex-shrink-0 pb-2 text-center text-xs text-slate-500 mobile-landscape:pb-0.5">
             Turn {state.turnNumber} · {displayName(state.currentTurnSeat)}&apos;s turn
           </div>
 
           {/* Every seat, including your own, sized to exactly fill the space
               below — a true edhplay-style grid, no scrolling needed to see
-              every board. */}
+              every board. On short landscape phones a 2x2 grid leaves each
+              board only a quarter of an already-tiny viewport, so it
+              collapses to a single row instead — every board then gets the
+              full viewport height, at the cost of being narrower, which is
+              the better trade when width is the one thing landscape has
+              plenty of. */}
           <div className="min-h-0 flex-1">
             <div
-              className={`grid h-full gap-2 ${state.players.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} ${
-                state.players.length > 2 ? 'grid-rows-2' : 'grid-rows-1'
+              className={`grid h-full gap-2 mobile-landscape:grid-flow-col mobile-landscape:grid-rows-1 ${
+                state.players.length > 1 ? 'grid-cols-2' : 'grid-cols-1'
+              } ${state.players.length > 2 ? 'grid-rows-2' : 'grid-rows-1'} ${
+                state.players.length >= 4
+                  ? 'mobile-landscape:grid-cols-4'
+                  : state.players.length === 3
+                    ? 'mobile-landscape:grid-cols-3'
+                    : state.players.length === 2
+                      ? 'mobile-landscape:grid-cols-2'
+                      : 'mobile-landscape:grid-cols-1'
               }`}
             >
               {state.players.map((p, i) => {
@@ -761,6 +810,7 @@ export default function GameTablePage() {
                         isViewer
                           ? () => {
                               setLibrarySearchOpen(true);
+                              setLibrarySearchQuery('');
                               // Logged so opponents can see (and check) that this
                               // player's library was opened for viewing/search —
                               // a private "see the whole order" action would
@@ -798,7 +848,7 @@ export default function GameTablePage() {
                 return (
                   <div
                     key={p.seat}
-                    className={`flex min-h-0 flex-col overflow-hidden rounded-lg border bg-panel p-1.5 ${
+                    className={`flex min-h-0 flex-col overflow-hidden rounded-lg border bg-panel p-1.5 mobile-landscape:col-span-1 ${
                       isLastOdd ? 'col-span-2' : ''
                     } ${isActiveTurn ? 'border-accent2 ring-1 ring-accent2/50' : isViewer ? 'border-accent/40' : 'border-white/10'}`}
                   >
@@ -838,14 +888,26 @@ export default function GameTablePage() {
                           interactive={isViewer}
                           onTapToggle={
                             isViewer
-                              ? (instanceId, tapped) =>
-                                  sendAction(tapped ? { type: 'UNTAP_CARD', instanceId } : { type: 'TAP_CARD', instanceId })
+                              ? (instanceId, tapped) => {
+                                  if (selectedInstanceIds.size > 1 && selectedInstanceIds.has(instanceId)) {
+                                    sendAction({
+                                      type: 'SET_GROUP_TAPPED',
+                                      instanceIds: Array.from(selectedInstanceIds),
+                                      tapped: !tapped,
+                                    });
+                                  } else {
+                                    sendAction(tapped ? { type: 'UNTAP_CARD', instanceId } : { type: 'TAP_CARD', instanceId });
+                                    if (selectedInstanceIds.size > 0) setSelectedInstanceIds(new Set());
+                                  }
+                                }
                               : undefined
                           }
                           onContextMenu={isViewer ? openBattlefieldCardMenu : undefined}
                           compact
                           zoom={zoom}
                           combatLabels={combatLabels}
+                          selectedInstanceIds={isViewer ? selectedInstanceIds : undefined}
+                          onSelectionChange={isViewer ? setSelectedInstanceIds : undefined}
                         />
                       </div>
                       {!sidebarOnLeft && sidebar}
@@ -940,7 +1002,7 @@ export default function GameTablePage() {
         </div>
 
         {showLog && (
-          <div className="flex h-40 flex-shrink-0 flex-col lg:h-auto lg:w-72">
+          <div className="flex h-40 flex-shrink-0 flex-col mobile-landscape:h-28 lg:h-auto lg:w-72">
             <div className="min-h-0 flex-1">
               <GameLog
                 events={log}
@@ -985,48 +1047,70 @@ export default function GameTablePage() {
               </button>
             </div>
 
+            {me.library && me.library.length > 0 && (
+              <input
+                type="text"
+                value={librarySearchQuery}
+                onChange={(e) => setLibrarySearchQuery(e.target.value)}
+                placeholder="Filter by card name…"
+                autoFocus
+                className="mb-4 w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-sm text-white outline-none placeholder:text-slate-500 focus:border-accent"
+              />
+            )}
+
             {me.library && me.library.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                {me.library.map((scryfallId, index) => {
-                  const facts = state.cards[scryfallId];
-                  return (
-                    <div
-                      key={`${scryfallId}-${index}`}
-                      data-scryfall-id={scryfallId}
-                      className="rounded border border-white/10 bg-panel p-2"
-                    >
-                      <CardImage name={facts?.name ?? scryfallId} imageUrl={facts?.imageNormal} />
-                      <div className="mt-2 flex flex-col gap-2">
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            setLibrarySearchOpen(false);
-                            await sendAction({ type: 'MOVE_CARD', fromZone: 'library', toZone: 'hand', scryfallId });
-                            await sendAction({ type: 'SHUFFLE_LIBRARY' });
-                          }}
-                          className="rounded bg-accent px-2 py-1 text-sm text-white hover:bg-accent/80"
+              (() => {
+                const query = librarySearchQuery.trim().toLowerCase();
+                const filtered = query
+                  ? me.library.filter((scryfallId) => (state.cards[scryfallId]?.name ?? '').toLowerCase().includes(query))
+                  : me.library;
+                if (filtered.length === 0) {
+                  return <p className="text-sm text-slate-400">No cards match &quot;{librarySearchQuery}&quot;.</p>;
+                }
+                return (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                    {filtered.map((scryfallId, index) => {
+                      const facts = state.cards[scryfallId];
+                      return (
+                        <div
+                          key={`${scryfallId}-${index}`}
+                          data-scryfall-id={scryfallId}
+                          className="rounded border border-white/10 bg-panel p-2"
                         >
-                          to hand
-                        </button>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            setLibrarySearchOpen(false);
-                            // Shuffle first, then move the found card to top —
-                            // otherwise shuffling after would just randomize
-                            // the card we specifically meant to put on top.
-                            await sendAction({ type: 'SHUFFLE_LIBRARY' });
-                            await sendAction({ type: 'MOVE_CARD', fromZone: 'library', toZone: 'library', scryfallId, position: 'top' });
-                          }}
-                          className="rounded bg-slate-700 px-2 py-1 text-sm text-white hover:bg-slate-600"
-                        >
-                          to top of library
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                          <CardImage name={facts?.name ?? scryfallId} imageUrl={facts?.imageNormal} />
+                          <div className="mt-2 flex flex-col gap-2">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setLibrarySearchOpen(false);
+                                await sendAction({ type: 'MOVE_CARD', fromZone: 'library', toZone: 'hand', scryfallId });
+                                await sendAction({ type: 'SHUFFLE_LIBRARY' });
+                              }}
+                              className="rounded bg-accent px-2 py-1 text-sm text-white hover:bg-accent/80"
+                            >
+                              to hand
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setLibrarySearchOpen(false);
+                                // Shuffle first, then move the found card to top —
+                                // otherwise shuffling after would just randomize
+                                // the card we specifically meant to put on top.
+                                await sendAction({ type: 'SHUFFLE_LIBRARY' });
+                                await sendAction({ type: 'MOVE_CARD', fromZone: 'library', toZone: 'library', scryfallId, position: 'top' });
+                              }}
+                              className="rounded bg-slate-700 px-2 py-1 text-sm text-white hover:bg-slate-600"
+                            >
+                              to top of library
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()
             ) : (
               <p className="text-sm text-slate-400">Your library is empty.</p>
             )}

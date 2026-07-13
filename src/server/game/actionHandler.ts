@@ -20,6 +20,7 @@ import {
   mulligan,
   randomDiscard,
   removeToken,
+  setGroupTapped,
   resolveLook,
   shuffleLibrary,
   startLook,
@@ -156,6 +157,15 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       const nextZones = tapCard(zones, action.instanceId, action.type === 'TAP_CARD');
       await updateZones(player.id, nextZones);
       event = await logEvent(gameId, action.type, { instanceId: action.instanceId }, actor);
+      break;
+    }
+
+    case 'SET_GROUP_TAPPED': {
+      const player = await getPlayer(gameId, actor.seat);
+      const zones = player.zones as unknown as ZoneState;
+      const nextZones = setGroupTapped(zones, action.instanceIds, action.tapped);
+      await updateZones(player.id, nextZones);
+      event = await logEvent(gameId, 'SET_GROUP_TAPPED', { instanceIds: action.instanceIds, tapped: action.tapped }, actor);
       break;
     }
 

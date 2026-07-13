@@ -29,7 +29,7 @@ const MOVE_EVENT_TYPES = new Set([
   'FLIP_CARD',
   'ATTACH_CARD',
 ]);
-const TAP_EVENT_TYPES = new Set(['TAP_CARD', 'UNTAP_CARD', 'UNTAP_ALL']);
+const TAP_EVENT_TYPES = new Set(['TAP_CARD', 'UNTAP_CARD', 'UNTAP_ALL', 'SET_GROUP_TAPPED']);
 const LIFE_EVENT_TYPES = new Set([
   'ADJUST_LIFE',
   'ADJUST_COMMANDER_DAMAGE',
@@ -90,6 +90,11 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
       return `${who} tapped a card.`;
     case 'UNTAP_CARD':
       return `${who} untapped a card.`;
+    case 'SET_GROUP_TAPPED': {
+      const count = ((event.payload.instanceIds as string[]) ?? []).length;
+      const tapped = event.payload.tapped as boolean;
+      return `${who} ${tapped ? 'tapped' : 'untapped'} ${count} card${count === 1 ? '' : 's'} at once.`;
+    }
     case 'MOVE_CARD': {
       const fromZone = event.payload.fromZone as string;
       const toZone = event.payload.toZone as string;

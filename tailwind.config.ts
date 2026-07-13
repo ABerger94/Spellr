@@ -4,6 +4,13 @@ const config: Config = {
   content: ['./src/**/*.{js,ts,jsx,tsx,mdx}'],
   theme: {
     extend: {
+      screens: {
+        // Short, wide viewports — phones held sideways — where a portrait
+        // layout's stacked rows leave almost no vertical room per board.
+        // Not just `landscape:`, which also matches desktop windows that
+        // have plenty of height to spare.
+        'mobile-landscape': { raw: '(orientation: landscape) and (max-height: 500px)' },
+      },
       colors: {
         ink: '#0b0d12',
         panel: '#141821',

@@ -10,6 +10,9 @@ interface CardImageProps {
   name: string;
   imageUrl?: string | null;
   tapped?: boolean;
+  /** Battlefield multi-select — a gold ring shown while this card is part of
+   * a drag-selected group, so the group is visible before a tap toggles all
+   * of them together. */
   selected?: boolean;
   className?: string;
   title?: string;
@@ -134,12 +137,14 @@ export function CardImage({
       title={title ?? name}
       className={`card-image relative block w-full select-none overflow-hidden bg-panelLight shadow-md transition-transform duration-150 ${
         tapped ? 'rotate-90' : ''
-      } ${selected ? 'ring-2 ring-accent2' : ''} ${
+      } ${
         combatBadge?.variant === 'attacking'
           ? 'ring-2 ring-red-500'
           : combatBadge?.variant === 'blocking'
             ? 'ring-2 ring-sky-400'
-            : ''
+            : selected
+              ? 'ring-2 ring-amber-400'
+              : ''
       } ${onClick ? 'cursor-pointer hover:scale-[1.03] hover:shadow-xl' : ''} ${className}`}
       style={{ aspectRatio: '5 / 7' }}
     >

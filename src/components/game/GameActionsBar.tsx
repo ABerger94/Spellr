@@ -82,19 +82,19 @@ export function GameActionsBar({
   }
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto border-b border-white/10 bg-panel px-3 py-2">
-      <span className="hidden flex-shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:inline">
+    <div className="flex items-center gap-2 overflow-x-auto border-b border-white/10 bg-panel px-3 py-2 mobile-landscape:gap-1 mobile-landscape:px-2 mobile-landscape:py-1">
+      <span className="hidden flex-shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-500 sm:inline mobile-landscape:hidden">
         Game actions
       </span>
       <button
         onClick={onUntapAll}
-        className="flex-shrink-0 rounded bg-panelLight px-3 py-1.5 text-sm text-white hover:bg-white/10"
+        className="flex-shrink-0 rounded bg-panelLight px-3 py-1.5 text-sm text-white hover:bg-white/10 mobile-landscape:px-2 mobile-landscape:py-1"
       >
         Untap All
       </button>
       <button
         onClick={onDraw}
-        className="flex-shrink-0 rounded bg-panelLight px-3 py-1.5 text-sm text-white hover:bg-white/10"
+        className="flex-shrink-0 rounded bg-panelLight px-3 py-1.5 text-sm text-white hover:bg-white/10 mobile-landscape:px-2 mobile-landscape:py-1"
       >
         Draw
       </button>
@@ -102,7 +102,7 @@ export function GameActionsBar({
         <button
           ref={actionsButtonRef}
           onClick={toggleMenu}
-          className="rounded bg-panelLight px-3 py-1.5 text-sm text-white hover:bg-white/10"
+          className="rounded bg-panelLight px-3 py-1.5 text-sm text-white hover:bg-white/10 mobile-landscape:px-2 mobile-landscape:py-1"
         >
           Actions ▾
         </button>
@@ -135,7 +135,7 @@ export function GameActionsBar({
       <button
         onClick={voiceJoined ? onVoiceToggleMute : onVoiceJoin}
         title={voiceMicError ?? (voiceJoined ? (voiceMuted ? 'Unmute microphone' : 'Mute microphone') : 'Join voice chat')}
-        className={`flex-shrink-0 rounded px-3 py-1.5 text-sm font-medium ${
+        className={`flex-shrink-0 rounded px-3 py-1.5 text-sm font-medium mobile-landscape:px-2 mobile-landscape:py-1 ${
           voiceJoined
             ? voiceMuted
               ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
@@ -162,7 +162,7 @@ export function GameActionsBar({
         <button
           onClick={onZoomOut}
           title="Zoom out the whole table"
-          className="rounded bg-panelLight px-2 py-1.5 text-sm text-white hover:bg-white/10"
+          className="rounded bg-panelLight px-2 py-1.5 text-sm text-white hover:bg-white/10 mobile-landscape:py-1"
         >
           −
         </button>
@@ -170,7 +170,7 @@ export function GameActionsBar({
         <button
           onClick={onZoomIn}
           title="Zoom in the whole table"
-          className="rounded bg-panelLight px-2 py-1.5 text-sm text-white hover:bg-white/10"
+          className="rounded bg-panelLight px-2 py-1.5 text-sm text-white hover:bg-white/10 mobile-landscape:py-1"
         >
           +
         </button>

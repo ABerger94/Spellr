@@ -23,7 +23,7 @@ interface CardPreviewContextValue {
 
 const CardPreviewCtx = createContext<CardPreviewContextValue | null>(null);
 
-const HOVER_DELAY_MS = 600;
+const HOVER_DELAY_MS = 1000;
 const HIDE_DELAY_MS = 80;
 
 export function CardPreviewProvider({ children }: { children: React.ReactNode }) {
