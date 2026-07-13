@@ -70,7 +70,6 @@ export async function listOpenPublicGames(excludeUserId: string) {
 export async function createGame(
   hostUserId: string,
   format: GameFormat,
-  deckId: string,
   opts: { seatCount?: number; isPublic?: boolean; bracket?: number } = {},
 ) {
   const maxSeats = format === 'COMMANDER' ? Math.min(Math.max(opts.seatCount ?? 4, 2), 4) : 2;
@@ -83,8 +82,11 @@ export async function createGame(
       maxSeats,
       isPublic: opts.isPublic ?? true,
       bracket,
+      // The host joins their own seat 0 without a deck picked yet, same as
+      // everyone else — deck choice happens in the lobby waiting room, not
+      // at creation time.
       players: {
-        create: [{ userId: hostUserId, deckId, seat: 0, isAI: false }],
+        create: [{ userId: hostUserId, seat: 0, isAI: false }],
       },
     },
     include: { players: true },
@@ -92,8 +94,9 @@ export async function createGame(
 }
 
 /** Shared "add me to an open seat" logic behind both invite-code joining and
- * joining a game browsed from the open-lobbies list. */
-export async function joinGameById(gameId: string, userId: string, deckId: string) {
+ * joining a game browsed from the open-lobbies list. Deck choice happens
+ * afterward in the lobby waiting room (setPlayerDeck), not at join time. */
+export async function joinGameById(gameId: string, userId: string) {
   const game = await prisma.game.findUnique({ where: { id: gameId }, include: { players: true } });
   if (!game) throw new Error('Game not found');
   if (game.status !== 'LOBBY') throw new Error('That game has already started');
@@ -106,7 +109,7 @@ export async function joinGameById(gameId: string, userId: string, deckId: strin
   while (takenSeats.has(seat)) seat++;
   if (seat >= game.maxSeats) throw new Error('That game is full');
 
-  await prisma.gamePlayer.create({ data: { gameId: game.id, userId, deckId, seat, isAI: false } });
+  await prisma.gamePlayer.create({ data: { gameId: game.id, userId, seat, isAI: false } });
 
   // Without this, the host (and anyone else already waiting) never finds out
   // a new player joined until they manually reload — nothing else broadcasts
@@ -120,10 +123,52 @@ export async function joinGameById(gameId: string, userId: string, deckId: strin
   return prisma.game.findUnique({ where: { id: game.id }, include: { players: true } });
 }
 
-export async function joinGame(inviteCode: string, userId: string, deckId: string) {
+export async function joinGame(inviteCode: string, userId: string) {
   const game = await prisma.game.findUnique({ where: { inviteCode } });
   if (!game) throw new Error('Game not found');
-  return joinGameById(game.id, userId, deckId);
+  return joinGameById(game.id, userId);
+}
+
+/** Picks (or changes) the calling player's deck while still in the lobby.
+ * Changing deck after marking ready un-readies them — a deck swap should
+ * always require a fresh confirmation. */
+export async function setPlayerDeck(gameId: string, userId: string, deckId: string) {
+  const game = await prisma.game.findUniqueOrThrow({ where: { id: gameId } });
+  if (game.status !== 'LOBBY') throw new Error('That game has already started');
+
+  const deck = await prisma.deck.findFirst({ where: { id: deckId, userId } });
+  if (!deck) throw new Error('Deck not found');
+  if (deck.format !== deckFormatFor(game.format)) throw new Error('Deck format does not match game format');
+
+  const player = await prisma.gamePlayer.findFirst({ where: { gameId, userId } });
+  if (!player) throw new Error('You are not in this game');
+
+  await prisma.gamePlayer.update({ where: { id: player.id }, data: { deckId, isReady: false } });
+
+  try {
+    await broadcastGameState(gameId);
+  } catch (err) {
+    console.error('[broadcastGameState]', err);
+  }
+}
+
+/** Marks the calling player ready (or not) in the lobby — requires a deck
+ * already picked when marking ready, so "Start" can trust isReady alone. */
+export async function setPlayerReady(gameId: string, userId: string, ready: boolean) {
+  const game = await prisma.game.findUniqueOrThrow({ where: { id: gameId } });
+  if (game.status !== 'LOBBY') throw new Error('That game has already started');
+
+  const player = await prisma.gamePlayer.findFirst({ where: { gameId, userId } });
+  if (!player) throw new Error('You are not in this game');
+  if (ready && !player.deckId) throw new Error('Pick a deck before marking yourself ready');
+
+  await prisma.gamePlayer.update({ where: { id: player.id }, data: { isReady: ready } });
+
+  try {
+    await broadcastGameState(gameId);
+  } catch (err) {
+    console.error('[broadcastGameState]', err);
+  }
 }
 
 /** Host-only. Permanently deletes a game that hasn't started yet (cascades
@@ -145,8 +190,8 @@ export async function cancelGame(gameId: string, requestingUserId: string) {
 /** Adds an AI player (its own precon deck, cycled randomly) to every seat
  * still empty in a LOBBY game — shared by the explicit host action below and
  * by starting a game, so "Start" never blocks on unfilled seats even if the
- * host never used the explicit action. No-ops if every seat is already
- * taken, or if the host's own seat/deck can't be found. */
+ * host never used the explicit action. Created already deck-assigned and
+ * ready, so AI seats never block the human-readiness gate in startGame. */
 async function fillEmptySeats(
   gameId: string,
   maxSeats: number,
@@ -154,8 +199,10 @@ async function fillEmptySeats(
   players: { seat: number; deckId: string | null }[],
 ): Promise<void> {
   const takenSeats = new Set(players.map((p) => p.seat));
-  const hostDeckId = players.find((p) => p.seat === 0)?.deckId;
-  if (!hostDeckId) return;
+  // Last-resort fallback if the precon-deck library came up empty (e.g.
+  // Scryfall was unreachable when it was seeded) — better to hand an AI
+  // seat a copy of the host's own deck than leave it with no deck at all.
+  const hostDeckId = players.find((p) => p.seat === 0)?.deckId ?? null;
 
   const newAiSeats: number[] = [];
   for (let seat = 1; seat < maxSeats; seat++) {
@@ -169,6 +216,7 @@ async function fillEmptySeats(
       gameId,
       seat,
       isAI: true,
+      isReady: true,
       aiPersona: AI_PERSONAS[i % AI_PERSONAS.length],
       deckId: aiDeckIds[i % aiDeckIds.length] ?? hostDeckId,
     })),
@@ -208,6 +256,15 @@ export async function startGame(gameId: string, requestingUserId: string) {
   if (!game) throw new Error('Game not found');
   if (game.hostUserId !== requestingUserId) throw new Error('Only the host can start the game');
   if (game.status !== 'LOBBY') throw new Error('That game has already started');
+
+  // Every human seat already at the table must have picked a deck and
+  // confirmed ready before the host can start — empty seats don't block
+  // (they're auto-filled with an already-ready AI below), and AI seats are
+  // always ready by construction.
+  const notReady = game.players.filter((p) => !p.isAI && (!p.deckId || !p.isReady));
+  if (notReady.length > 0) {
+    throw new Error('Every player must pick a deck and mark themselves ready before the game can start');
+  }
 
   // Backfill any seats the host left empty with AI players so "Start" never
   // blocks on waiting for more humans to join, even if the host never used
