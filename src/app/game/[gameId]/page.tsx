@@ -41,6 +41,21 @@ const DEFAULT_HAND_WIDTH_PX = 768; // matches the old max-w-3xl cap
 const MIN_HAND_WIDTH_PX = 360;
 const MAX_HAND_WIDTH_PX = 1600;
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+/** Keeps at least a grabbable strip of the floating hand panel on-screen
+ * after a move or resize (or a viewport resize), rather than letting it
+ * drift entirely out of reach. */
+function clampHandPos(pos: { x: number; y: number }, width: number, height: number): { x: number; y: number } {
+  const margin = 48;
+  return {
+    x: clamp(pos.x, -(width - margin), window.innerWidth - margin),
+    y: clamp(pos.y, 0, window.innerHeight - margin),
+  };
+}
+
 export default function GameTablePage() {
   const params = useParams<{ gameId: string }>();
   const router = useRouter();
@@ -57,6 +72,10 @@ export default function GameTablePage() {
   const [handCollapsed, setHandCollapsed] = useState(false);
   const [handHeightPx, setHandHeightPx] = useState(DEFAULT_HAND_HEIGHT_PX);
   const [handWidthPx, setHandWidthPx] = useState(DEFAULT_HAND_WIDTH_PX);
+  // Top-left corner of the floating hand panel, in viewport px — null until
+  // the mount effect below picks a default (needs `window`, so it can't be
+  // computed during the initial server-rendered pass).
+  const [handPos, setHandPos] = useState<{ x: number; y: number } | null>(null);
   const [counterEditor, setCounterEditor] = useState<{ instanceId: string; name: string } | null>(null);
   const [attachPicker, setAttachPicker] = useState<{ instanceId: string; name: string } | null>(null);
   const [attackPicker, setAttackPicker] = useState<{ instanceId: string; name: string } | null>(null);
@@ -76,11 +95,32 @@ export default function GameTablePage() {
   // used throughout this page. Only runs once at mount so a mid-game
   // rotation doesn't yank settings the player already changed themselves.
   useEffect(() => {
-    if (window.matchMedia('(orientation: landscape) and (max-height: 500px)').matches) {
+    const isShortLandscape = window.matchMedia('(orientation: landscape) and (max-height: 500px)').matches;
+    const initialHeight = isShortLandscape ? MIN_HAND_HEIGHT_PX : DEFAULT_HAND_HEIGHT_PX;
+    if (isShortLandscape) {
       setHandHeightPx(MIN_HAND_HEIGHT_PX);
       setShowLog(false);
     }
+    // Default docked position: bottom-center, matching where the hand bar
+    // used to be permanently pinned before it became freely movable.
+    setHandPos(
+      clampHandPos(
+        { x: (window.innerWidth - DEFAULT_HAND_WIDTH_PX) / 2, y: window.innerHeight - initialHeight - 32 },
+        DEFAULT_HAND_WIDTH_PX,
+        initialHeight,
+      ),
+    );
   }, []);
+
+  // Keep the hand panel from getting stranded off-screen if the viewport
+  // resizes (window resize, or a phone rotating) after it's been moved.
+  useEffect(() => {
+    function onResize() {
+      setHandPos((prev) => (prev ? clampHandPos(prev, handWidthPx, handHeightPx) : prev));
+    }
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [handWidthPx, handHeightPx]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -442,26 +482,64 @@ export default function GameTablePage() {
     });
   };
 
-  // Drag a handle to resize the hand bar. The bar is pinned to the bottom of
-  // the screen and horizontally centered, so height only ever grows upward
-  // (dragging up = taller) and width grows symmetrically from the center
-  // (dragging further from center, in the direction the handle's on = wider)
-  // — widthSign flips which raw mouse-delta direction counts as "wider" for
-  // the left vs. right corner handle; omit it for the height-only middle handle.
-  function handleHandResizeStart(e: React.PointerEvent, widthSign?: 1 | -1) {
+  // Drag anywhere on the panel's title strip to move it — the whole panel
+  // just follows the pointer, clamped so it can't be dragged fully off-screen.
+  function handleHandDragStart(e: React.PointerEvent) {
     e.preventDefault();
     e.stopPropagation();
     const startX = e.clientX;
     const startY = e.clientY;
-    const startHeight = handHeightPx;
-    const startWidth = handWidthPx;
+    const startPos = handPos ?? { x: 0, y: 0 };
     function onMove(ev: PointerEvent) {
-      const heightDelta = startY - ev.clientY;
-      setHandHeightPx(Math.min(MAX_HAND_HEIGHT_PX, Math.max(MIN_HAND_HEIGHT_PX, startHeight + heightDelta)));
-      if (widthSign) {
-        const widthDelta = (ev.clientX - startX) * widthSign;
-        setHandWidthPx(Math.min(MAX_HAND_WIDTH_PX, Math.max(MIN_HAND_WIDTH_PX, startWidth + widthDelta)));
+      setHandPos(
+        clampHandPos({ x: startPos.x + (ev.clientX - startX), y: startPos.y + (ev.clientY - startY) }, handWidthPx, handHeightPx),
+      );
+    }
+    function onUp() {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    }
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }
+
+  // Drag any edge or corner handle to resize the hand panel from that side —
+  // when the dragged edge is the top or left one, the opposite edge has to
+  // stay visually anchored, so resizing from there also shifts position by
+  // however much the (possibly clamped) size actually changed.
+  function handleHandResizeStart(e: React.PointerEvent, edges: { top?: boolean; bottom?: boolean; left?: boolean; right?: boolean }) {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startWidth = handWidthPx;
+    const startHeight = handHeightPx;
+    const startPos = handPos ?? { x: 0, y: 0 };
+    function onMove(ev: PointerEvent) {
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+
+      let width = startWidth;
+      let x = startPos.x;
+      if (edges.right) {
+        width = clamp(startWidth + dx, MIN_HAND_WIDTH_PX, MAX_HAND_WIDTH_PX);
+      } else if (edges.left) {
+        width = clamp(startWidth - dx, MIN_HAND_WIDTH_PX, MAX_HAND_WIDTH_PX);
+        x = startPos.x + (startWidth - width);
       }
+
+      let height = startHeight;
+      let y = startPos.y;
+      if (edges.bottom) {
+        height = clamp(startHeight + dy, MIN_HAND_HEIGHT_PX, MAX_HAND_HEIGHT_PX);
+      } else if (edges.top) {
+        height = clamp(startHeight - dy, MIN_HAND_HEIGHT_PX, MAX_HAND_HEIGHT_PX);
+        y = startPos.y + (startHeight - height);
+      }
+
+      setHandWidthPx(width);
+      setHandHeightPx(height);
+      setHandPos(clampHandPos({ x, y }, width, height));
     }
     function onUp() {
       window.removeEventListener('pointermove', onMove);
@@ -637,15 +715,16 @@ export default function GameTablePage() {
           <p className="mb-1">
             <strong>More room:</strong> each player&apos;s battlefield (including yours) is its own scrollable canvas
             within its board — scroll (or drag) to reach cards placed further out. Your hand wraps into rows and
-            shrinks cards to fit as needed, so up to 20 cards are visible at once with no scrolling; drag the ▬
-            handle above the hand bar up or down to resize its height, or either corner to resize height and width
-            together, and beyond 20 cards it scrolls vertically instead of shrinking further.
+            shrinks cards to fit as needed, so up to 20 cards are visible at once with no scrolling; beyond 20 cards
+            it scrolls vertically instead of shrinking further.
           </p>
           <p className="mb-1">
             <strong>Layout:</strong> every player&apos;s board — including yours — sits in a grid sized to fit the
             whole table on screen at once, no scrolling needed; your own board is highlighted, and your hand floats
-            over the bottom of the grid in its own resizable bar rather than taking up a permanent row of its own.
-            Tap ▼ Hide hand / ▲ Show hand on that bar to collapse it entirely and see the full boards underneath.
+            over the grid as its own movable panel rather than taking up a permanent row of its own. Drag the
+            <strong> • • •</strong> strip at its top to put it anywhere on screen, or any of its edges/corners to
+            resize it from that side. Tap ▼ Hide hand / ▲ Show hand on that strip to collapse it entirely and see the
+            full boards underneath (you can still drag a collapsed hand out of the way).
           </p>
           <p className="mb-1">
             <strong>Dice &amp; coins:</strong> below the game log — pick a die size and tap Roll, or tap Flip for a
@@ -918,50 +997,80 @@ export default function GameTablePage() {
             </div>
           </div>
 
-          {/* Your hand floats over the grid instead of reserving its own
-              row — a translucent bar pinned to the bottom of the table
-              column so it never eats into the boards' visible space.
-              Collapsible: hide it entirely to see the full boards
-              underneath, leaving just a handle to bring it back. */}
-          {me && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center px-1 pb-1">
-              <div
-                className="pointer-events-auto w-full rounded-t-lg border border-white/10 bg-panel/95 shadow-2xl backdrop-blur"
-                style={{ width: handWidthPx, maxWidth: '97vw' }}
-              >
-                {!handCollapsed && (
-                  <div className="relative flex h-2.5 w-full items-center justify-center rounded-t-lg">
-                    <div
-                      onPointerDown={(e) => handleHandResizeStart(e)}
-                      title="Drag to resize your hand (up/down)"
-                      className="flex h-full flex-1 cursor-ns-resize items-center justify-center hover:bg-white/5"
-                    >
-                      <div className="h-1 w-10 rounded-full bg-white/20" />
-                    </div>
-                    <div
-                      onPointerDown={(e) => handleHandResizeStart(e, -1)}
-                      title="Drag to resize your hand (up/down + left/right)"
-                      className="absolute left-0 top-0 h-3.5 w-3.5 cursor-nwse-resize rounded-tl-lg hover:bg-white/10"
-                    />
-                    <div
-                      onPointerDown={(e) => handleHandResizeStart(e, 1)}
-                      title="Drag to resize your hand (up/down + left/right)"
-                      className="absolute right-0 top-0 h-3.5 w-3.5 cursor-nesw-resize rounded-tr-lg hover:bg-white/10"
-                    />
-                  </div>
-                )}
+          {/* Your hand floats as a freely movable, resizable panel over the
+              grid instead of reserving its own row or being pinned to one
+              spot — drag its title strip to put it anywhere on screen, drag
+              any edge or corner to resize it from that side. Collapsible:
+              hide it entirely to see the full boards underneath, leaving
+              just a handle to bring it back. */}
+          {me && handPos && (
+            <div
+              className="fixed z-20 rounded-lg border border-white/10 bg-panel/95 shadow-2xl backdrop-blur"
+              style={{ left: handPos.x, top: handPos.y, width: handWidthPx, maxWidth: '97vw' }}
+            >
+              {!handCollapsed && (
+                <>
+                  <div
+                    onPointerDown={(e) => handleHandResizeStart(e, { top: true })}
+                    title="Drag to resize height"
+                    className="absolute inset-x-3 top-0 h-2 cursor-ns-resize hover:bg-white/10"
+                  />
+                  <div
+                    onPointerDown={(e) => handleHandResizeStart(e, { bottom: true })}
+                    title="Drag to resize height"
+                    className="absolute inset-x-3 bottom-0 h-2 cursor-ns-resize hover:bg-white/10"
+                  />
+                  <div
+                    onPointerDown={(e) => handleHandResizeStart(e, { left: true })}
+                    title="Drag to resize width"
+                    className="absolute inset-y-3 left-0 w-2 cursor-ew-resize hover:bg-white/10"
+                  />
+                  <div
+                    onPointerDown={(e) => handleHandResizeStart(e, { right: true })}
+                    title="Drag to resize width"
+                    className="absolute inset-y-3 right-0 w-2 cursor-ew-resize hover:bg-white/10"
+                  />
+                  <div
+                    onPointerDown={(e) => handleHandResizeStart(e, { top: true, left: true })}
+                    title="Drag to resize"
+                    className="absolute left-0 top-0 h-3.5 w-3.5 cursor-nwse-resize rounded-tl-lg hover:bg-white/10"
+                  />
+                  <div
+                    onPointerDown={(e) => handleHandResizeStart(e, { top: true, right: true })}
+                    title="Drag to resize"
+                    className="absolute right-0 top-0 h-3.5 w-3.5 cursor-nesw-resize rounded-tr-lg hover:bg-white/10"
+                  />
+                  <div
+                    onPointerDown={(e) => handleHandResizeStart(e, { bottom: true, left: true })}
+                    title="Drag to resize"
+                    className="absolute bottom-0 left-0 h-3.5 w-3.5 cursor-nesw-resize rounded-bl-lg hover:bg-white/10"
+                  />
+                  <div
+                    onPointerDown={(e) => handleHandResizeStart(e, { bottom: true, right: true })}
+                    title="Drag to resize"
+                    className="absolute bottom-0 right-0 h-3.5 w-3.5 cursor-nwse-resize rounded-br-lg hover:bg-white/10"
+                  />
+                </>
+              )}
+              <div className="flex items-stretch rounded-t-lg">
+                <div
+                  onPointerDown={handleHandDragStart}
+                  title="Drag to move your hand"
+                  className="flex h-6 flex-1 cursor-move items-center justify-center gap-1 rounded-tl-lg hover:bg-white/5"
+                >
+                  <span className="select-none text-[10px] tracking-widest text-slate-500">• • •</span>
+                </div>
                 <button
                   type="button"
                   onClick={() => setHandCollapsed((v) => !v)}
-                  className={`flex w-full items-center justify-center gap-1 px-2 py-1 text-[11px] text-slate-400 hover:bg-white/5 ${
-                    handCollapsed ? 'rounded-t-lg' : ''
-                  }`}
+                  className="flex h-6 items-center gap-1 rounded-tr-lg px-2 text-[11px] text-slate-400 hover:bg-white/5"
                 >
-                  {handCollapsed ? `▲ Show hand (${me.hand?.length ?? 0})` : '▼ Hide hand'}
+                  {handCollapsed ? `▲ Show hand (${me.hand?.length ?? 0})` : '▼ Hide'}
                 </button>
-                {!handCollapsed && (
-                  <div className="p-1.5 pt-0" style={{ height: handHeightPx }}>
-                    <HandZone
+              </div>
+              {!handCollapsed && (
+                <div className="p-1.5 pt-0" style={{ height: handHeightPx }}>
+                  <HandZone
                       hand={me.hand ?? []}
                       cards={state.cards}
                       onPlay={(scryfallId, transformed) =>
@@ -997,7 +1106,6 @@ export default function GameTablePage() {
                   </div>
                 )}
               </div>
-            </div>
           )}
         </div>
 
