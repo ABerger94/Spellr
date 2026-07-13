@@ -175,6 +175,18 @@ export function tapCard(zones: ZoneState, instanceId: string, tapped: boolean): 
   };
 }
 
+/** Multi-select helper — taps or untaps every listed card in one update, so
+ * a group picked via battlefield drag-select can be toggled together. Cards
+ * that no longer exist (e.g. moved away between selecting and tapping) are
+ * silently skipped rather than failing the whole batch. */
+export function setGroupTapped(zones: ZoneState, instanceIds: string[], tapped: boolean): ZoneState {
+  const idSet = new Set(instanceIds);
+  return {
+    ...cloneZones(zones),
+    battlefield: zones.battlefield.map((c) => (idSet.has(c.instanceId) ? { ...c, tapped } : c)),
+  };
+}
+
 export interface MulliganResult {
   zones: ZoneState;
   drawnScryfallIds: string[];

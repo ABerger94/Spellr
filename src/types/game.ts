@@ -150,6 +150,10 @@ export type GameActionPayload =
   | { type: 'PLAY_CARD'; scryfallId: string; fromZone: 'hand' | 'commandZone'; x?: number; y?: number; transformed?: boolean }
   | { type: 'TAP_CARD'; instanceId: string }
   | { type: 'UNTAP_CARD'; instanceId: string }
+  /** Multi-select helper: taps or untaps every listed card in one shot, so a
+   * group selected via battlefield drag-select can be toggled together
+   * instead of one card at a time. */
+  | { type: 'SET_GROUP_TAPPED'; instanceIds: string[]; tapped: boolean }
   | {
       type: 'MOVE_CARD';
       fromZone: ContentZone;

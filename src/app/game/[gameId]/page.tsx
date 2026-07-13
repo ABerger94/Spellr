@@ -62,6 +62,10 @@ export default function GameTablePage() {
   const [attackPicker, setAttackPicker] = useState<{ instanceId: string; name: string } | null>(null);
   const [blockPicker, setBlockPicker] = useState<{ instanceId: string; name: string } | null>(null);
   const [addTokenOpen, setAddTokenOpen] = useState(false);
+  // Battlefield multi-select: instanceIds drag-selected on your own board,
+  // shown with a gold ring — tapping any one of them while 2+ are selected
+  // taps/untaps the whole group together instead of just that card.
+  const [selectedInstanceIds, setSelectedInstanceIds] = useState<Set<string>>(new Set());
 
   const isMyTurn = state?.status === 'ACTIVE' && state.currentTurnSeat === state.viewerSeat;
 
@@ -350,6 +354,12 @@ export default function GameTablePage() {
               name: cardName,
             }),
         },
+        // A fresh token copy — same printed card, but its own instance with
+        // no counters/tap state carried over, same as any other token.
+        {
+          label: 'Make copy (token)',
+          onClick: () => sendAction({ type: 'CREATE_TOKEN', scryfallId: card.scryfallId, x: card.x + 3, y: card.y + 3 }),
+        },
         // Combat helper: bookkeeping only, no automatic damage — declares an
         // attack target or a blocked attacker and shows a badge, same spirit
         // as the rest of the table.
@@ -553,12 +563,23 @@ export default function GameTablePage() {
             <strong>Tap/untap:</strong> tap a permanent on your battlefield.
           </p>
           <p className="mb-1">
+            <strong>Select and tap multiple at once:</strong> on a computer, drag on empty battlefield space (not on
+            a card) to draw a selection box around several permanents — they highlight with a gold ring. Tap any one
+            of the highlighted cards to tap/untap the whole group together; tap empty space again to clear the
+            selection. Mouse only for now, so it doesn&apos;t fight with scrolling the battlefield by touch.
+          </p>
+          <p className="mb-1">
             <strong>Rearrange the battlefield:</strong> drag a permanent to any spot — positions are freeform, not a grid.
           </p>
           <p className="mb-1">
             <strong>Attach equipment/auras:</strong> drag a permanent onto another one on your battlefield to attach
             it — it renders stacked underneath, peeking out. Tap ⋯ → &quot;Detach&quot; to unattach, or use ⋯ →
             &quot;Attach to…&quot; instead of dragging.
+          </p>
+          <p className="mb-1">
+            <strong>Make a token copy:</strong> tap ⋯ on any permanent and choose &quot;Make copy (token)&quot; to
+            drop a fresh token copy of it right next to the original — same printed card, but its own tap state and
+            counters starting fresh, same as any other token.
           </p>
           <p className="mb-1">
             <strong>Two-sided cards:</strong> transform/modal-DFC permanents get a &quot;Flip card&quot; option in
@@ -867,14 +888,26 @@ export default function GameTablePage() {
                           interactive={isViewer}
                           onTapToggle={
                             isViewer
-                              ? (instanceId, tapped) =>
-                                  sendAction(tapped ? { type: 'UNTAP_CARD', instanceId } : { type: 'TAP_CARD', instanceId })
+                              ? (instanceId, tapped) => {
+                                  if (selectedInstanceIds.size > 1 && selectedInstanceIds.has(instanceId)) {
+                                    sendAction({
+                                      type: 'SET_GROUP_TAPPED',
+                                      instanceIds: Array.from(selectedInstanceIds),
+                                      tapped: !tapped,
+                                    });
+                                  } else {
+                                    sendAction(tapped ? { type: 'UNTAP_CARD', instanceId } : { type: 'TAP_CARD', instanceId });
+                                    if (selectedInstanceIds.size > 0) setSelectedInstanceIds(new Set());
+                                  }
+                                }
                               : undefined
                           }
                           onContextMenu={isViewer ? openBattlefieldCardMenu : undefined}
                           compact
                           zoom={zoom}
                           combatLabels={combatLabels}
+                          selectedInstanceIds={isViewer ? selectedInstanceIds : undefined}
+                          onSelectionChange={isViewer ? setSelectedInstanceIds : undefined}
                         />
                       </div>
                       {!sidebarOnLeft && sidebar}

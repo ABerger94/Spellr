@@ -24,6 +24,7 @@ export const actionSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('TAP_CARD'), instanceId: z.string() }),
   z.object({ type: z.literal('UNTAP_CARD'), instanceId: z.string() }),
+  z.object({ type: z.literal('SET_GROUP_TAPPED'), instanceIds: z.array(z.string()).min(1), tapped: z.boolean() }),
   z.object({
     type: z.literal('MOVE_CARD'),
     fromZone: zoneName,

@@ -11,6 +11,7 @@ export function DraggableCard({
   name,
   imageUrl,
   tapped,
+  selected,
   className,
   title,
   counters,
@@ -31,6 +32,8 @@ export function DraggableCard({
   name: string;
   imageUrl?: string | null;
   tapped?: boolean;
+  /** Battlefield multi-select — see CardImage. */
+  selected?: boolean;
   className?: string;
   title?: string;
   counters?: Record<string, number>;
@@ -108,6 +111,7 @@ export function DraggableCard({
         name={name}
         imageUrl={imageUrl}
         tapped={tapped}
+        selected={selected}
         className={className}
         title={title}
         counters={counters}
