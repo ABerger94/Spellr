@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/close-idle-games",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 9 * * *"
     }
   ]
 }

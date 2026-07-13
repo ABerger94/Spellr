@@ -41,7 +41,6 @@ export default function LobbyPage() {
   const [isPublic, setIsPublic] = useState(true);
   const [bracket, setBracket] = useState(3);
   const [inviteCode, setInviteCode] = useState('');
-  const [spectateInviteCode, setSpectateInviteCode] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -119,14 +118,14 @@ export default function LobbyPage() {
 
   async function handleSpectateByCode() {
     setError(null);
-    if (!spectateInviteCode.trim()) {
+    if (!inviteCode.trim()) {
       setError('Enter an invite code');
       return;
     }
     const res = await fetch('/api/games/spectate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inviteCode: spectateInviteCode.trim() }),
+      body: JSON.stringify({ inviteCode: inviteCode.trim() }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -207,7 +206,7 @@ export default function LobbyPage() {
 
             <div className="flex flex-col gap-6">
               <section className="rounded-lg border border-white/10 bg-panel p-5">
-                <h2 className="mb-4 text-lg font-medium text-white">Join a game</h2>
+                <h2 className="mb-4 text-lg font-medium text-white">Join or spectate a game</h2>
                 <div className="space-y-3">
                   <div>
                     <label className="mb-1 block text-sm text-slate-300">Invite code</label>
@@ -217,33 +216,23 @@ export default function LobbyPage() {
                       className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
                     />
                   </div>
-                  <button onClick={handleJoin} className="w-full rounded bg-panelLight px-3 py-2 font-medium text-white hover:bg-white/10">
-                    Join game
-                  </button>
-                  <p className="text-xs text-slate-500">You&apos;ll pick your deck in the lobby waiting room after joining.</p>
-                </div>
-              </section>
-
-              <section className="rounded-lg border border-white/10 bg-panel p-5">
-                <h2 className="mb-4 text-lg font-medium text-white">Spectate a game</h2>
-                <div className="space-y-3">
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-300">Invite code</label>
-                    <input
-                      value={spectateInviteCode}
-                      onChange={(e) => setSpectateInviteCode(e.target.value)}
-                      className="w-full rounded border border-white/10 bg-panelLight px-3 py-2 text-white"
-                    />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleJoin}
+                      className="flex-1 rounded bg-panelLight px-3 py-2 font-medium text-white hover:bg-white/10"
+                    >
+                      Join game
+                    </button>
+                    <button
+                      onClick={handleSpectateByCode}
+                      className="flex-1 rounded bg-panelLight px-3 py-2 font-medium text-white hover:bg-white/10"
+                    >
+                      👁 Spectate
+                    </button>
                   </div>
-                  <button
-                    onClick={handleSpectateByCode}
-                    className="w-full rounded bg-panelLight px-3 py-2 font-medium text-white hover:bg-white/10"
-                  >
-                    👁 Spectate game
-                  </button>
                   <p className="text-xs text-slate-500">
-                    Watch without taking a seat — you can read text chat and the game log, but can&apos;t play cards, take
-                    actions, or use voice chat.
+                    Join to pick a deck and play, or spectate to watch without taking a seat — you can read text chat and
+                    the game log, but can&apos;t play cards, take actions, or use voice chat.
                   </p>
                 </div>
               </section>

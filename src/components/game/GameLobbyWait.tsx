@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import type { GameStateView } from '@/types/game';
-import type { GameInfo } from '@/hooks/useGameState';
+import type { GameInfo, GameLogEntry } from '@/hooks/useGameState';
 import { bracketTagLabel } from '@/lib/bracket';
+import { GameLog } from './GameLog';
 
 interface Deck {
   id: string;
@@ -20,25 +21,36 @@ export function GameLobbyWait({
   state,
   gameInfo,
   isHost,
+  log,
   onStarted,
   onCancelled,
+  onLeft,
   onSeatsChanged,
+  onSendChat,
 }: {
   state: GameStateView;
   gameInfo: GameInfo;
   isHost: boolean;
+  log: GameLogEntry[];
   onStarted: () => void | Promise<void>;
   onCancelled: () => void | Promise<void>;
+  /** Called after a non-host player successfully leaves their own seat. */
+  onLeft: () => void | Promise<void>;
   onSeatsChanged: () => void | Promise<void>;
+  onSendChat: (text: string) => void | Promise<void>;
 }) {
   const [starting, setStarting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const [fillingAI, setFillingAI] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [decks, setDecks] = useState<Deck[]>([]);
   const [selectedDeckId, setSelectedDeckId] = useState('');
   const [savingDeck, setSavingDeck] = useState(false);
   const [togglingReady, setTogglingReady] = useState(false);
+
+  const displayName = (seat: number | null) =>
+    seat === null ? 'System' : (state.players.find((p) => p.seat === seat)?.displayName ?? `Seat ${seat}`);
 
   const me = state.players.find((p) => p.seat === state.viewerSeat);
   const decksForFormat = decks.filter((d) => d.format === (state.format === 'COMMANDER' ? 'COMMANDER' : 'STANDARD_1V1'));
@@ -137,6 +149,20 @@ export function GameLobbyWait({
       return;
     }
     await onCancelled();
+  }
+
+  async function handleLeave() {
+    if (!window.confirm('Leave this lobby? Your seat will open up for someone else.')) return;
+    setLeaving(true);
+    setError(null);
+    const res = await fetch(`/api/games/${gameInfo.id}/leave`, { method: 'POST' });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error ?? 'Failed to leave game');
+      setLeaving(false);
+      return;
+    }
+    await onLeft();
   }
 
   const seats = Array.from({ length: gameInfo.maxSeats }, (_, seat) => state.players.find((p) => p.seat === seat));
@@ -246,14 +272,29 @@ export function GameLobbyWait({
           </button>
         </div>
       ) : (
-        <p className="text-center text-sm text-slate-400">
-          {me && !me.isAI && !me.isReady
-            ? 'Pick a deck and mark yourself ready above.'
-            : canStart
-              ? 'Waiting for the host to start the game…'
-              : 'Waiting for other players to pick a deck and ready up…'}
-        </p>
+        <div className="space-y-3">
+          <p className="text-center text-sm text-slate-400">
+            {me && !me.isAI && !me.isReady
+              ? 'Pick a deck and mark yourself ready above.'
+              : canStart
+                ? 'Waiting for the host to start the game…'
+                : 'Waiting for other players to pick a deck and ready up…'}
+          </p>
+          {me && (
+            <button
+              onClick={handleLeave}
+              disabled={leaving}
+              className="w-full rounded bg-red-500/10 px-4 py-2 font-medium text-red-400 hover:bg-red-500/20 disabled:opacity-50"
+            >
+              {leaving ? 'Leaving…' : 'Leave lobby'}
+            </button>
+          )}
+        </div>
       )}
+
+      <div className="mt-6 h-64">
+        <GameLog events={log} displayName={displayName} onSendChat={onSendChat} />
+      </div>
     </div>
   );
 }

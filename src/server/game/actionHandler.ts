@@ -145,7 +145,9 @@ export function execute(gameId: string, actor: ActionActor, action: Action): Pro
 
 async function executeLocked(gameId: string, actor: ActionActor, action: Action): Promise<GameEvent> {
   const game = await prisma.game.findUniqueOrThrow({ where: { id: gameId } });
-  if (game.status !== 'ACTIVE') throw new Error('Game is not active');
+  // Chat is the one action allowed before the game actually starts, so
+  // players waiting in the lobby can talk to each other.
+  if (action.type !== 'CHAT_MESSAGE' && game.status !== 'ACTIVE') throw new Error('Game is not active');
 
   let event: GameEvent | undefined;
 

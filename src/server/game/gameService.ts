@@ -239,6 +239,40 @@ export async function cancelGame(gameId: string, requestingUserId: string) {
   await prisma.game.delete({ where: { id: gameId } });
 }
 
+/** Backs a player out of a lobby they've already joined, freeing their seat
+ * for someone else — the non-host equivalent of cancelGame. The host has no
+ * seat to "just" free without also ending the table for everyone else still
+ * waiting, so a host leaving is treated as cancelling the whole lobby
+ * (same as the existing Cancel game button) rather than a partial exit. */
+export async function leaveLobby(gameId: string, userId: string): Promise<{ cancelled: boolean }> {
+  const game = await prisma.game.findUniqueOrThrow({ where: { id: gameId } });
+  if (game.status !== 'LOBBY') throw new Error('You can only leave a game before it starts');
+
+  if (game.hostUserId === userId) {
+    try {
+      await broadcastGameCancelled(gameId);
+    } catch (err) {
+      console.error('[broadcastGameCancelled]', err);
+    }
+    await prisma.game.delete({ where: { id: gameId } });
+    return { cancelled: true };
+  }
+
+  const player = await prisma.gamePlayer.findFirst({ where: { gameId, userId } });
+  if (!player) throw new Error('You are not in this game');
+
+  await prisma.gamePlayer.delete({ where: { id: player.id } });
+  await touchGameActivity(gameId);
+
+  try {
+    await broadcastGameState(gameId);
+  } catch (err) {
+    console.error('[broadcastGameState]', err);
+  }
+
+  return { cancelled: false };
+}
+
 /** Adds an AI player (its own precon deck, cycled randomly) to every seat
  * still empty in a LOBBY game — shared by the explicit host action below and
  * by starting a game, so "Start" never blocks on unfilled seats even if the
