@@ -64,6 +64,19 @@ export default function GameTablePage() {
 
   const isMyTurn = state?.status === 'ACTIVE' && state.currentTurnSeat === state.viewerSeat;
 
+  // A short landscape phone has so little height to begin with that the
+  // default hand bar and the always-on log panel can together eat most of
+  // the screen — start the hand collapsed to its minimum and the log
+  // hidden, same viewport check as the mobile-landscape Tailwind variant
+  // used throughout this page. Only runs once at mount so a mid-game
+  // rotation doesn't yank settings the player already changed themselves.
+  useEffect(() => {
+    if (window.matchMedia('(orientation: landscape) and (max-height: 500px)').matches) {
+      setHandHeightPx(MIN_HAND_HEIGHT_PX);
+      setShowLog(false);
+    }
+  }, []);
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
@@ -477,8 +490,8 @@ export default function GameTablePage() {
     <div className="flex h-screen flex-col">
       <NavBar />
 
-      <div className="flex items-center justify-between border-b border-white/10 bg-panel px-4 py-1.5 text-xs text-slate-400">
-        <span className="hidden truncate sm:inline">
+      <div className="flex items-center justify-between border-b border-white/10 bg-panel px-4 py-1.5 text-xs text-slate-400 mobile-landscape:px-2 mobile-landscape:py-0.5">
+        <span className="hidden truncate sm:inline mobile-landscape:hidden">
           Tap or drag a card to play/move it · tap ⋯ on a card for more options · use the Game actions bar for
           draw/scry/surveil/mill/pass/etc ·
           keyboard: <kbd className="rounded bg-panelLight px-1">D</kbd> draw, <kbd className="rounded bg-panelLight px-1">Space</kbd> pass turn
@@ -487,7 +500,7 @@ export default function GameTablePage() {
           <button
             onClick={handleRestartGame}
             title="Restart the game for everyone"
-            className="ml-auto mr-2 rounded bg-red-500/10 px-2 py-0.5 text-red-400 hover:bg-red-500/20 sm:ml-2"
+            className="ml-auto mr-2 whitespace-nowrap rounded bg-red-500/10 px-2 py-0.5 text-red-400 hover:bg-red-500/20 sm:ml-2 mobile-landscape:mr-1 mobile-landscape:px-1.5 mobile-landscape:py-0"
           >
             ⟲ Restart game
           </button>
@@ -496,14 +509,14 @@ export default function GameTablePage() {
           <button
             onClick={handleEndGame}
             title="End the game for everyone"
-            className="mr-2 rounded bg-red-500/10 px-2 py-0.5 text-red-400 hover:bg-red-500/20"
+            className="mr-2 whitespace-nowrap rounded bg-red-500/10 px-2 py-0.5 text-red-400 hover:bg-red-500/20 mobile-landscape:mr-1 mobile-landscape:px-1.5 mobile-landscape:py-0"
           >
             ✕ End game
           </button>
         )}
         <button
           onClick={() => setShowLog((v) => !v)}
-          className={`mr-2 rounded px-2 py-0.5 hover:bg-white/10 ${
+          className={`mr-2 whitespace-nowrap rounded px-2 py-0.5 hover:bg-white/10 mobile-landscape:mr-1 mobile-landscape:px-1.5 mobile-landscape:py-0 ${
             showLog ? 'bg-accent/20 text-accent' : 'bg-panelLight'
           } ${isHost ? '' : 'ml-auto sm:ml-0'}`}
         >
@@ -511,7 +524,7 @@ export default function GameTablePage() {
         </button>
         <button
           onClick={() => setShowHelp((v) => !v)}
-          className="rounded bg-panelLight px-2 py-0.5 hover:bg-white/10"
+          className="whitespace-nowrap rounded bg-panelLight px-2 py-0.5 hover:bg-white/10 mobile-landscape:px-1.5 mobile-landscape:py-0"
         >
           {showHelp ? 'Hide help' : '? Help'}
         </button>
@@ -715,17 +728,30 @@ export default function GameTablePage() {
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-2 lg:flex-row lg:gap-4 lg:p-4">
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
           {/* Turn indicator */}
-          <div className="flex-shrink-0 pb-2 text-center text-xs text-slate-500">
+          <div className="flex-shrink-0 pb-2 text-center text-xs text-slate-500 mobile-landscape:pb-0.5">
             Turn {state.turnNumber} · {displayName(state.currentTurnSeat)}&apos;s turn
           </div>
 
           {/* Every seat, including your own, sized to exactly fill the space
               below — a true edhplay-style grid, no scrolling needed to see
-              every board. */}
+              every board. On short landscape phones a 2x2 grid leaves each
+              board only a quarter of an already-tiny viewport, so it
+              collapses to a single row instead — every board then gets the
+              full viewport height, at the cost of being narrower, which is
+              the better trade when width is the one thing landscape has
+              plenty of. */}
           <div className="min-h-0 flex-1">
             <div
-              className={`grid h-full gap-2 ${state.players.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} ${
-                state.players.length > 2 ? 'grid-rows-2' : 'grid-rows-1'
+              className={`grid h-full gap-2 mobile-landscape:grid-flow-col mobile-landscape:grid-rows-1 ${
+                state.players.length > 1 ? 'grid-cols-2' : 'grid-cols-1'
+              } ${state.players.length > 2 ? 'grid-rows-2' : 'grid-rows-1'} ${
+                state.players.length >= 4
+                  ? 'mobile-landscape:grid-cols-4'
+                  : state.players.length === 3
+                    ? 'mobile-landscape:grid-cols-3'
+                    : state.players.length === 2
+                      ? 'mobile-landscape:grid-cols-2'
+                      : 'mobile-landscape:grid-cols-1'
               }`}
             >
               {state.players.map((p, i) => {
@@ -798,7 +824,7 @@ export default function GameTablePage() {
                 return (
                   <div
                     key={p.seat}
-                    className={`flex min-h-0 flex-col overflow-hidden rounded-lg border bg-panel p-1.5 ${
+                    className={`flex min-h-0 flex-col overflow-hidden rounded-lg border bg-panel p-1.5 mobile-landscape:col-span-1 ${
                       isLastOdd ? 'col-span-2' : ''
                     } ${isActiveTurn ? 'border-accent2 ring-1 ring-accent2/50' : isViewer ? 'border-accent/40' : 'border-white/10'}`}
                   >
@@ -940,7 +966,7 @@ export default function GameTablePage() {
         </div>
 
         {showLog && (
-          <div className="flex h-40 flex-shrink-0 flex-col lg:h-auto lg:w-72">
+          <div className="flex h-40 flex-shrink-0 flex-col mobile-landscape:h-28 lg:h-auto lg:w-72">
             <div className="min-h-0 flex-1">
               <GameLog
                 events={log}
