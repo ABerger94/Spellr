@@ -571,6 +571,9 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
     case 'DECLARE_BLOCK': {
       const player = await getPlayer(gameId, actor.seat);
       const zones = player.zones as unknown as ZoneState;
+      if (!zones.battlefield.some((c) => c.instanceId === action.instanceId)) {
+        throw new Error('That creature is not on your own battlefield — you can only declare blocks with creatures you control.');
+      }
       const nextZones = declareBlock(zones, action.instanceId, action.attackerInstanceId);
       await updateZones(player.id, nextZones);
       event = await logEvent(

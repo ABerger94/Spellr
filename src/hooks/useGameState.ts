@@ -223,5 +223,41 @@ export function useGameState(gameId: string) {
     };
   }, [state, gameId, refreshState]);
 
+  // AI seats also need a chance to react (declare blocks) to attacks made
+  // against them mid-opponent's-turn — waiting for their own next turn would
+  // always be too late, since combat declarations are cleared the instant
+  // the attacker passes. Same "whichever client notices" pattern as the AI
+  // turn trigger above, deduped per AI seat by its current set of attacking
+  // instanceIds so it only refires when that set actually changes.
+  const aiBlockTriggeredRef = useRef<Map<number, string>>(new Map());
+  useEffect(() => {
+    if (!state || state.status !== 'ACTIVE') return;
+
+    for (const target of state.players) {
+      if (!target.isAI) continue;
+
+      const attackerIds: string[] = [];
+      for (const other of state.players) {
+        if (other.seat === target.seat) continue;
+        for (const c of other.battlefield) {
+          if (c.attacking?.targetSeat === target.seat) attackerIds.push(c.instanceId);
+        }
+      }
+      if (attackerIds.length === 0) continue;
+
+      const key = attackerIds.sort().join(',');
+      if (aiBlockTriggeredRef.current.get(target.seat) === key) continue;
+      aiBlockTriggeredRef.current.set(target.seat, key);
+
+      fetch(`/api/games/${gameId}/ai-block-check`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seat: target.seat }),
+      })
+        .then(() => refreshState())
+        .catch((err) => console.error('[useGameState] ai-block-check trigger failed', err));
+    }
+  }, [state, gameId, refreshState]);
+
   return { state, gameInfo, log, joinError, actionError, sendAction, onlineUserIds, refreshState };
 }

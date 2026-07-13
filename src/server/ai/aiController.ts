@@ -46,17 +46,63 @@ export function runAITurnOnce(gameId: string, seat: number): Promise<void> {
   return run;
 }
 
+// Separate lock namespace from aiTurnLocks — an AI seat can need a block
+// reaction while it's *not* its turn (during an opponent's attack), so this
+// must be able to run concurrently with, not compete with, aiTurnLocks.
+const aiBlockLocks = new Map<string, Promise<void>>();
+
+/** Entry point for reacting to attacks declared against an AI seat. This is
+ * deliberately NOT part of runAITurnOnce/takeTurn: combat declarations are
+ * cleared the instant the attacking player passes their turn (see
+ * actionHandler.ts's PASS_TURN case), which happens well before this AI
+ * seat would ever become the active player and get a chance to see them via
+ * its normal turn prompt. A connected client calls this as soon as it
+ * notices an AI seat has an unresolved attacker, the same way it notices
+ * and triggers a normal AI turn. */
+export function runAIBlockCheckOnce(gameId: string, seat: number): Promise<void> {
+  const key = `${gameId}:${seat}`;
+  const existing = aiBlockLocks.get(key);
+  if (existing) return existing;
+
+  const run = maybeTakeAIBlocks(gameId, seat).finally(() => {
+    aiBlockLocks.delete(key);
+  });
+  aiBlockLocks.set(key, run);
+  return run;
+}
+
+async function maybeTakeAIBlocks(gameId: string, seat: number): Promise<void> {
+  const providers = listConfiguredProviders();
+  for (const provider of providers) {
+    try {
+      await takeBlockReaction(gameId, seat, createDriver(provider));
+      return;
+    } catch (err) {
+      // Unlike a missed turn, a missed block just means the attack goes
+      // through undefended — not a broken game state — so this falls
+      // through to the next provider silently rather than logging a
+      // table-visible error for every attack declared against an AI seat.
+      console.error(`[aiController] block reaction (${provider}) failed`, err);
+    }
+  }
+}
+
 // Tried in order of preference, falling through to the next only when the
 // current one is down, rate-limited, or misconfigured — not load-balanced
 // peers, since the open fallback models are less reliable at multi-step tool
 // calling than Gemini.
-async function maybeTakeAITurn(gameId: string, seat: number): Promise<void> {
+function listConfiguredProviders(): ProviderName[] {
   const providers: ProviderName[] = [];
   if (env.geminiApiKey) providers.push('gemini');
   if (env.groqApiKey) providers.push('groq');
   if (env.cerebrasApiKey) providers.push('cerebras');
   if (env.openRouterApiKey) providers.push('openrouter');
   if (env.base44AppId) providers.push('base44');
+  return providers;
+}
+
+async function maybeTakeAITurn(gameId: string, seat: number): Promise<void> {
+  const providers = listConfiguredProviders();
 
   if (providers.length === 0) {
     await logEvent(gameId, 'AI_SKIPPED_NO_KEY', {}, { seat });
@@ -251,6 +297,56 @@ function buildPrompt(state: GameStateView, seat: number, aggressionAgainstMe: Re
   return lines.join('\n');
 }
 
+/** Prompt for a block-only reaction (see takeBlockReaction) — deliberately a
+ * separate, much narrower prompt than buildPrompt's full-turn one, since
+ * this fires mid-opponent's-turn and the AI should only be deciding blocks,
+ * not replaying its whole turn logic. Returns null when nothing is
+ * currently attacking this seat, so callers can skip the LLM call entirely. */
+function buildBlockPrompt(state: GameStateView, seat: number): string | null {
+  const me = state.players.find((p) => p.seat === seat);
+  if (!me) return null;
+
+  const attackers: { instanceId: string; controllerSeat: number; label: string }[] = [];
+  for (const p of state.players) {
+    if (p.seat === seat) continue;
+    for (const c of p.battlefield) {
+      if (c.attacking?.targetSeat === seat) {
+        attackers.push({ instanceId: c.instanceId, controllerSeat: p.seat, label: cardLabel(state, c.scryfallId, true, c.counters) });
+      }
+    }
+  }
+  if (attackers.length === 0) return null;
+
+  const untappedBlockers = me.battlefield.filter((c) => !c.tapped && (state.cards[c.scryfallId]?.typeLine ?? '').includes('Creature'));
+
+  const lines: string[] = [
+    `You are seat ${seat} (${me.displayName}) in a Magic: The Gathering game. It is NOT your turn right now — ` +
+      "an opponent has declared an attack against you during their own turn, and you're only being asked " +
+      'whether to block, nothing else.',
+    '',
+    'Creatures currently attacking you:',
+    ...attackers.map((a) => `- instanceId=${a.instanceId}, controlled by seat ${a.controllerSeat}: ${a.label}`),
+    '',
+  ];
+  if (untappedBlockers.length > 0) {
+    lines.push('Your untapped creatures available to block:');
+    lines.push(...untappedBlockers.map((c) => `- instanceId=${c.instanceId}: ${cardLabel(state, c.scryfallId, true, c.counters)}`));
+  } else {
+    lines.push('You have no untapped creatures available to block.');
+  }
+  lines.push('');
+  lines.push(
+    "For each attacker you want to block, call block_with with YOUR blocker's instanceId (never an opponent's) " +
+      "and that attacker's instanceId. Compare power/toughness and rules text (deathtouch, trample, first " +
+      'strike, etc.) to judge the trade — block when it kills or favorably trades with the attacker, or when ' +
+      "you can't afford the life loss; decline a block that would lose a valuable creature for nothing. You " +
+      'may block zero, one, or several attackers (a creature can only block one attacker unless its rules text ' +
+      'says otherwise). When you are done, stop calling functions — do not call pass_turn or any other ' +
+      "action; this is not your turn.",
+  );
+  return lines.join('\n');
+}
+
 /** Used to hand the AI its actual new hand right after a mulligan — the
  * generic `{ ok: true }` tool result otherwise leaves it unable to say what
  * changed, since its prompt was only built once at the start of the turn. */
@@ -299,6 +395,11 @@ async function mapFunctionCallToAction(
       const targetSeat = Number(args.targetSeat);
       const targetInstanceId = args.targetInstanceId ? String(args.targetInstanceId) : undefined;
       return { type: 'DECLARE_ATTACK', instanceId, targetType, targetSeat, targetInstanceId };
+    }
+    case 'block_with': {
+      const instanceId = String(args.instanceId);
+      const attackerInstanceId = String(args.attackerInstanceId);
+      return { type: 'DECLARE_BLOCK', instanceId, attackerInstanceId };
     }
     case 'move_card_zone':
       return {
@@ -368,4 +469,37 @@ async function takeTurn(gameId: string, seat: number, driver: AITurnDriver): Pro
     await logEvent(gameId, 'AI_TURN_CAPPED', {}, { seat });
   }
   await forcePass(gameId, seat);
+}
+
+/** Narrow sibling of takeTurn for reacting to an opponent's attack — only
+ * ever executes block_with calls. If the model calls anything else (or
+ * nothing), the reaction just ends there; unlike takeTurn this never calls
+ * pass_turn or forcePass, since it isn't anyone's turn transition. */
+async function takeBlockReaction(gameId: string, seat: number, driver: AITurnDriver): Promise<void> {
+  const state = await buildStateFor(gameId, seat);
+  const prompt = buildBlockPrompt(state, seat);
+  if (!prompt) return;
+
+  let step = await driver.sendInitial(prompt);
+  let blocksDeclared = 0;
+
+  while (blocksDeclared < MAX_ACTIONS_PER_TURN && step.toolCall?.name === 'block_with') {
+    if (step.reasoningText) {
+      await logEvent(gameId, 'AI_REASONING', { text: step.reasoningText }, { seat });
+    }
+
+    const { id: toolCallId, name, args } = step.toolCall;
+    let resultPayload: Record<string, unknown>;
+    try {
+      const rawAction = await mapFunctionCallToAction(gameId, seat, name, args);
+      const action = actionSchema.parse(rawAction);
+      await execute(gameId, { seat }, action);
+      blocksDeclared += 1;
+      resultPayload = { ok: true };
+    } catch (err) {
+      resultPayload = { ok: false, error: err instanceof Error ? err.message : 'Block failed' };
+    }
+
+    step = await driver.sendToolResult(toolCallId, name, resultPayload);
+  }
 }
