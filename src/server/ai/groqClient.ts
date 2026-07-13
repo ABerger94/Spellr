@@ -6,5 +6,5 @@ export function createGroqDriver(): AITurnDriver {
   if (!env.groqApiKey) {
     throw new Error('GROQ_API_KEY is not configured');
   }
-  return createOpenAICompatDriver({ apiKey: env.groqApiKey, model: env.groqModel });
+  return createOpenAICompatDriver({ apiKey: env.groqApiKey, baseURL: 'https://api.groq.com/openai/v1', model: env.groqModel });
 }
