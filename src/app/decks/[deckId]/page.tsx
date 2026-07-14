@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { NavBar } from '@/components/layout/NavBar';
+import { CardPreviewProvider } from '@/components/game/CardPreviewContext';
 import { CardSearchAutocomplete } from '@/components/deck/CardSearchAutocomplete';
 import { DecklistPasteBox } from '@/components/deck/DecklistPasteBox';
 import { DeckUrlImportBox } from '@/components/deck/DeckUrlImportBox';
@@ -20,6 +21,8 @@ interface DeckCardEntry {
     typeLine: string | null;
     manaCost: string | null;
     oracleText: string | null;
+    power: string | null;
+    toughness: string | null;
     colorIdentity: string[];
   };
 }
@@ -95,57 +98,59 @@ export default function DeckEditorPage() {
   }
 
   return (
-    <div>
-      <NavBar />
-      <main className="mx-auto max-w-6xl px-6 py-8">
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-white">{deck.name}</h1>
-            <p className="text-sm text-slate-400">{deck.format === 'COMMANDER' ? 'Commander' : '1v1'}</p>
-          </div>
-          <button onClick={handleDelete} className="rounded bg-panelLight px-3 py-1.5 text-sm text-red-400 hover:bg-white/10">
-            Delete deck
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_360px]">
-          <div>
-            <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Deck</h2>
-            <DeckCardGrid
-              cards={deck.cards}
-              format={deck.format}
-              onRemove={(scryfallId) => patchDeck({ action: 'removeCard', scryfallId })}
-              onSetCommander={(scryfallId) => patchDeck({ action: 'setCommander', scryfallId })}
-            />
-          </div>
-
-          <div className="space-y-6">
+    <CardPreviewProvider>
+      <div>
+        <NavBar />
+        <main className="mx-auto max-w-6xl px-6 py-8">
+          <div className="mb-6 flex items-center justify-between">
             <div>
-              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Add cards</h2>
-              <CardSearchAutocomplete
-                onAdd={(scryfallId) => patchDeck({ action: 'addCard', scryfallId, quantity: 1 })}
+              <h1 className="text-2xl font-semibold text-white">{deck.name}</h1>
+              <p className="text-sm text-slate-400">{deck.format === 'COMMANDER' ? 'Commander' : '1v1'}</p>
+            </div>
+            <button onClick={handleDelete} className="rounded bg-panelLight px-3 py-1.5 text-sm text-red-400 hover:bg-white/10">
+              Delete deck
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_360px]">
+            <div>
+              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Deck</h2>
+              <DeckCardGrid
+                cards={deck.cards}
+                format={deck.format}
+                onRemove={(scryfallId) => patchDeck({ action: 'removeCard', scryfallId })}
+                onSetCommander={(scryfallId) => patchDeck({ action: 'setCommander', scryfallId })}
               />
             </div>
-            <div>
-              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Paste a decklist</h2>
-              <DecklistPasteBox deckId={deck.id} onImported={loadDeck} />
-            </div>
-            <div>
-              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Import from a deck URL</h2>
-              <DeckUrlImportBox deckId={deck.id} onImported={loadDeck} />
-            </div>
-            <div>
-              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Export decklist</h2>
-              <DeckExportBox deckName={deck.name} cards={deck.cards} />
+
+            <div className="space-y-6">
+              <div>
+                <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Add cards</h2>
+                <CardSearchAutocomplete
+                  onAdd={(scryfallId) => patchDeck({ action: 'addCard', scryfallId, quantity: 1 })}
+                />
+              </div>
+              <div>
+                <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Paste a decklist</h2>
+                <DecklistPasteBox deckId={deck.id} onImported={loadDeck} />
+              </div>
+              <div>
+                <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Import from a deck URL</h2>
+                <DeckUrlImportBox deckId={deck.id} onImported={loadDeck} />
+              </div>
+              <div>
+                <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">Export decklist</h2>
+                <DeckExportBox deckName={deck.name} cards={deck.cards} />
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="mt-8 rounded-lg border border-white/10 bg-panel p-4">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Deck stats</h2>
-          <DeckStatsPanel cards={deck.cards} format={deck.format} />
-        </div>
-      </main>
-    </div>
+          <div className="mt-8 rounded-lg border border-white/10 bg-panel p-4">
+            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Deck stats</h2>
+            <DeckStatsPanel cards={deck.cards} format={deck.format} />
+          </div>
+        </main>
+      </div>
+    </CardPreviewProvider>
   );
 }

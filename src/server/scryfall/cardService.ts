@@ -9,6 +9,9 @@ export interface CardSummary {
   typeLine: string | null;
   imageNormal: string | null;
   imageArtCrop: string | null;
+  oracleText: string | null;
+  power: string | null;
+  toughness: string | null;
 }
 
 function toCacheData(card: ScryfallCard) {
@@ -123,6 +126,9 @@ function toSummary(card: ScryfallCard): CardSummary {
     typeLine: card.type_line ?? card.card_faces?.[0]?.type_line ?? null,
     imageNormal: imageUris?.normal ?? null,
     imageArtCrop: imageUris?.art_crop ?? null,
+    oracleText: card.oracle_text ?? card.card_faces?.[0]?.oracle_text ?? null,
+    power: card.power ?? card.card_faces?.[0]?.power ?? null,
+    toughness: card.toughness ?? card.card_faces?.[0]?.toughness ?? null,
   };
 }
 

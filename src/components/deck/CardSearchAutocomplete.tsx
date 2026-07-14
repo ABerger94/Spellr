@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { CardImage } from '@/components/card/CardImage';
 
 interface SearchResult {
   scryfallId: string;
@@ -8,6 +9,9 @@ interface SearchResult {
   manaCost: string | null;
   typeLine: string | null;
   imageNormal: string | null;
+  oracleText: string | null;
+  power: string | null;
+  toughness: string | null;
 }
 
 export function CardSearchAutocomplete({
@@ -122,25 +126,22 @@ export function CardSearchAutocomplete({
       {results.length > 0 && (
         <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
           {results.map((card) => (
-            <button
-              key={card.scryfallId}
-              type="button"
-              onClick={() => onAdd(card.scryfallId, card.name)}
-              className="group relative overflow-hidden rounded-md border border-white/10 text-left"
-              title={`Add ${card.name}`}
-            >
-              {card.imageNormal ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={card.imageNormal} alt={card.name} className="w-full" />
-              ) : (
-                <div className="flex aspect-[5/7] items-center justify-center bg-panelLight p-2 text-center text-xs text-slate-300">
-                  {card.name}
-                </div>
-              )}
-              <div className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
+            <div key={card.scryfallId} className="group relative overflow-hidden rounded-md border border-white/10">
+              <CardImage
+                name={card.name}
+                imageUrl={card.imageNormal}
+                manaCost={card.manaCost}
+                typeLine={card.typeLine}
+                oracleText={card.oracleText}
+                power={card.power}
+                toughness={card.toughness}
+                title={`Add ${card.name}`}
+                onClick={() => onAdd(card.scryfallId, card.name)}
+              />
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 transition-opacity group-hover:opacity-100">
                 <span className="rounded bg-accent px-2 py-1 text-xs font-semibold text-white">+ Add</span>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       )}

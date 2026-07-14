@@ -10,6 +10,10 @@ interface DeckCardEntry {
     name: string;
     imageNormal: string | null;
     typeLine: string | null;
+    manaCost?: string | null;
+    oracleText?: string | null;
+    power?: string | null;
+    toughness?: string | null;
   };
 }
 
@@ -36,7 +40,15 @@ export function DeckCardGrid({
         <div className="mb-4">
           <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-accent2">Commander</p>
           <div className="w-32">
-            <CardImage name={commander.cardCache.name} imageUrl={commander.cardCache.imageNormal} />
+            <CardImage
+              name={commander.cardCache.name}
+              imageUrl={commander.cardCache.imageNormal}
+              typeLine={commander.cardCache.typeLine}
+              manaCost={commander.cardCache.manaCost}
+              oracleText={commander.cardCache.oracleText}
+              power={commander.cardCache.power}
+              toughness={commander.cardCache.toughness}
+            />
           </div>
         </div>
       )}
@@ -44,7 +56,15 @@ export function DeckCardGrid({
       <div className="grid grid-cols-4 gap-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8">
         {rest.map((c) => (
           <div key={c.scryfallId} className="group relative">
-            <CardImage name={c.cardCache.name} imageUrl={c.cardCache.imageNormal} />
+            <CardImage
+              name={c.cardCache.name}
+              imageUrl={c.cardCache.imageNormal}
+              typeLine={c.cardCache.typeLine}
+              manaCost={c.cardCache.manaCost}
+              oracleText={c.cardCache.oracleText}
+              power={c.cardCache.power}
+              toughness={c.cardCache.toughness}
+            />
             {c.quantity > 1 && (
               <span className="absolute right-1 top-1 rounded bg-black/70 px-1.5 py-0.5 text-xs font-semibold text-white">
                 ×{c.quantity}
