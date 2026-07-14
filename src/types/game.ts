@@ -206,7 +206,7 @@ export type GameActionPayload =
   | { type: 'RESTART_GAME' }
   | { type: 'MILL'; count: number }
   | { type: 'RANDOM_DISCARD' }
-  | { type: 'REVEAL_HAND' }
+  | { type: 'REVEAL_HAND'; targetSeats?: number[] }
   | { type: 'MULLIGAN' }
   | { type: 'ROLL_DICE'; sides: number }
   | { type: 'FLIP_COIN' }

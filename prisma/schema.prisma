@@ -188,6 +188,7 @@ model GameEvent {
   actorSeat   Int?
   type        String
   payload     Json     @default("{}")
+  visibleToSeats Int[] @default([])
   createdAt   DateTime @default(now())
 
   @@index([gameId, createdAt])

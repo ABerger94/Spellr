@@ -467,7 +467,8 @@ async function executeLocked(gameId: string, actor: ActionActor, action: Action)
       });
       const namesById = new Map(cardRows.map((c) => [c.scryfallId, c.name]));
       const cardNames = zones.hand.map((id) => namesById.get(id) ?? id);
-      event = await logEvent(gameId, 'REVEAL_HAND', { cardNames }, actor);
+      const targetSeats = action.targetSeats && action.targetSeats.length > 0 ? action.targetSeats : undefined;
+      event = await logEvent(gameId, 'REVEAL_HAND', { cardNames, targetSeats }, actor, targetSeats ?? []);
       break;
     }
 

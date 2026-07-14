@@ -172,7 +172,12 @@ function describeEvent(event: GameLogEntry, displayName: (seat: number | null) =
       return `${who} randomly discarded a card.`;
     case 'REVEAL_HAND': {
       const names = (event.payload.cardNames as string[]) ?? [];
-      return names.length > 0 ? `${who} revealed their hand: ${names.join(', ')}.` : `${who} revealed an empty hand.`;
+      const targetSeats = event.payload.targetSeats as number[] | undefined;
+      const target =
+        targetSeats && targetSeats.length > 0 ? ` to ${targetSeats.map((s) => displayName(s)).join(', ')}` : '';
+      return names.length > 0
+        ? `${who} revealed their hand${target}: ${names.join(', ')}.`
+        : `${who} revealed an empty hand${target}.`;
     }
     case 'MULLIGAN': {
       const count = event.payload.mulliganCount as number | undefined;
