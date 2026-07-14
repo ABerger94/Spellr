@@ -25,6 +25,7 @@ import { CounterEditor } from '@/components/game/CounterEditor';
 import { AttachPicker } from '@/components/game/AttachPicker';
 import { AnnotationEditor } from '@/components/game/AnnotationEditor';
 import { GivePicker } from '@/components/game/GivePicker';
+import { RevealHandPicker } from '@/components/game/RevealHandPicker';
 import { AttackTargetPicker, type AttackTargetOption } from '@/components/game/AttackTargetPicker';
 import { BlockTargetPicker, type BlockAttackerOption } from '@/components/game/BlockTargetPicker';
 import { AddTokenModal } from '@/components/game/AddTokenModal';
@@ -125,6 +126,7 @@ export default function GameTablePage() {
   const [attachPicker, setAttachPicker] = useState<{ instanceId: string; name: string } | null>(null);
   const [annotationEditor, setAnnotationEditor] = useState<{ instanceId: string; name: string } | null>(null);
   const [givePicker, setGivePicker] = useState<{ instanceId: string; name: string } | null>(null);
+  const [revealHandOpen, setRevealHandOpen] = useState(false);
   const [attackPicker, setAttackPicker] = useState<{ instanceId: string; name: string } | null>(null);
   const [blockPicker, setBlockPicker] = useState<{ instanceId: string; name: string } | null>(null);
   const [addTokenOpen, setAddTokenOpen] = useState(false);
@@ -968,7 +970,7 @@ export default function GameTablePage() {
           onExileTop={() => sendAction({ type: 'MOVE_CARD', fromZone: 'library', toZone: 'exile' })}
           onLookAtTop={(count) => sendAction({ type: 'REORDER_TOP', count })}
           onRandomDiscard={() => sendAction({ type: 'RANDOM_DISCARD' })}
-          onRevealHand={() => sendAction({ type: 'REVEAL_HAND' })}
+          onRevealHand={() => setRevealHandOpen(true)}
           onShuffle={() => sendAction({ type: 'SHUFFLE_LIBRARY' })}
           onMulligan={() => sendAction({ type: 'MULLIGAN' })}
           onResetLife={() => sendAction({ type: 'RESET_LIFE' })}
@@ -1522,6 +1524,15 @@ export default function GameTablePage() {
             setGivePicker(null);
           }}
           onClose={() => setGivePicker(null)}
+        />
+      )}
+
+      {revealHandOpen && me && (
+        <RevealHandPicker
+          players={state.players.filter((p) => p.seat !== me.seat).map((p) => ({ seat: p.seat, name: p.displayName }))}
+          onRevealToAll={() => sendAction({ type: 'REVEAL_HAND' })}
+          onRevealToSeats={(seats) => sendAction({ type: 'REVEAL_HAND', targetSeats: seats })}
+          onClose={() => setRevealHandOpen(false)}
         />
       )}
 

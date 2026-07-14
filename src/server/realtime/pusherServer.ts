@@ -52,6 +52,11 @@ export async function broadcastGameLog(gameId: string, event: unknown): Promise<
   await getPusher().trigger(presenceGameChannel(gameId), 'game:log', event);
 }
 
+export async function broadcastPrivateGameLog(gameId: string, seats: number[], event: unknown): Promise<void> {
+  const pusher = getPusher();
+  await Promise.all(seats.map((seat) => pusher.trigger(privateSeatChannel(gameId, seat), 'game:log', event)));
+}
+
 /** Relays a WebRTC signaling message (offer/answer/ICE candidate/join/leave)
  * to every client subscribed to the game's presence channel; each client
  * filters locally by `target`/`from`. This is a server-triggered relay

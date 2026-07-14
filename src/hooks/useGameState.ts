@@ -107,6 +107,9 @@ export function useGameState(gameId: string) {
           setState(s);
           stateRef.current = s;
         });
+        seatChannel.bind('game:log', (event: GameLogEntry) => {
+          setLog((prev) => mergeLogEntries(prev, [event]));
+        });
       }
 
       const eventsRes = await fetch(`/api/games/${gameId}/events`);
